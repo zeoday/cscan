@@ -52,6 +52,10 @@ export function updateTask(data) {
   return request.post('/task/update', data)
 }
 
+export function getTaskDetail(data) {
+  return request.post('/task/detail', data)
+}
+
 export function getTaskLogs(data) {
   return request.post('/task/logs', data)
 }

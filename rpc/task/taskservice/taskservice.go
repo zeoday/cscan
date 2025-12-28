@@ -7,7 +7,7 @@ package taskservice
 import (
 	"context"
 
-	"cscan/rpc/task/pb/pb"
+	"cscan/rpc/task/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
@@ -28,6 +28,8 @@ type (
 	GetPocByIdResp             = pb.GetPocByIdResp
 	GetPocValidationResultReq  = pb.GetPocValidationResultReq
 	GetPocValidationResultResp = pb.GetPocValidationResultResp
+	GetSubfinderProvidersReq   = pb.GetSubfinderProvidersReq
+	GetSubfinderProvidersResp  = pb.GetSubfinderProvidersResp
 	GetTemplatesByIdsReq       = pb.GetTemplatesByIdsReq
 	GetTemplatesByIdsResp      = pb.GetTemplatesByIdsResp
 	GetTemplatesByTagsReq      = pb.GetTemplatesByTagsReq
@@ -49,6 +51,7 @@ type (
 	SaveTaskResultResp         = pb.SaveTaskResultResp
 	SaveVulResultReq           = pb.SaveVulResultReq
 	SaveVulResultResp          = pb.SaveVulResultResp
+	SubfinderProviderDocument  = pb.SubfinderProviderDocument
 	UpdateTaskReq              = pb.UpdateTaskReq
 	UpdateTaskResp             = pb.UpdateTaskResp
 	ValidateFingerprintReq     = pb.ValidateFingerprintReq
@@ -92,6 +95,8 @@ type (
 		GetTemplatesByIds(ctx context.Context, in *GetTemplatesByIdsReq, opts ...grpc.CallOption) (*GetTemplatesByIdsResp, error)
 		// 获取HTTP服务映射
 		GetHttpServiceMappings(ctx context.Context, in *GetHttpServiceMappingsReq, opts ...grpc.CallOption) (*GetHttpServiceMappingsResp, error)
+		// 获取Subfinder数据源配置
+		GetSubfinderProviders(ctx context.Context, in *GetSubfinderProvidersReq, opts ...grpc.CallOption) (*GetSubfinderProvidersResp, error)
 	}
 
 	defaultTaskService struct {
@@ -205,4 +210,10 @@ func (m *defaultTaskService) GetTemplatesByIds(ctx context.Context, in *GetTempl
 func (m *defaultTaskService) GetHttpServiceMappings(ctx context.Context, in *GetHttpServiceMappingsReq, opts ...grpc.CallOption) (*GetHttpServiceMappingsResp, error) {
 	client := pb.NewTaskServiceClient(m.cli.Conn())
 	return client.GetHttpServiceMappings(ctx, in, opts...)
+}
+
+// 获取Subfinder数据源配置
+func (m *defaultTaskService) GetSubfinderProviders(ctx context.Context, in *GetSubfinderProvidersReq, opts ...grpc.CallOption) (*GetSubfinderProvidersResp, error) {
+	client := pb.NewTaskServiceClient(m.cli.Conn())
+	return client.GetSubfinderProviders(ctx, in, opts...)
 }

@@ -6,6 +6,12 @@ type BaseResp struct {
 	Msg  string `json:"msg"`
 }
 
+type BaseRespWithId struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Id   string `json:"id,omitempty"`
+}
+
 type PageReq struct {
 	Page     int `json:"page,default=1"`
 	PageSize int `json:"pageSize,default=20"`
@@ -234,20 +240,168 @@ type AssetHistoryResp struct {
 	List []AssetHistoryItem `json:"list"`
 }
 
+// ==================== 站点管理 ====================
+type SiteListReq struct {
+	Page       int    `json:"page,default=1"`
+	PageSize   int    `json:"pageSize,default=20"`
+	Site       string `json:"site,optional"`
+	Title      string `json:"title,optional"`
+	App        string `json:"app,optional"`
+	HttpStatus string `json:"httpStatus,optional"`
+	OrgId      string `json:"orgId,optional"`
+}
+
+type Site struct {
+	Id         string   `json:"id"`
+	Site       string   `json:"site"`
+	Title      string   `json:"title"`
+	IP         string   `json:"ip"`
+	Port       int      `json:"port"`
+	Service    string   `json:"service"`
+	HttpStatus string   `json:"httpStatus"`
+	App        []string `json:"app"`
+	Screenshot string   `json:"screenshot"`
+	Location   string   `json:"location"`
+	OrgId      string   `json:"orgId,omitempty"`
+	OrgName    string   `json:"orgName,omitempty"`
+	UpdateTime string   `json:"updateTime"`
+	HttpHeader string   `json:"httpHeader,omitempty"`
+	IconHash   string   `json:"iconHash,omitempty"`
+}
+
+type SiteListResp struct {
+	Code  int    `json:"code"`
+	Msg   string `json:"msg"`
+	Total int    `json:"total"`
+	List  []Site `json:"list"`
+}
+
+type SiteStatResp struct {
+	Code       int `json:"code"`
+	Total      int `json:"total"`
+	HttpCount  int `json:"httpCount"`
+	HttpsCount int `json:"httpsCount"`
+	NewCount   int `json:"newCount"`
+}
+
+// ==================== 域名管理 ====================
+type DomainListReq struct {
+	Page       int    `json:"page,default=1"`
+	PageSize   int    `json:"pageSize,default=20"`
+	Domain     string `json:"domain,optional"`
+	RootDomain string `json:"rootDomain,optional"`
+	IP         string `json:"ip,optional"`
+	OrgId      string `json:"orgId,optional"`
+}
+
+type Domain struct {
+	Id         string   `json:"id"`
+	Domain     string   `json:"domain"`
+	RootDomain string   `json:"rootDomain"`
+	IPs        []string `json:"ips"`
+	CName      string   `json:"cname"`
+	Source     string   `json:"source"`
+	OrgId      string   `json:"orgId,omitempty"`
+	OrgName    string   `json:"orgName,omitempty"`
+	IsNew      bool     `json:"isNew"`
+	CreateTime string   `json:"createTime"`
+}
+
+type DomainListResp struct {
+	Code  int      `json:"code"`
+	Msg   string   `json:"msg"`
+	Total int      `json:"total"`
+	List  []Domain `json:"list"`
+}
+
+type DomainStatResp struct {
+	Code            int `json:"code"`
+	Total           int `json:"total"`
+	RootDomainCount int `json:"rootDomainCount"`
+	ResolvedCount   int `json:"resolvedCount"`
+	NewCount        int `json:"newCount"`
+}
+
+type DomainDeleteReq struct {
+	Id string `json:"id"`
+}
+
+type DomainBatchDeleteReq struct {
+	Ids []string `json:"ids"`
+}
+
+// ==================== IP管理 ====================
+type IPListReq struct {
+	Page     int    `json:"page,default=1"`
+	PageSize int    `json:"pageSize,default=20"`
+	IP       string `json:"ip,optional"`
+	Port     string `json:"port,optional"`
+	Service  string `json:"service,optional"`
+	Location string `json:"location,optional"`
+	OrgId    string `json:"orgId,optional"`
+}
+
+type PortInfo struct {
+	Port    int    `json:"port"`
+	Service string `json:"service"`
+}
+
+type IPAsset struct {
+	Id          string     `json:"id"`
+	IP          string     `json:"ip"`
+	Location    string     `json:"location"`
+	ASN         string     `json:"asn,omitempty"`
+	ISP         string     `json:"isp,omitempty"`
+	Ports       []PortInfo `json:"ports"`
+	Domains     []string   `json:"domains"`
+	DomainCount int        `json:"domainCount"`
+	OrgId       string     `json:"orgId,omitempty"`
+	OrgName     string     `json:"orgName,omitempty"`
+	UpdateTime  string     `json:"updateTime"`
+	IsNew       bool       `json:"isNew"`
+}
+
+type IPListResp struct {
+	Code  int       `json:"code"`
+	Msg   string    `json:"msg"`
+	Total int       `json:"total"`
+	List  []IPAsset `json:"list"`
+}
+
+type IPStatResp struct {
+	Code         int `json:"code"`
+	Total        int `json:"total"`
+	PortCount    int `json:"portCount"`
+	ServiceCount int `json:"serviceCount"`
+	NewCount     int `json:"newCount"`
+}
+
+type IPDeleteReq struct {
+	IP string `json:"ip"`
+}
+
+type IPBatchDeleteReq struct {
+	IPs []string `json:"ips"`
+}
+
 // ==================== 任务管理 ====================
 type MainTask struct {
 	Id           string `json:"id"`
 	TaskId       string `json:"taskId"` // UUID，用于日志查询
 	Name         string `json:"name"`
 	Target       string `json:"target"`
+	Config       string `json:"config"`       // 任务配置JSON
 	ProfileId    string `json:"profileId"`
 	ProfileName  string `json:"profileName"`
 	Status       string `json:"status"`
+	CurrentPhase string `json:"currentPhase"` // 当前执行阶段
 	Progress     int    `json:"progress"`
 	Result       string `json:"result"`
 	IsCron       bool   `json:"isCron"`
 	CronRule     string `json:"cronRule"`
 	CreateTime   string `json:"createTime"`
+	StartTime    string `json:"startTime"`  // 开始时间
+	EndTime      string `json:"endTime"`    // 结束时间
 	SubTaskCount int    `json:"subTaskCount"` // 子任务总数
 	SubTaskDone  int    `json:"subTaskDone"`  // 已完成子任务数
 }
@@ -472,6 +626,7 @@ type Worker struct {
 	MemUsed      float64           `json:"memUsed"`
 	TaskCount    int               `json:"taskCount"`    // 已执行任务数
 	RunningCount int               `json:"runningCount"` // 正在执行任务数
+	Concurrency  int               `json:"concurrency"`  // 并发数
 	Status       string            `json:"status"`
 	UpdateTime   string            `json:"updateTime"`
 	Tools        map[string]bool   `json:"tools"`        // 工具安装状态
@@ -507,6 +662,16 @@ type WorkerRestartReq struct {
 }
 
 type WorkerRestartResp struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+}
+
+type WorkerSetConcurrencyReq struct {
+	Name        string `json:"name"`        // Worker名称
+	Concurrency int    `json:"concurrency"` // 新的并发数
+}
+
+type WorkerSetConcurrencyResp struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
 }
@@ -1094,4 +1259,43 @@ type GetScanConfigResp struct {
 	Code   int    `json:"code"`
 	Msg    string `json:"msg"`
 	Config string `json:"config"` // 扫描配置JSON
+}
+
+// ==================== Subfinder数据源配置 ====================
+type SubfinderProvider struct {
+	Id          string   `json:"id"`
+	Provider    string   `json:"provider"`    // 数据源名称
+	Keys        []string `json:"keys"`        // API密钥列表（脱敏后）
+	Status      string   `json:"status"`      // enable/disable
+	Description string   `json:"description"` // 描述
+	CreateTime  string   `json:"createTime"`
+	UpdateTime  string   `json:"updateTime"`
+}
+
+type SubfinderProviderListResp struct {
+	Code int                 `json:"code"`
+	Msg  string              `json:"msg"`
+	List []SubfinderProvider `json:"list"`
+}
+
+type SubfinderProviderSaveReq struct {
+	Provider    string   `json:"provider"`              // 数据源名称
+	Keys        []string `json:"keys"`                  // API密钥列表
+	Status      string   `json:"status,optional"`       // enable/disable
+	Description string   `json:"description,optional"`  // 描述
+}
+
+// SubfinderProviderMeta 数据源元信息（用于前端展示）
+type SubfinderProviderMeta struct {
+	Provider    string `json:"provider"`    // 数据源标识
+	Name        string `json:"name"`        // 显示名称
+	Description string `json:"description"` // 描述
+	KeyFormat   string `json:"keyFormat"`   // 密钥格式说明
+	URL         string `json:"url"`         // 获取API密钥的URL
+}
+
+type SubfinderProviderInfoResp struct {
+	Code int                     `json:"code"`
+	Msg  string                  `json:"msg"`
+	List []SubfinderProviderMeta `json:"list"`
 }

@@ -49,6 +49,18 @@
             <span v-else>0</span>
           </template>
         </el-table-column>
+        <el-table-column prop="concurrency" label="并发数" width="100">
+          <template #default="{ row }">
+            <span 
+              class="editable-name" 
+              @click="openConcurrencyDialog(row)"
+              :title="'点击修改并发数'"
+            >
+              {{ row.concurrency || 5 }}
+              <el-icon class="edit-icon"><Edit /></el-icon>
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
             <div>
@@ -109,6 +121,30 @@
       <template #footer>
         <el-button @click="renameDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitRename" :loading="renameLoading">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 并发数编辑对话框 -->
+    <el-dialog v-model="concurrencyDialogVisible" title="修改并发数" width="400px">
+      <el-form :model="concurrencyForm" label-width="80px">
+        <el-form-item label="Worker">
+          <el-input v-model="concurrencyForm.name" disabled />
+        </el-form-item>
+        <el-form-item label="并发数">
+          <el-input-number v-model="concurrencyForm.concurrency" :min="1" :max="100" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">范围: 1-100</span>
+        </el-form-item>
+        <el-form-item>
+          <el-alert type="info" :closable="false" show-icon>
+            <template #title>
+              减少并发数立即生效；增加并发数需要重启Worker
+            </template>
+          </el-alert>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="concurrencyDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitConcurrency" :loading="concurrencyLoading">确定</el-button>
       </template>
     </el-dialog>
 
@@ -232,6 +268,14 @@ const renameLoading = ref(false)
 const renameForm = reactive({
   oldName: '',
   newName: ''
+})
+
+// 并发数编辑相关
+const concurrencyDialogVisible = ref(false)
+const concurrencyLoading = ref(false)
+const concurrencyForm = reactive({
+  name: '',
+  concurrency: 5
 })
 
 onMounted(() => {
@@ -415,6 +459,39 @@ function openRenameDialog(row) {
   renameForm.oldName = row.name
   renameForm.newName = row.name
   renameDialogVisible.value = true
+}
+
+function openConcurrencyDialog(row) {
+  concurrencyForm.name = row.name
+  concurrencyForm.concurrency = row.concurrency || 5
+  concurrencyDialogVisible.value = true
+}
+
+async function submitConcurrency() {
+  if (concurrencyForm.concurrency < 1 || concurrencyForm.concurrency > 100) {
+    ElMessage.warning('并发数必须在1-100之间')
+    return
+  }
+
+  concurrencyLoading.value = true
+  try {
+    const res = await request.post('/worker/concurrency', {
+      name: concurrencyForm.name,
+      concurrency: concurrencyForm.concurrency
+    })
+    if (res.code === 0) {
+      ElMessage.success('并发数设置命令已发送')
+      concurrencyDialogVisible.value = false
+      // 延迟刷新，等待Worker更新状态
+      setTimeout(() => loadData(), 1000)
+    } else {
+      ElMessage.error(res.msg || '设置失败')
+    }
+  } catch (e) {
+    ElMessage.error('设置失败: ' + e.message)
+  } finally {
+    concurrencyLoading.value = false
+  }
 }
 
 async function submitRename() {

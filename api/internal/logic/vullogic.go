@@ -118,6 +118,15 @@ func (l *VulLogic) VulBatchDelete(req *types.VulBatchDeleteReq, workspaceId stri
 	return &types.BaseResp{Code: 0, Msg: "成功删除 " + strconv.FormatInt(deleted, 10) + " 条记录"}, nil
 }
 
+func (l *VulLogic) VulClear(workspaceId string) (resp *types.BaseResp, err error) {
+	vulModel := l.svcCtx.GetVulModel(workspaceId)
+	deleted, err := vulModel.Clear(l.ctx)
+	if err != nil {
+		return &types.BaseResp{Code: 500, Msg: "清空失败: " + err.Error()}, nil
+	}
+	return &types.BaseResp{Code: 0, Msg: "成功清空 " + strconv.FormatInt(deleted, 10) + " 条漏洞"}, nil
+}
+
 
 // VulStatLogic 漏洞统计逻辑
 type VulStatLogic struct {

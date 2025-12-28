@@ -40,6 +40,8 @@ service TaskService {
   rpc GetTemplatesByIds(GetTemplatesByIdsReq) returns (GetTemplatesByIdsResp);
   // 获取HTTP服务映射
   rpc GetHttpServiceMappings(GetHttpServiceMappingsReq) returns (GetHttpServiceMappingsResp);
+  // 获取Subfinder数据源配置
+  rpc GetSubfinderProviders(GetSubfinderProvidersReq) returns (GetSubfinderProvidersResp);
 }
 
 message CheckTaskReq {
@@ -105,6 +107,7 @@ message AssetDocument {
   repeated IPV6 ipv6 = 19;
   string screenshot = 20;
   bool isHttp = 21;
+  string source = 22;  // 资产来源: subfinder, portscan, etc.
 }
 
 message IPV4 {
@@ -415,5 +418,27 @@ message GetHttpServiceMappingsResp {
   bool success = 1;
   string message = 2;
   repeated HttpServiceMappingDocument mappings = 3;
+  int32 count = 4;
+}
+
+// 获取Subfinder数据源配置请求
+message GetSubfinderProvidersReq {
+  string workspaceId = 1;
+}
+
+// Subfinder数据源配置
+message SubfinderProviderDocument {
+  string id = 1;
+  string provider = 2;
+  repeated string keys = 3;
+  string status = 4;
+  string description = 5;
+}
+
+// 获取Subfinder数据源配置响应
+message GetSubfinderProvidersResp {
+  bool success = 1;
+  string message = 2;
+  repeated SubfinderProviderDocument providers = 3;
   int32 count = 4;
 }

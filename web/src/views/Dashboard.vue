@@ -3,6 +3,46 @@
     <el-row :gutter="20">
       <!-- 左侧主区域 -->
       <el-col :span="16">
+        
+        <!-- 资产统计 -->
+        <div class="dark-card">
+          <div class="card-header">
+            <span class="card-title">资产统计</span>
+            <el-icon class="card-icon"><Monitor /></el-icon>
+          </div>
+          <div class="asset-stats">
+            <div class="asset-stat-item">
+              <span class="asset-count">{{ assetStats.totalAsset }}</span>
+              <span class="asset-label">资产</span>
+            </div>
+            <div class="asset-stat-item">
+              <span class="asset-count">{{ assetStats.totalHost }}</span>
+              <span class="asset-label">主机</span>
+            </div>
+            <div class="asset-stat-item">
+              <span class="asset-count">{{ assetStats.totalService }}</span>
+              <span class="asset-label">服务</span>
+            </div>
+            <div class="asset-stat-item">
+              <span class="asset-count">{{ assetStats.totalApp }}</span>
+              <span class="asset-label">应用</span>
+            </div>
+          </div>
+          <div class="asset-category-section">
+            <div class="chart-title">资产分类</div>
+            <div class="category-list">
+              <div v-for="item in assetCategories" :key="item.name" class="category-item">
+                <span class="category-name">{{ item.name }}</span>
+                <div class="category-bar">
+                  <div class="category-bar-fill" :style="{ width: item.percent + '%' }"></div>
+                </div>
+                <span class="category-count">{{ item.count }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="view-all-btn" @click="$router.push('/asset')">查看全部</div>
+        </div>
+        
         <!-- 漏洞统计 -->
         <div class="dark-card">
           <div class="card-header">
@@ -43,44 +83,6 @@
           <div class="view-all-btn" @click="$router.push('/vul')">查看全部</div>
         </div>
 
-        <!-- 资产统计 -->
-        <div class="dark-card">
-          <div class="card-header">
-            <span class="card-title">资产统计</span>
-            <el-icon class="card-icon"><Monitor /></el-icon>
-          </div>
-          <div class="asset-stats">
-            <div class="asset-stat-item">
-              <span class="asset-count">{{ assetStats.totalAsset }}</span>
-              <span class="asset-label">资产</span>
-            </div>
-            <div class="asset-stat-item">
-              <span class="asset-count">{{ assetStats.totalHost }}</span>
-              <span class="asset-label">主机</span>
-            </div>
-            <div class="asset-stat-item">
-              <span class="asset-count">{{ assetStats.totalService }}</span>
-              <span class="asset-label">服务</span>
-            </div>
-            <div class="asset-stat-item">
-              <span class="asset-count">{{ assetStats.totalApp }}</span>
-              <span class="asset-label">应用</span>
-            </div>
-          </div>
-          <div class="asset-category-section">
-            <div class="chart-title">资产分类</div>
-            <div class="category-list">
-              <div v-for="item in assetCategories" :key="item.name" class="category-item">
-                <span class="category-name">{{ item.name }}</span>
-                <div class="category-bar">
-                  <div class="category-bar-fill" :style="{ width: item.percent + '%' }"></div>
-                </div>
-                <span class="category-count">{{ item.count }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="view-all-btn" @click="$router.push('/asset')">查看全部</div>
-        </div>
 
         <!-- 任务效率统计 -->
         <div class="dark-card">

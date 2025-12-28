@@ -16,6 +16,10 @@ export function batchDeleteAsset(data) {
   return request.post('/asset/batchDelete', data)
 }
 
+export function clearAsset() {
+  return request.post('/asset/clear', {})
+}
+
 export function getAssetHistory(data) {
   return request.post('/asset/history', data)
 }

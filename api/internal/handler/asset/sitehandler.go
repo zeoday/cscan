@@ -1,0 +1,47 @@
+package asset
+
+import (
+	"net/http"
+
+	"cscan/api/internal/logic"
+	"cscan/api/internal/middleware"
+	"cscan/api/internal/svc"
+	"cscan/api/internal/types"
+	"cscan/pkg/response"
+
+	"github.com/zeromicro/go-zero/rest/httpx"
+)
+
+// SiteListHandler 站点列表
+func SiteListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.SiteListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		workspaceId := middleware.GetWorkspaceId(r.Context())
+		l := logic.NewSiteLogic(r.Context(), svcCtx)
+		resp, err := l.SiteList(&req, workspaceId)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// SiteStatHandler 站点统计
+func SiteStatHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		workspaceId := middleware.GetWorkspaceId(r.Context())
+		l := logic.NewSiteLogic(r.Context(), svcCtx)
+		resp, err := l.SiteStat(workspaceId)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}

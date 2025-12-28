@@ -96,18 +96,96 @@ func (l *MainTaskListLogic) MainTaskList(req *types.MainTaskListReq, workspaceId
 	list := make([]types.MainTask, 0, len(tasks))
 	for _, t := range tasks {
 		progress := t.Progress
+		currentPhase := t.CurrentPhase
+		subTaskDone := t.SubTaskDone
 		
-		// 如果任务正在执行中，尝试从Redis获取实时进度
+		// 如果任务正在执行中，尝试从Redis获取实时进度和当前阶段
 		if t.Status == "STARTED" && l.svcCtx.RedisClient != nil {
-			key := fmt.Sprintf("cscan:task:progress:%s", t.TaskId)
-			if data, err := l.svcCtx.RedisClient.Get(l.ctx, key).Result(); err == nil && data != "" {
+			// 获取主任务的当前阶段
+			mainKey := fmt.Sprintf("cscan:task:progress:%s", t.TaskId)
+			if data, err := l.svcCtx.RedisClient.Get(l.ctx, mainKey).Result(); err == nil && data != "" {
 				var progressData struct {
-					Progress int `json:"progress"`
+					CurrentPhase string `json:"currentPhase"`
 				}
-				if json.Unmarshal([]byte(data), &progressData) == nil && progressData.Progress > progress {
-					progress = progressData.Progress
+				if json.Unmarshal([]byte(data), &progressData) == nil {
+					if progressData.CurrentPhase != "" {
+						currentPhase = progressData.CurrentPhase
+					}
 				}
 			}
+
+			// 计算整体进度
+			subTaskCount := t.SubTaskCount
+			if subTaskCount <= 0 {
+				subTaskCount = 1 // 兼容旧任务
+			}
+
+			if subTaskCount > 1 {
+				// 多子任务：遍历所有子任务，统计已完成数和运行中进度
+				completedCount := 0
+				runningProgress := 0
+				runningCount := 0
+
+				// 获取所有子任务的进度
+				for i := 0; i < subTaskCount; i++ {
+					subTaskId := fmt.Sprintf("%s-%d", t.TaskId, i)
+					subKey := fmt.Sprintf("cscan:task:progress:sub:%s", subTaskId)
+					if data, err := l.svcCtx.RedisClient.Get(l.ctx, subKey).Result(); err == nil && data != "" {
+						var subProgress struct {
+							Progress int `json:"progress"`
+						}
+						if json.Unmarshal([]byte(data), &subProgress) == nil {
+							if subProgress.Progress >= 100 {
+								// 已完成的子任务
+								completedCount++
+							} else if subProgress.Progress > 0 {
+								// 运行中的子任务
+								runningProgress += subProgress.Progress
+								runningCount++
+							}
+						}
+					}
+				}
+
+				// 使用实时统计的已完成数（取较大值，避免数据不一致）
+				if completedCount > subTaskDone {
+					subTaskDone = completedCount
+				}
+
+				// 计算整体进度
+				completedProgress := subTaskDone * 100
+				totalProgress := completedProgress
+				if runningCount > 0 {
+					totalProgress += runningProgress / runningCount // 取运行中子任务的平均进度
+				}
+				progress = totalProgress / subTaskCount
+				if progress > 99 && subTaskDone < subTaskCount {
+					progress = 99 // 未全部完成时最多显示99%
+				}
+			} else {
+				// 单任务或单批次：直接获取进度
+				subKey := fmt.Sprintf("cscan:task:progress:sub:%s", t.TaskId)
+				if data, err := l.svcCtx.RedisClient.Get(l.ctx, subKey).Result(); err == nil && data != "" {
+					var progressData struct {
+						Progress int `json:"progress"`
+					}
+					if json.Unmarshal([]byte(data), &progressData) == nil {
+						if progressData.Progress > progress {
+							progress = progressData.Progress
+						}
+					}
+				}
+			}
+		}
+
+		// 格式化开始时间和结束时间
+		startTime := ""
+		endTime := ""
+		if t.StartTime != nil {
+			startTime = t.StartTime.Format("2006-01-02 15:04:05")
+		}
+		if t.EndTime != nil {
+			endTime = t.EndTime.Format("2006-01-02 15:04:05")
 		}
 		
 		list = append(list, types.MainTask{
@@ -115,16 +193,20 @@ func (l *MainTaskListLogic) MainTaskList(req *types.MainTaskListReq, workspaceId
 			TaskId:       t.TaskId, // UUID，用于日志查询
 			Name:         t.Name,
 			Target:       t.Target,
+			Config:       t.Config,
 			ProfileId:    t.ProfileId,
 			ProfileName:  t.ProfileName,
 			Status:       t.Status,
+			CurrentPhase: currentPhase,
 			Progress:     progress,
 			Result:       t.Result,
 			IsCron:       t.IsCron,
 			CronRule:     t.CronRule,
 			CreateTime:   t.CreateTime.Format("2006-01-02 15:04:05"),
+			StartTime:    startTime,
+			EndTime:      endTime,
 			SubTaskCount: t.SubTaskCount,
-			SubTaskDone:  t.SubTaskDone,
+			SubTaskDone:  subTaskDone,
 		})
 	}
 
@@ -150,15 +232,15 @@ func NewMainTaskCreateLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Ma
 	}
 }
 
-func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, workspaceId string) (resp *types.BaseResp, err error) {
+func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, workspaceId string) (resp *types.BaseRespWithId, err error) {
 	l.Logger.Infof("MainTaskCreate: name=%s, workspaceId=%s", req.Name, workspaceId)
 
 	// 校验目标格式
 	if req.Target == "" {
-		return &types.BaseResp{Code: 400, Msg: "扫描目标不能为空"}, nil
+		return &types.BaseRespWithId{Code: 400, Msg: "扫描目标不能为空"}, nil
 	}
 	if validationErrors := common.ValidateTargets(req.Target); len(validationErrors) > 0 {
-		return &types.BaseResp{Code: 400, Msg: common.FormatValidationErrors(validationErrors)}, nil
+		return &types.BaseRespWithId{Code: 400, Msg: common.FormatValidationErrors(validationErrors)}, nil
 	}
 
 	taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
@@ -192,7 +274,7 @@ func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, works
 		// 从 profile 获取配置（兼容旧版）
 		profile, err := l.svcCtx.ProfileModel.FindById(l.ctx, req.ProfileId)
 		if err != nil {
-			return &types.BaseResp{Code: 400, Msg: "任务配置不存在"}, nil
+			return &types.BaseRespWithId{Code: 400, Msg: "任务配置不存在"}, nil
 		}
 		profileName = profile.Name
 		if profile.Config != "" {
@@ -225,12 +307,12 @@ func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, works
 
 	if err := taskModel.Insert(l.ctx, task); err != nil {
 		l.Logger.Errorf("MainTaskCreate: insert failed, taskId=%s, error=%v", taskId, err)
-		return &types.BaseResp{Code: 500, Msg: "创建任务失败: " + err.Error()}, nil
+		return &types.BaseRespWithId{Code: 500, Msg: "创建任务失败: " + err.Error()}, nil
 	}
 
 	l.Logger.Infof("Task created (not started): taskId=%s, workspaceId=%s", taskId, workspaceId)
 
-	return &types.BaseResp{Code: 0, Msg: "任务创建成功，请手动启动"}, nil
+	return &types.BaseRespWithId{Code: 0, Msg: "任务创建成功", Id: task.Id.Hex()}, nil
 }
 
 type TaskProfileListLogic struct {
@@ -430,76 +512,154 @@ func NewMainTaskRetryLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Mai
 	}
 }
 
-func (l *MainTaskRetryLogic) MainTaskRetry(req *types.MainTaskRetryReq, workspaceId string) (resp *types.BaseResp, err error) {
+func (l *MainTaskRetryLogic) MainTaskRetry(req *types.MainTaskRetryReq, workspaceId string) (resp *types.BaseRespWithId, err error) {
 	taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
 
 	// 获取原任务信息
-	task, err := taskModel.FindById(l.ctx, req.Id)
+	oldTask, err := taskModel.FindById(l.ctx, req.Id)
 	if err != nil {
-		return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
-	}
-
-	// 获取任务配置
-	profile, err := l.svcCtx.ProfileModel.FindById(l.ctx, task.ProfileId)
-	if err != nil {
-		return &types.BaseResp{Code: 400, Msg: "任务配置不存在"}, nil
-	}
-
-	// 生成新的任务ID
-	taskId := uuid.New().String()
-
-	// 重置任务状态
-	update := bson.M{
-		"task_id":  taskId,
-		"status":   "PENDING",
-		"progress": 0,
-		"result":   "",
-	}
-	if err := taskModel.Update(l.ctx, req.Id, update); err != nil {
-		return &types.BaseResp{Code: 500, Msg: "更新任务状态失败"}, nil
+		return &types.BaseRespWithId{Code: 400, Msg: "任务不存在"}, nil
 	}
 
 	// 构建任务配置
 	taskConfig := map[string]interface{}{
-		"target": task.Target,
+		"target": oldTask.Target,
 	}
-	if profile.Config != "" {
-		var profileConfig map[string]interface{}
-		if err := json.Unmarshal([]byte(profile.Config), &profileConfig); err == nil {
-			for k, v := range profileConfig {
+
+	// 优先使用任务自带的Config（资产管理下发的任务），否则从ProfileId获取
+	if oldTask.Config != "" {
+		// 任务自带配置（资产管理下发的任务）
+		var savedConfig map[string]interface{}
+		if err := json.Unmarshal([]byte(oldTask.Config), &savedConfig); err == nil {
+			for k, v := range savedConfig {
 				taskConfig[k] = v
 			}
 		}
+	} else if oldTask.ProfileId != "" {
+		// 从配置模板获取（任务管理创建的任务）
+		profile, err := l.svcCtx.ProfileModel.FindById(l.ctx, oldTask.ProfileId)
+		if err != nil {
+			return &types.BaseRespWithId{Code: 400, Msg: "任务配置不存在"}, nil
+		}
+		if profile.Config != "" {
+			var profileConfig map[string]interface{}
+			if err := json.Unmarshal([]byte(profile.Config), &profileConfig); err == nil {
+				for k, v := range profileConfig {
+					taskConfig[k] = v
+				}
+			}
+		}
+	} else {
+		return &types.BaseRespWithId{Code: 400, Msg: "任务配置不存在"}, nil
 	}
 
 	// 注入自定义POC和标签映射
 	taskConfig = common.InjectPocConfig(l.ctx, l.svcCtx, taskConfig, l.Logger)
 	configBytes, _ := json.Marshal(taskConfig)
 
-	// 发送任务到消息队列
-	schedTask := &scheduler.TaskInfo{
-		TaskId:      taskId,
-		MainTaskId:  task.Id.Hex(),
-		WorkspaceId: workspaceId,
-		TaskName:    task.Name,
+	// 创建新任务（而不是复用旧任务）
+	newTaskId := uuid.New().String()
+	newTask := &model.MainTask{
+		TaskId:      newTaskId,
+		Name:        oldTask.Name + " (重试)",
+		Target:      oldTask.Target,
+		ProfileId:   oldTask.ProfileId,
+		ProfileName: oldTask.ProfileName,
+		OrgId:       oldTask.OrgId,
 		Config:      string(configBytes),
-		Priority:    1,
-	}
-	l.Logger.Infof("Retrying task: taskId=%s, workspaceId=%s", taskId, workspaceId)
-	if err := l.svcCtx.Scheduler.PushTask(l.ctx, schedTask); err != nil {
-		l.Logger.Errorf("push task to queue failed: %v", err)
-		return &types.BaseResp{Code: 500, Msg: "任务入队失败"}, nil
 	}
 
-	// 保存任务信息到 Redis
-	taskInfoKey := "cscan:task:info:" + taskId
-	taskInfoData, _ := json.Marshal(map[string]string{
-		"workspaceId": workspaceId,
-		"mainTaskId":  task.Id.Hex(),
+	if err := taskModel.Insert(l.ctx, newTask); err != nil {
+		l.Logger.Errorf("MainTaskRetry: insert new task failed, error=%v", err)
+		return &types.BaseRespWithId{Code: 500, Msg: "创建新任务失败: " + err.Error()}, nil
+	}
+
+	// 从配置中获取批次大小，默认50
+	batchSize := 50
+	if bs, ok := taskConfig["batchSize"].(float64); ok && bs > 0 {
+		batchSize = int(bs)
+	}
+
+	// 使用目标拆分器判断是否需要拆分
+	splitter := scheduler.NewTargetSplitter(batchSize)
+	batches := splitter.SplitTargets(oldTask.Target)
+
+	l.Logger.Infof("Retry task %s target split into %d batches (batchSize=%d)", newTaskId, len(batches), batchSize)
+
+	// 更新新任务状态为PENDING，记录子任务数量
+	taskModel.Update(l.ctx, newTask.Id.Hex(), bson.M{
+		"status":         model.TaskStatusPending,
+		"sub_task_count": len(batches),
+		"sub_task_done":  0,
+	})
+
+	// 保存主任务信息到 Redis
+	taskInfoKey := "cscan:task:info:" + newTaskId
+	taskInfoData, _ := json.Marshal(map[string]interface{}{
+		"workspaceId":  workspaceId,
+		"mainTaskId":   newTask.Id.Hex(),
+		"subTaskCount": len(batches),
 	})
 	l.svcCtx.RedisClient.Set(l.ctx, taskInfoKey, taskInfoData, 24*time.Hour)
 
-	return &types.BaseResp{Code: 0, Msg: "任务已重新执行"}, nil
+	// 从配置中获取指定的 Worker 列表
+	var workers []string
+	if w, ok := taskConfig["workers"].([]interface{}); ok {
+		for _, v := range w {
+			if s, ok := v.(string); ok {
+				workers = append(workers, s)
+			}
+		}
+	}
+
+	// 为每个批次创建子任务并推送到队列
+	for i, batch := range batches {
+		// 复制配置并替换目标
+		subConfig := make(map[string]interface{})
+		for k, v := range taskConfig {
+			subConfig[k] = v
+		}
+		subConfig["target"] = batch
+		subConfig["subTaskIndex"] = i
+		subConfig["subTaskTotal"] = len(batches)
+		subConfigBytes, _ := json.Marshal(subConfig)
+
+		// 生成子任务ID
+		subTaskId := newTaskId
+		if len(batches) > 1 {
+			subTaskId = newTaskId + "-" + strconv.Itoa(i)
+		}
+
+		schedTask := &scheduler.TaskInfo{
+			TaskId:      subTaskId,
+			MainTaskId:  newTask.Id.Hex(),
+			WorkspaceId: workspaceId,
+			TaskName:    newTask.Name,
+			Config:      string(subConfigBytes),
+			Priority:    1,
+			Workers:     workers,
+		}
+
+		l.Logger.Infof("Pushing retry sub-task %d/%d: taskId=%s, targets=%d", i+1, len(batches), subTaskId, len(strings.Split(batch, "\n")))
+
+		if err := l.svcCtx.Scheduler.PushTask(l.ctx, schedTask); err != nil {
+			l.Logger.Errorf("push retry task to queue failed: %v", err)
+			continue
+		}
+
+		// 保存子任务信息到 Redis（多批次时）
+		if len(batches) > 1 {
+			subTaskInfoKey := "cscan:task:info:" + subTaskId
+			subTaskInfoData, _ := json.Marshal(map[string]interface{}{
+				"workspaceId":  workspaceId,
+				"mainTaskId":   newTask.Id.Hex(),
+				"subTaskCount": len(batches),
+			})
+			l.svcCtx.RedisClient.Set(l.ctx, subTaskInfoKey, subTaskInfoData, 24*time.Hour)
+		}
+	}
+
+	return &types.BaseRespWithId{Code: 0, Msg: "已创建新任务并开始执行", Id: newTask.Id.Hex()}, nil
 }
 
 
@@ -782,10 +942,12 @@ func (l *MainTaskStopLogic) MainTaskStop(req *types.MainTaskControlReq, workspac
 	ctrlKey := "cscan:task:ctrl:" + task.TaskId
 	l.svcCtx.RedisClient.Set(l.ctx, ctrlKey, "STOP", 24*time.Hour)
 
-	// 更新状态为STOPPED
+	// 更新状态为STOPPED，设置结束时间
+	now := time.Now()
 	update := bson.M{
-		"status": model.TaskStatusStopped,
-		"result": "任务已手动停止",
+		"status":   model.TaskStatusStopped,
+		"result":   "任务已手动停止",
+		"end_time": now,
 	}
 	if err := taskModel.Update(l.ctx, req.Id, update); err != nil {
 		return &types.BaseResp{Code: 500, Msg: "更新任务状态失败"}, nil

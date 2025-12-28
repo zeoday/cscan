@@ -85,6 +85,25 @@ func WorkerRestartHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+// WorkerSetConcurrencyHandler Worker设置并发数
+func WorkerSetConcurrencyHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.WorkerSetConcurrencyReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpx.OkJson(w, &types.WorkerSetConcurrencyResp{Code: 400, Msg: "参数解析失败"})
+			return
+		}
+
+		l := logic.NewWorkerSetConcurrencyLogic(r.Context(), svcCtx)
+		resp, err := l.WorkerSetConcurrency(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
 // WorkerLogsHandler SSE实时日志推送
 func WorkerLogsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

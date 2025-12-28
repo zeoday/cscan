@@ -2,7 +2,7 @@
   <div class="task-page">
     <!-- 操作栏 -->
     <el-card class="action-card">
-      <el-button type="primary" @click="showCreateDialog">
+      <el-button type="primary" @click="goToCreateTask">
         <el-icon><Plus /></el-icon>新建任务
       </el-button>
       <el-switch
@@ -25,9 +25,9 @@
         <el-table-column type="selection" width="50" />
         <el-table-column prop="name" label="任务名称" min-width="150" />
         <el-table-column prop="target" label="扫描目标" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
+            <el-tag :type="getStatusType(row.status)">{{ getStatusText(row) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="progress" label="进度" width="150">
@@ -47,10 +47,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="160" />
+        <el-table-column prop="startTime" label="开始时间" width="160">
+          <template #default="{ row }">
+            {{ row.startTime || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="endTime" label="结束时间" width="160">
+          <template #default="{ row }">
+            {{ row.endTime || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button v-if="row.status === 'CREATED'" type="success" link size="small" @click="handleStart(row)">启动</el-button>
-            <el-button v-if="row.status === 'CREATED'" type="warning" link size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status === 'CREATED'" type="warning" link size="small" @click="goToEditTask(row)">编辑</el-button>
             <el-button v-if="row.status === 'STARTED'" type="warning" link size="small" @click="handlePause(row)">暂停</el-button>
             <el-button v-if="row.status === 'PAUSED'" type="success" link size="small" @click="handleResume(row)">继续</el-button>
             <el-button v-if="['STARTED', 'PAUSED', 'PENDING'].includes(row.status)" type="danger" link size="small" @click="handleStop(row)">停止</el-button>
@@ -75,16 +85,18 @@
     </el-card>
 
     <!-- 任务详情对话框 -->
-    <el-dialog v-model="detailVisible" title="任务详情" width="700px">
+    <el-dialog v-model="detailVisible" title="任务详情" width="800px">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="任务名称">{{ currentTask.name }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="getStatusType(currentTask.status)">{{ currentTask.status }}</el-tag>
+          <el-tag :type="getStatusType(currentTask.status)">{{ getStatusText(currentTask) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="进度">
           <el-progress :percentage="currentTask.progress" :stroke-width="10" style="width: 150px" />
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ currentTask.createTime }}</el-descriptions-item>
+        <el-descriptions-item label="开始时间">{{ currentTask.startTime || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="结束时间">{{ currentTask.endTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="扫描目标" :span="2">
           <div style="max-height: 100px; overflow-y: auto; white-space: pre-wrap">{{ currentTask.target }}</div>
         </el-descriptions-item>
@@ -92,6 +104,74 @@
           <div style="max-height: 100px; overflow-y: auto">{{ currentTask.result || '-' }}</div>
         </el-descriptions-item>
       </el-descriptions>
+      
+      <!-- 任务配置详情 -->
+      <div v-if="parsedConfig" class="config-section">
+        <h4 style="margin: 15px 0 10px">扫描配置</h4>
+        <el-descriptions :column="3" border size="small">
+          <el-descriptions-item label="子域名扫描">
+            <el-tag :type="parsedConfig.domainscan?.enable ? 'success' : 'info'" size="small">
+              {{ parsedConfig.domainscan?.enable ? '开启' : '关闭' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="端口扫描">
+            <el-tag :type="parsedConfig.portscan?.enable !== false ? 'success' : 'info'" size="small">
+              {{ parsedConfig.portscan?.enable !== false ? '开启' : '关闭' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="端口识别">
+            <el-tag :type="parsedConfig.portidentify?.enable ? 'success' : 'info'" size="small">
+              {{ parsedConfig.portidentify?.enable ? '开启' : '关闭' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="指纹识别">
+            <el-tag :type="parsedConfig.fingerprint?.enable ? 'success' : 'info'" size="small">
+              {{ parsedConfig.fingerprint?.enable ? '开启' : '关闭' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="漏洞扫描">
+            <el-tag :type="parsedConfig.pocscan?.enable ? 'success' : 'info'" size="small">
+              {{ parsedConfig.pocscan?.enable ? '开启' : '关闭' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="任务拆分">
+            {{ parsedConfig.batchSize || 50 }} 个/批
+          </el-descriptions-item>
+        </el-descriptions>
+        
+        <!-- 端口扫描配置 -->
+        <div v-if="parsedConfig.portscan?.enable !== false" class="config-detail">
+          <el-descriptions :column="4" border size="small" title="端口扫描配置">
+            <el-descriptions-item label="扫描工具">{{ parsedConfig.portscan?.tool || 'naabu' }}</el-descriptions-item>
+            <el-descriptions-item label="端口范围">{{ parsedConfig.portscan?.ports || 'top100' }}</el-descriptions-item>
+            <el-descriptions-item label="扫描速率">{{ parsedConfig.portscan?.rate || 1000 }}</el-descriptions-item>
+            <el-descriptions-item label="端口阈值">{{ parsedConfig.portscan?.portThreshold || 100 }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+        
+        <!-- 指纹识别配置 -->
+        <div v-if="parsedConfig.fingerprint?.enable" class="config-detail">
+          <el-descriptions :column="4" border size="small" title="指纹识别配置">
+            <el-descriptions-item label="探测工具">
+              <el-tag :type="parsedConfig.fingerprint?.tool === 'httpx' ? 'primary' : 'success'" size="small">
+                {{ parsedConfig.fingerprint?.tool === 'httpx' ? 'Httpx' : 'Wappalyzer (内置)' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="Icon Hash">{{ parsedConfig.fingerprint?.iconHash ? '是' : '否' }}</el-descriptions-item>
+            <el-descriptions-item label="自定义指纹">{{ parsedConfig.fingerprint?.customEngine ? '是' : '否' }}</el-descriptions-item>
+            <el-descriptions-item label="网页截图">{{ parsedConfig.fingerprint?.screenshot ? '是' : '否' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+        
+        <!-- 漏洞扫描配置 -->
+        <div v-if="parsedConfig.pocscan?.enable" class="config-detail">
+          <el-descriptions :column="3" border size="small" title="漏洞扫描配置">
+            <el-descriptions-item label="自动扫描">{{ parsedConfig.pocscan?.autoScan ? '是' : '否' }}</el-descriptions-item>
+            <el-descriptions-item label="严重级别">{{ parsedConfig.pocscan?.severity || 'critical,high,medium' }}</el-descriptions-item>
+            <el-descriptions-item label="目标超时">{{ parsedConfig.pocscan?.targetTimeout || 600 }}秒</el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </div>
     </el-dialog>
 
     <!-- 新建/编辑任务对话框 - Tab页布局 -->
@@ -139,6 +219,55 @@
                 </el-form-item>
               </el-col>
             </el-row>
+          </el-form>
+        </el-tab-pane>
+
+        <!-- 子域名扫描 Tab -->
+        <el-tab-pane name="domainscan">
+          <template #label>
+            <span>子域名扫描 <el-tag v-if="form.domainscanEnable" type="success" size="small" style="margin-left:4px">开</el-tag></span>
+          </template>
+          <el-form label-width="120px" class="tab-form">
+            <el-form-item label="启用">
+              <el-switch v-model="form.domainscanEnable" />
+              <span class="form-hint">针对域名目标进行子域名枚举</span>
+            </el-form-item>
+            <template v-if="form.domainscanEnable">
+              <el-form-item label="使用Subfinder">
+                <el-switch v-model="form.domainscanSubfinder" />
+                <span class="form-hint">使用Subfinder进行子域名枚举</span>
+              </el-form-item>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="超时时间(秒)">
+                    <el-input-number v-model="form.domainscanTimeout" :min="60" :max="3600" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="最大枚举时间(分)">
+                    <el-input-number v-model="form.domainscanMaxEnumTime" :min="1" :max="60" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="速率限制">
+                    <el-input-number v-model="form.domainscanRateLimit" :min="0" :max="1000" style="width:100%" />
+                    <span class="form-hint">0=不限制</span>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-form-item label="扫描选项">
+                <el-checkbox v-model="form.domainscanRemoveWildcard">移除泛解析域名</el-checkbox>
+              </el-form-item>
+              <el-form-item label="DNS解析">
+                <el-checkbox v-model="form.domainscanResolveDNS">解析子域名DNS</el-checkbox>
+                <span class="form-hint">并发数由Worker设置控制</span>
+              </el-form-item>
+            </template>
+            <el-alert v-if="!form.domainscanEnable" type="info" :closable="false" show-icon>
+              <template #title>子域名扫描使用 Subfinder 对域名目标进行子域名枚举，发现的子域名将自动加入扫描目标</template>
+            </el-alert>
           </el-form>
         </el-tab-pane>
 
@@ -239,11 +368,13 @@
             </el-form-item>
             <template v-if="form.fingerprintEnable">
               <el-form-item label="探测工具">
-                <el-checkbox v-model="form.fingerprintHttpx">Httpx探测 (推荐)</el-checkbox>
+                <el-radio-group v-model="form.fingerprintTool">
+                  <el-radio label="httpx">Httpx (推荐)</el-radio>
+                  <el-radio label="builtin">Wappalyzer (内置)</el-radio>
+                </el-radio-group>
               </el-form-item>
               <el-form-item label="附加功能">
                 <el-checkbox v-model="form.fingerprintIconHash">Icon Hash</el-checkbox>
-                <el-checkbox v-model="form.fingerprintWappalyzer">Wappalyzer</el-checkbox>
                 <el-checkbox v-model="form.fingerprintCustomEngine">自定义指纹</el-checkbox>
                 <el-checkbox v-model="form.fingerprintScreenshot">网页截图</el-checkbox>
               </el-form-item>
@@ -251,11 +382,7 @@
                 <el-col :span="12">
                   <el-form-item label="超时(秒)">
                     <el-input-number v-model="form.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="并发数">
-                    <el-input-number v-model="form.fingerprintConcurrency" :min="1" :max="50" style="width:100%" />
+                    <span class="form-hint">并发数由Worker设置控制</span>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -335,6 +462,7 @@
         </el-select>
         <el-select v-model="logLevelFilter" placeholder="筛选级别" clearable size="small" style="width: 120px; margin-left: 10px">
           <el-option label="全部级别" value="" />
+          <el-option label="DEBUG" value="DEBUG" />
           <el-option label="INFO" value="INFO" />
           <el-option label="WARN" value="WARN" />
           <el-option label="ERROR" value="ERROR" />
@@ -410,6 +538,17 @@ const form = reactive({
   cronRule: '',
   workers: [],
   batchSize: 50,
+  // 子域名扫描
+  domainscanEnable: false,
+  domainscanSubfinder: true,
+  domainscanTimeout: 300,
+  domainscanMaxEnumTime: 10,
+  domainscanThreads: 10,
+  domainscanRateLimit: 0,
+  domainscanRemoveWildcard: true,
+  domainscanResolveDNS: true,
+  domainscanConcurrent: 50,
+  // 端口扫描
   portscanEnable: true,
   portscanTool: 'naabu',
   portscanRate: 1000,
@@ -422,13 +561,11 @@ const form = reactive({
   portidentifyTimeout: 30,
   portidentifyArgs: '',
   fingerprintEnable: true,
-  fingerprintHttpx: true,
+  fingerprintTool: 'httpx',
   fingerprintIconHash: true,
-  fingerprintWappalyzer: true,
   fingerprintCustomEngine: false,
   fingerprintScreenshot: false,
   fingerprintTimeout: 30,
-  fingerprintConcurrency: 10,
   pocscanEnable: false,
   pocscanAutoScan: true,
   pocscanAutomaticScan: true,
@@ -547,17 +684,60 @@ function getStatusType(status) {
   return map[status] || 'info'
 }
 
+// 获取状态显示文本（显示当前阶段而不是状态单词）
+function getStatusText(row) {
+  const statusMap = {
+    CREATED: '待启动',
+    PENDING: '等待执行',
+    PAUSED: '已暂停',
+    SUCCESS: '已完成',
+    FAILURE: '执行失败',
+    STOPPED: '已停止'
+  }
+  // 如果是执行中状态，显示当前阶段
+  if (row.status === 'STARTED') {
+    return row.currentPhase || '执行中'
+  }
+  return statusMap[row.status] || row.status
+}
+
+// 解析任务配置
+const parsedConfig = computed(() => {
+  if (!currentTask.value?.config) return null
+  try {
+    return JSON.parse(currentTask.value.config)
+  } catch (e) {
+    return null
+  }
+})
+
 function resetForm() {
   Object.assign(form, {
     id: '', name: '', target: '', workspaceId: '', orgId: '', isCron: false, cronRule: '', workers: [],
-    batchSize: 50, portscanEnable: true, portscanTool: 'naabu', portscanRate: 1000, ports: 'top100',
+    batchSize: 50,
+    // 子域名扫描
+    domainscanEnable: false, domainscanSubfinder: true, domainscanTimeout: 300, domainscanMaxEnumTime: 10,
+    domainscanThreads: 10, domainscanRateLimit: 0,
+    domainscanRemoveWildcard: true, domainscanResolveDNS: true, domainscanConcurrent: 50,
+    // 端口扫描
+    portscanEnable: true, portscanTool: 'naabu', portscanRate: 1000, ports: 'top100',
     portThreshold: 100, scanType: 'c', portscanTimeout: 60, skipHostDiscovery: false, portidentifyEnable: false, portidentifyTimeout: 30,
-    portidentifyArgs: '', fingerprintEnable: true, fingerprintHttpx: true, fingerprintIconHash: true,
-    fingerprintWappalyzer: true, fingerprintCustomEngine: false, fingerprintScreenshot: false,
-    fingerprintTimeout: 30, fingerprintConcurrency: 10, pocscanEnable: false, pocscanAutoScan: true,
+    portidentifyArgs: '', fingerprintEnable: true, fingerprintTool: 'httpx', fingerprintIconHash: true,
+    fingerprintCustomEngine: false, fingerprintScreenshot: false,
+    fingerprintTimeout: 30, pocscanEnable: false, pocscanAutoScan: true,
     pocscanAutomaticScan: true, pocscanCustomOnly: false, pocscanSeverity: ['critical', 'high', 'medium'],
     pocscanTargetTimeout: 600
   })
+}
+
+// 跳转到新建任务页面
+function goToCreateTask() {
+  router.push('/task/create')
+}
+
+// 跳转到编辑任务页面
+function goToEditTask(row) {
+  router.push({ path: '/task/create', query: { id: row.id } })
 }
 
 async function showCreateDialog() {
@@ -586,6 +766,19 @@ async function showCreateDialog() {
 function applyConfig(config) {
   Object.assign(form, {
     batchSize: config.batchSize || 50,
+    // 子域名扫描
+    domainscanEnable: config.domainscan?.enable ?? false,
+    domainscanSubfinder: config.domainscan?.subfinder ?? true,
+    domainscanTimeout: config.domainscan?.timeout || 300,
+    domainscanMaxEnumTime: config.domainscan?.maxEnumerationTime || 10,
+    domainscanThreads: config.domainscan?.threads || 10,
+    domainscanRateLimit: config.domainscan?.rateLimit || 0,
+    domainscanAll: config.domainscan?.all ?? false,
+    domainscanRecursive: config.domainscan?.recursive ?? false,
+    domainscanRemoveWildcard: config.domainscan?.removeWildcard ?? true,
+    domainscanResolveDNS: config.domainscan?.resolveDNS ?? true,
+    domainscanConcurrent: config.domainscan?.concurrent || 50,
+    // 端口扫描
     portscanEnable: config.portscan?.enable ?? true,
     portscanTool: config.portscan?.tool || 'naabu',
     portscanRate: config.portscan?.rate || 1000,
@@ -598,13 +791,11 @@ function applyConfig(config) {
     portidentifyTimeout: config.portidentify?.timeout || 30,
     portidentifyArgs: config.portidentify?.args || '',
     fingerprintEnable: config.fingerprint?.enable ?? true,
-    fingerprintHttpx: config.fingerprint?.httpx ?? true,
+    fingerprintTool: config.fingerprint?.tool || (config.fingerprint?.httpx ? 'httpx' : 'builtin'),
     fingerprintIconHash: config.fingerprint?.iconHash ?? true,
-    fingerprintWappalyzer: config.fingerprint?.wappalyzer ?? true,
     fingerprintCustomEngine: config.fingerprint?.customEngine ?? false,
     fingerprintScreenshot: config.fingerprint?.screenshot ?? false,
     fingerprintTimeout: config.fingerprint?.targetTimeout || 30,
-    fingerprintConcurrency: config.fingerprint?.concurrency || 10,
     pocscanEnable: config.pocscan?.enable ?? false,
     pocscanAutoScan: config.pocscan?.autoScan ?? true,
     pocscanAutomaticScan: config.pocscan?.automaticScan ?? true,
@@ -635,18 +826,21 @@ function handleEdit(row) {
 function buildConfig() {
   return {
     batchSize: form.batchSize,
+    domainscan: { enable: form.domainscanEnable, subfinder: form.domainscanSubfinder, timeout: form.domainscanTimeout, maxEnumerationTime: form.domainscanMaxEnumTime, threads: form.domainscanThreads, rateLimit: form.domainscanRateLimit, all: form.domainscanAll, recursive: form.domainscanRecursive, removeWildcard: form.domainscanRemoveWildcard, resolveDNS: form.domainscanResolveDNS, concurrent: form.domainscanConcurrent },
     portscan: { enable: form.portscanEnable, tool: form.portscanTool, rate: form.portscanRate, ports: form.ports, portThreshold: form.portThreshold, scanType: form.scanType, timeout: form.portscanTimeout, skipHostDiscovery: form.skipHostDiscovery },
     portidentify: { enable: form.portidentifyEnable, timeout: form.portidentifyTimeout, args: form.portidentifyArgs },
-    fingerprint: { enable: form.fingerprintEnable, httpx: form.fingerprintHttpx, iconHash: form.fingerprintIconHash, wappalyzer: form.fingerprintWappalyzer, customEngine: form.fingerprintCustomEngine, screenshot: form.fingerprintScreenshot, targetTimeout: form.fingerprintTimeout, concurrency: form.fingerprintConcurrency },
+    fingerprint: { enable: form.fingerprintEnable, tool: form.fingerprintTool, iconHash: form.fingerprintIconHash, customEngine: form.fingerprintCustomEngine, screenshot: form.fingerprintScreenshot, targetTimeout: form.fingerprintTimeout },
     pocscan: { enable: form.pocscanEnable, useNuclei: true, autoScan: form.pocscanAutoScan, automaticScan: form.pocscanAutomaticScan, customPocOnly: form.pocscanCustomOnly, severity: form.pocscanSeverity.join(','), targetTimeout: form.pocscanTargetTimeout }
   }
 }
 
 // 扫描配置字段列表（用于监听变化自动保存）
 const scanConfigFields = [
-  'batchSize', 'portscanEnable', 'portscanTool', 'portscanRate', 'ports', 'portThreshold', 'scanType', 'portscanTimeout', 'skipHostDiscovery',
+  'batchSize',
+  'domainscanEnable', 'domainscanSubfinder', 'domainscanTimeout', 'domainscanMaxEnumTime', 'domainscanThreads', 'domainscanRateLimit', 'domainscanAll', 'domainscanRecursive', 'domainscanRemoveWildcard', 'domainscanResolveDNS', 'domainscanConcurrent',
+  'portscanEnable', 'portscanTool', 'portscanRate', 'ports', 'portThreshold', 'scanType', 'portscanTimeout', 'skipHostDiscovery',
   'portidentifyEnable', 'portidentifyTimeout', 'portidentifyArgs',
-  'fingerprintEnable', 'fingerprintHttpx', 'fingerprintIconHash', 'fingerprintWappalyzer', 'fingerprintCustomEngine', 'fingerprintScreenshot', 'fingerprintTimeout', 'fingerprintConcurrency',
+  'fingerprintEnable', 'fingerprintTool', 'fingerprintIconHash', 'fingerprintCustomEngine', 'fingerprintScreenshot', 'fingerprintTimeout',
   'pocscanEnable', 'pocscanAutoScan', 'pocscanAutomaticScan', 'pocscanCustomOnly', 'pocscanSeverity', 'pocscanTargetTimeout'
 ]
 
@@ -708,9 +902,14 @@ async function handleBatchDelete() {
 }
 
 async function handleRetry(row) {
-  await ElMessageBox.confirm('确定重新执行该任务吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确定重新执行该任务吗？将创建一个新任务来执行。', '提示', { type: 'warning' })
   const res = await retryTask({ id: row.id })
-  res.code === 0 ? (ElMessage.success('任务已重新执行'), loadData()) : ElMessage.error(res.msg)
+  if (res.code === 0) {
+    ElMessage.success(res.msg || '已创建新任务并开始执行')
+    loadData()
+  } else {
+    ElMessage.error(res.msg)
+  }
 }
 
 async function handleStart(row) {
@@ -877,7 +1076,17 @@ function closeLogDialog() {
 .log-level { font-weight: bold; margin-right: 6px; min-width: 45px; display: inline-block; font-size: 11px; }
 .log-worker { color: #569cd6; margin-right: 6px; font-size: 11px; }
 .log-message { color: #d4d4d4; }
+.log-debug .log-level { color: #9e9e9e; }
 .log-info .log-level { color: #4fc3f7; }
 .log-warn .log-level, .log-warning .log-level { color: #ffb74d; }
 .log-error .log-level { color: #ef5350; }
+
+.config-section {
+  margin-top: 15px;
+  h4 { color: var(--el-text-color-primary); font-weight: 500; }
+}
+
+.config-detail {
+  margin-top: 10px;
+}
 </style>

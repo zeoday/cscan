@@ -36,6 +36,7 @@ const (
 	TaskService_GetPocById_FullMethodName             = "/task.TaskService/GetPocById"
 	TaskService_GetTemplatesByIds_FullMethodName      = "/task.TaskService/GetTemplatesByIds"
 	TaskService_GetHttpServiceMappings_FullMethodName = "/task.TaskService/GetHttpServiceMappings"
+	TaskService_GetSubfinderProviders_FullMethodName  = "/task.TaskService/GetSubfinderProviders"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -78,6 +79,8 @@ type TaskServiceClient interface {
 	GetTemplatesByIds(ctx context.Context, in *GetTemplatesByIdsReq, opts ...grpc.CallOption) (*GetTemplatesByIdsResp, error)
 	// 获取HTTP服务映射
 	GetHttpServiceMappings(ctx context.Context, in *GetHttpServiceMappingsReq, opts ...grpc.CallOption) (*GetHttpServiceMappingsResp, error)
+	// 获取Subfinder数据源配置
+	GetSubfinderProviders(ctx context.Context, in *GetSubfinderProvidersReq, opts ...grpc.CallOption) (*GetSubfinderProvidersResp, error)
 }
 
 type taskServiceClient struct {
@@ -258,6 +261,16 @@ func (c *taskServiceClient) GetHttpServiceMappings(ctx context.Context, in *GetH
 	return out, nil
 }
 
+func (c *taskServiceClient) GetSubfinderProviders(ctx context.Context, in *GetSubfinderProvidersReq, opts ...grpc.CallOption) (*GetSubfinderProvidersResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSubfinderProvidersResp)
+	err := c.cc.Invoke(ctx, TaskService_GetSubfinderProviders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -298,6 +311,8 @@ type TaskServiceServer interface {
 	GetTemplatesByIds(context.Context, *GetTemplatesByIdsReq) (*GetTemplatesByIdsResp, error)
 	// 获取HTTP服务映射
 	GetHttpServiceMappings(context.Context, *GetHttpServiceMappingsReq) (*GetHttpServiceMappingsResp, error)
+	// 获取Subfinder数据源配置
+	GetSubfinderProviders(context.Context, *GetSubfinderProvidersReq) (*GetSubfinderProvidersResp, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -358,6 +373,9 @@ func (UnimplementedTaskServiceServer) GetTemplatesByIds(context.Context, *GetTem
 }
 func (UnimplementedTaskServiceServer) GetHttpServiceMappings(context.Context, *GetHttpServiceMappingsReq) (*GetHttpServiceMappingsResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetHttpServiceMappings not implemented")
+}
+func (UnimplementedTaskServiceServer) GetSubfinderProviders(context.Context, *GetSubfinderProvidersReq) (*GetSubfinderProvidersResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSubfinderProviders not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -686,6 +704,24 @@ func _TaskService_GetHttpServiceMappings_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_GetSubfinderProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubfinderProvidersReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetSubfinderProviders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetSubfinderProviders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetSubfinderProviders(ctx, req.(*GetSubfinderProvidersReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -760,6 +796,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHttpServiceMappings",
 			Handler:    _TaskService_GetHttpServiceMappings_Handler,
+		},
+		{
+			MethodName: "GetSubfinderProviders",
+			Handler:    _TaskService_GetSubfinderProviders_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

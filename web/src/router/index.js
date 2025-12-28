@@ -21,10 +21,46 @@ const routes = [
         meta: { title: '工作台', icon: 'Odometer' }
       },
       {
+        path: 'asset-management',
+        name: 'AssetManagement',
+        component: () => import('@/views/AssetManagement.vue'),
+        meta: { title: '资产管理', icon: 'DataAnalysis' }
+      },
+      {
+        path: 'site',
+        name: 'Site',
+        component: () => import('@/views/Site.vue'),
+        meta: { title: '站点管理', icon: 'Monitor', hidden: true }
+      },
+      {
+        path: 'domain',
+        name: 'Domain',
+        component: () => import('@/views/Domain.vue'),
+        meta: { title: '域名管理', icon: 'Link', hidden: true }
+      },
+      {
+        path: 'ip',
+        name: 'IP',
+        component: () => import('@/views/IP.vue'),
+        meta: { title: 'IP管理', icon: 'Position', hidden: true }
+      },
+      {
         path: 'asset',
         name: 'Asset',
         component: () => import('@/views/Asset.vue'),
-        meta: { title: '资产管理', icon: 'Monitor' }
+        meta: { title: '资产管理', icon: 'Monitor', hidden: true }
+      },
+      {
+        path: 'task/create',
+        name: 'TaskCreate',
+        component: () => import('@/views/TaskCreate.vue'),
+        meta: { title: '新建任务', icon: 'List', hidden: true }
+      },
+      {
+        path: 'task/edit/:id',
+        name: 'TaskEdit',
+        component: () => import('@/views/TaskCreate.vue'),
+        meta: { title: '编辑任务', icon: 'List', hidden: true }
       },
       {
         path: 'task',
@@ -36,7 +72,7 @@ const routes = [
         path: 'vul',
         name: 'Vul',
         component: () => import('@/views/Vul.vue'),
-        meta: { title: '漏洞管理', icon: 'Warning' }
+        meta: { title: '漏洞管理', icon: 'Warning', hidden: true }
       },
       {
         path: 'online-search',
@@ -47,8 +83,8 @@ const routes = [
       {
         path: 'workspace',
         name: 'Workspace',
-        component: () => import('@/views/Workspace.vue'),
-        meta: { title: '工作空间', icon: 'Folder' }
+        redirect: '/settings?tab=workspace',
+        meta: { title: '工作空间', icon: 'Folder', hidden: true }
       },
       {
         path: 'worker',
@@ -77,14 +113,20 @@ const routes = [
       {
         path: 'user',
         name: 'User',
-        component: () => import('@/views/User.vue'),
-        meta: { title: '用户管理', icon: 'User', roles: ['superadmin'] }
+        redirect: '/settings?tab=user',
+        meta: { title: '用户管理', icon: 'User', roles: ['superadmin'], hidden: true }
       },
       {
         path: 'organization',
         name: 'Organization',
-        component: () => import('@/views/Organization.vue'),
-        meta: { title: '组织管理', icon: 'OfficeBuilding' }
+        redirect: '/settings?tab=organization',
+        meta: { title: '组织管理', icon: 'OfficeBuilding', hidden: true }
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/views/Settings.vue'),
+        meta: { title: '系统配置', icon: 'Setting' }
       }
     ]
   }

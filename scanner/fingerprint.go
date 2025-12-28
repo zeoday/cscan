@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"cscan/pkg/utils"
+
 	"github.com/chromedp/chromedp"
 	wappalyzer "github.com/projectdiscovery/wappalyzergo"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -66,15 +68,16 @@ func (s *FingerprintScanner) SetCustomFingerprintEngine(engine *CustomFingerprin
 
 // FingerprintOptions 指纹识别选项
 type FingerprintOptions struct {
-	Enable       bool `json:"enable"`
-	Httpx        bool `json:"httpx"`
-	Screenshot   bool `json:"screenshot"`
-	IconHash     bool `json:"iconHash"`
-	Wappalyzer   bool `json:"wappalyzer"`
-	CustomEngine bool `json:"customEngine"` // 使用自定义指纹引擎
-	Timeout      int  `json:"timeout"`      // 总超时时间(秒)，默认300秒
-	TargetTimeout int `json:"targetTimeout"` // 单个目标超时时间(秒)，默认30秒
-	Concurrency  int  `json:"concurrency"`  // 并发数，默认10
+	Enable       bool   `json:"enable"`
+	Tool         string `json:"tool"`         // 探测工具: httpx, builtin (默认httpx)
+	Httpx        bool   `json:"httpx"`        // 已废弃，兼容旧配置
+	Screenshot   bool   `json:"screenshot"`
+	IconHash     bool   `json:"iconHash"`
+	Wappalyzer   bool   `json:"wappalyzer"`
+	CustomEngine bool   `json:"customEngine"` // 使用自定义指纹引擎
+	Timeout      int    `json:"timeout"`      // 总超时时间(秒)，默认300秒
+	TargetTimeout int   `json:"targetTimeout"` // 单个目标超时时间(秒)，默认30秒
+	Concurrency  int    `json:"concurrency"`  // 并发数，默认10
 }
 
 
@@ -83,7 +86,7 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 	// 解析配置
 	opts := &FingerprintOptions{
 		Enable:        true,
-		Httpx:         true,
+		Tool:          "httpx", // 默认使用httpx
 		IconHash:      true,
 		Wappalyzer:    true,
 		CustomEngine:  true, // 默认启用自定义指纹引擎
@@ -100,6 +103,21 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 				json.Unmarshal(data, opts)
 			}
 		}
+	}
+
+	// 兼容旧配置：如果Tool为空但Httpx为true，使用httpx
+	if opts.Tool == "" {
+		if opts.Httpx {
+			opts.Tool = "httpx"
+		} else {
+			opts.Tool = "builtin"
+		}
+	}
+
+	// 根据工具选择自动设置 Wappalyzer
+	// httpx 自带技术检测，builtin 使用 wappalyzergo
+	if opts.Tool == "builtin" {
+		opts.Wappalyzer = true
 	}
 
 	// 设置默认值
@@ -129,58 +147,50 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 		return result, nil
 	}
 	
-	logx.Infof("Fingerprint: scanning %d HTTP assets, timeout %ds/target", len(httpAssets), opts.TargetTimeout)
-	taskLog("INFO", "Fingerprint: scanning %d HTTP assets, timeout %ds/target", len(httpAssets), opts.TargetTimeout)
-	// 检查httpx是否可用
-	httpxInstalled := checkHttpxInstalled()
-	useHttpx := opts.Httpx && httpxInstalled
+	logx.Infof("Fingerprint: scanning %d HTTP assets, tool=%s, timeout %ds/target", len(httpAssets), opts.Tool, opts.TargetTimeout)
+	taskLog("INFO", "Fingerprint: scanning %d HTTP assets, tool=%s, timeout %ds/target", len(httpAssets), opts.Tool, opts.TargetTimeout)
 
+	// 根据选择的工具执行扫描
+	useHttpx := opts.Tool == "httpx"
 	if useHttpx {
-		// httpx支持截图功能，如果同时启用httpx和screenshot，使用httpx的-screenshot参数
-		if opts.Screenshot {
-			logx.Info("Using httpx for fingerprint detection with screenshot enabled")
-			taskLog("DEBUG", "Using httpx for fingerprint detection with screenshot enabled")
-		} else {
-			logx.Info("Using httpx for fingerprint detection")
+		// 检查httpx是否可用
+		httpxInstalled := checkHttpxInstalled()
+		if httpxInstalled {
 			taskLog("DEBUG", "Using httpx for fingerprint detection")
+			s.runHttpx(ctx, httpAssets, opts)
+		} else {
+			logx.Info("httpx not installed, falling back to builtin method")
+			taskLog("WARN", "httpx not installed, falling back to builtin method")
+			useHttpx = false
 		}
-		s.runHttpx(ctx, httpAssets, opts)
-	} else if !opts.Httpx && opts.Screenshot {
-		logx.Info("Screenshot enabled without httpx, using builtin fingerprint method with chromedp")
-		taskLog("DEBUG", "Screenshot enabled without httpx, using builtin fingerprint method with chromedp")
-	} else if opts.Httpx && !httpxInstalled {
-		logx.Info("httpx not installed, using builtin fingerprint method")
-		taskLog("DEBUG", "httpx not installed, using builtin fingerprint method")
+	} else {
+		taskLog("DEBUG", "Using builtin method for fingerprint detection")
 	}
 
-	// 串行扫描每个目标，每个目标独立超时
+	// 扫描每个目标
 	for i, asset := range httpAssets {
 		select {
 		case <-ctx.Done():
 			logx.Info("Fingerprint scan cancelled by context")
 			return result, ctx.Err()
 		default:
-			// 如果没有使用httpx，或者httpx没有获取到信息，使用内置方法
-			if !useHttpx || (asset.Title == "" && asset.HttpStatus == "") {
-				logx.Debugf("Fingerprint [%d/%d]: %s:%d (builtin)", i+1, len(httpAssets), asset.Host, asset.Port)
+			// 如果使用httpx且已获取到基本信息，只执行附加功能
+			if useHttpx && asset.Title != "" && asset.HttpStatus != "" {
+				logx.Debugf("Fingerprint [%d/%d]: %s:%d (additional)", i+1, len(httpAssets), asset.Host, asset.Port)
 				taskLog("INFO", "Fingerprint [%d/%d]: %s:%d", i+1, len(httpAssets), asset.Host, asset.Port)
-				// 为单个目标创建超时上下文
 				targetCtx, targetCancel := context.WithTimeout(ctx, time.Duration(opts.TargetTimeout)*time.Second)
-				s.fingerprint(targetCtx, asset, opts)
+				s.runAdditionalFingerprint(targetCtx, asset, opts)
 				if targetCtx.Err() == context.DeadlineExceeded {
-					logx.Debugf("Fingerprint: %s:%d timeout after %ds", asset.Host, asset.Port, opts.TargetTimeout)
 					taskLog("WARN", "Fingerprint: %s:%d timeout", asset.Host, asset.Port)
 				}
 				targetCancel()
 			} else {
-				// 使用了httpx，但仍需执行勾选的其他功能（不包括截图，因为httpx已处理）
-				logx.Debugf("Fingerprint [%d/%d]: %s:%d (additional)", i+1, len(httpAssets), asset.Host, asset.Port)
+				// 使用内置方法完整扫描
+				logx.Debugf("Fingerprint [%d/%d]: %s:%d (builtin)", i+1, len(httpAssets), asset.Host, asset.Port)
 				taskLog("INFO", "Fingerprint [%d/%d]: %s:%d", i+1, len(httpAssets), asset.Host, asset.Port)
-				// 为单个目标创建超时上下文
 				targetCtx, targetCancel := context.WithTimeout(ctx, time.Duration(opts.TargetTimeout)*time.Second)
-				s.runAdditionalFingerprint(targetCtx, asset, opts)
+				s.fingerprint(targetCtx, asset, opts)
 				if targetCtx.Err() == context.DeadlineExceeded {
-					logx.Debugf("Fingerprint: %s:%d timeout after %ds", asset.Host, asset.Port, opts.TargetTimeout)
 					taskLog("WARN", "Fingerprint: %s:%d timeout", asset.Host, asset.Port)
 				}
 				targetCancel()
@@ -197,7 +207,7 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 	}
 
 	logx.Infof("Fingerprint: completed, scanned %d assets", len(httpAssets))
-	taskLog("Debug", "Fingerprint: completed, scanned %d assets", len(httpAssets))
+	taskLog("DEBUG", "Fingerprint: completed, scanned %d assets", len(httpAssets))
 	return result, nil
 }
 
@@ -299,7 +309,6 @@ func SetHttpServiceChecker(checker HttpServiceChecker) {
 }
 
 // runAdditionalFingerprint 执行额外的指纹识别功能（httpx已执行后）
-// 注意：截图功能由httpx的-screenshot参数处理，这里不再重复执行
 func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset *Asset, opts *FingerprintOptions) {
 	targetUrl := fmt.Sprintf("%s://%s:%d", asset.Service, asset.Host, asset.Port)
 	if asset.Service == "" {
@@ -369,14 +378,13 @@ func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset
 		}
 	}
 
-	// 如果启用Wappalyzer，进行检测
+	// 如果启用Wappalyzer，进行检测（httpx模式下通常不需要，但保留兼容性）
 	if opts.Wappalyzer && s.wappalyzerClient != nil {
 		apps := s.wappalyzerClient.Fingerprint(headers, []byte(asset.HttpBody))
 		logx.Debugf("Wappalyzer detected apps for %s:%d: %v", asset.Host, asset.Port, apps)
 		
 		for app := range apps {
 			appNameLower := strings.ToLower(app)
-			// 查找是否已有相同应用（使用小写key匹配）
 			if result, exists := appResults[appNameLower]; exists {
 				result.Sources = append(result.Sources, "wappalyzer")
 			} else {
@@ -389,22 +397,25 @@ func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset
 		}
 	}
 
-	// 如果启用IconHash且httpx没有获取到，单独获取MMH3 hash
+	// 获取 IconHash 和 MMH3 hash（用于自定义指纹匹配）
 	var faviconMMH3Hash string
-	if opts.IconHash && asset.IconHash == "" {
-		iconHash, iconData := s.getIconHashWithData(targetUrl)
-		if iconHash != "" {
-			asset.IconHash = iconHash
-		}
-		// 计算MMH3 hash用于自定义指纹匹配（ARL格式）
-		if len(iconData) > 0 {
-			faviconMMH3Hash = CalculateMMH3Hash(iconData)
-		}
-	} else if asset.IconHash != "" {
-		// httpx已获取到hash，尝试获取favicon数据计算MMH3
-		_, iconData := s.getIconHashWithData(targetUrl)
-		if len(iconData) > 0 {
-			faviconMMH3Hash = CalculateMMH3Hash(iconData)
+	if opts.IconHash || opts.CustomEngine {
+		// 如果启用了 IconHash 或自定义指纹，都需要获取 favicon 数据
+		if asset.IconHash == "" && opts.IconHash {
+			// httpx 没有获取到 IconHash，需要补充获取
+			iconHash, iconData := s.getIconHashWithData(targetUrl)
+			if iconHash != "" {
+				asset.IconHash = iconHash
+			}
+			if len(iconData) > 0 {
+				faviconMMH3Hash = CalculateMMH3Hash(iconData)
+			}
+		} else if opts.CustomEngine {
+			// 自定义指纹需要 MMH3 hash，即使 IconHash 已有也要获取原始数据
+			_, iconData := s.getIconHashWithData(targetUrl)
+			if len(iconData) > 0 {
+				faviconMMH3Hash = CalculateMMH3Hash(iconData)
+			}
 		}
 	}
 
@@ -418,25 +429,20 @@ func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset
 		// 从header字符串中提取所有Set-Cookie值
 		var cookies string
 		if headers != nil {
-			// 尝试多种可能的key格式
 			cookies = headers.Get("Set-Cookie")
 			if cookies == "" {
 				cookies = headers.Get("set-cookie")
 			}
-			if cookies == "" {
-				cookies = headers.Get("set_cookie")
-			}
 		}
-		// 如果从http.Header获取失败，直接从原始字符串中提取
 		if cookies == "" && asset.HttpHeader != "" {
 			cookies = extractCookiesFromHeader(asset.HttpHeader)
 		}
 		fpData := &FingerprintData{
 			Title:        asset.Title,
 			Body:         asset.HttpBody,
-			BodyBytes:    bodyBytes, // 用于GBK编码匹配
+			BodyBytes:    bodyBytes,
 			Headers:      headers,
-			HeaderString: asset.HttpHeader, // 原始header字符串，用于httpx非标准格式匹配
+			HeaderString: asset.HttpHeader,
 			Server:       asset.Server,
 			URL:          targetUrl,
 			FaviconHash:  faviconMMH3Hash,
@@ -447,7 +453,6 @@ func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset
 
 		for _, customApp := range customApps {
 			appNameLower := strings.ToLower(customApp.Name)
-			// 查找是否已有相同应用（使用小写key匹配）
 			if result, exists := appResults[appNameLower]; exists {
 				result.Sources = append(result.Sources, "custom")
 				result.CustomIDs = append(result.CustomIDs, customApp.Id)
@@ -467,6 +472,15 @@ func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset
 	for _, result := range appResults {
 		formattedApp := formatAppWithSources(result)
 		asset.App = append(asset.App, formattedApp)
+	}
+
+	// 截图功能：如果 httpx 没有获取到截图，使用内置方法补充
+	if opts.Screenshot && asset.Screenshot == "" {
+		screenshot := s.takeScreenshot(ctx, targetUrl)
+		if screenshot != "" {
+			asset.Screenshot = screenshot
+			logx.Debugf("Screenshot captured for %s:%d using builtin method", asset.Host, asset.Port)
+		}
 	}
 }
 
@@ -1089,19 +1103,6 @@ func readScreenshotAsBase64(filePath string) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
-// uniqueStrings 去重字符串切片
-func uniqueStrings(slice []string) []string {
-	seen := make(map[string]bool)
-	result := make([]string, 0)
-	for _, s := range slice {
-		if !seen[s] {
-			seen[s] = true
-			result = append(result, s)
-		}
-	}
-	return result
-}
-
 // containsAppName 检查应用列表中是否包含指定应用名（忽略来源标识）
 func containsAppName(apps []string, appName string) bool {
 	appNameLower := strings.ToLower(appName)
@@ -1174,7 +1175,7 @@ func formatAppWithSources(result *AppDetectionResult) string {
 	}
 
 	// 去重并排序来源
-	sources := uniqueStrings(result.Sources)
+	sources := utils.UniqueStrings(result.Sources)
 	
 	// 构建来源标识
 	var sourceStr string

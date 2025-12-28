@@ -33,6 +33,8 @@ type WorkerStatus struct {
 	MemUsed            float64         `json:"memUsed"`
 	TaskStartedNumber  int             `json:"taskStartedNumber"`
 	TaskExecutedNumber int             `json:"taskExecutedNumber"`
+	Concurrency        int             `json:"concurrency"`
+	RunningTasks       int             `json:"runningTasks"`
 	UpdateTime         string          `json:"updateTime"`
 	Tools              map[string]bool `json:"tools"`
 }
@@ -65,7 +67,7 @@ func (l *WorkerListLogic) WorkerList() (resp *types.WorkerListResp, err error) {
 		}
 
 		// 根据最后更新时间判断在线状态
-		// 心跳间隔30秒，如果60秒内有更新则认为在线
+		// 心跳间隔30秒，如果45秒内有更新则认为在线
 		workerStatus := "offline"
 		if status.UpdateTime != "" {
 			loc := time.Local
@@ -73,12 +75,14 @@ func (l *WorkerListLogic) WorkerList() (resp *types.WorkerListResp, err error) {
 			if err == nil {
 				elapsed := time.Since(updateTime)
 				l.Logger.Infof("Worker %s: updateTime=%s, elapsed=%v", status.WorkerName, status.UpdateTime, elapsed)
-				if elapsed < 60*time.Second {
+				if elapsed < 45*time.Second {
 					workerStatus = "running"
 				}
 			} else {
-				l.Logger.Errorf("Parse time error: %v", err)
+				l.Logger.Errorf("Parse time error for worker %s: %v, updateTime=%s", status.WorkerName, err, status.UpdateTime)
 			}
+		} else {
+			l.Logger.Infof("Worker %s has empty updateTime", status.WorkerName)
 		}
 
 		// 计算正在执行的任务数
@@ -94,6 +98,7 @@ func (l *WorkerListLogic) WorkerList() (resp *types.WorkerListResp, err error) {
 			MemUsed:      status.MemUsed,
 			TaskCount:    status.TaskExecutedNumber,
 			RunningCount: runningCount,
+			Concurrency:  status.Concurrency,
 			Status:       workerStatus,
 			UpdateTime:   status.UpdateTime,
 			Tools:        status.Tools,
@@ -106,7 +111,6 @@ func (l *WorkerListLogic) WorkerList() (resp *types.WorkerListResp, err error) {
 		List: list,
 	}, nil
 }
-
 
 // WorkerDeleteLogic Worker删除逻辑
 type WorkerDeleteLogic struct {
@@ -250,4 +254,45 @@ func (l *WorkerRestartLogic) WorkerRestart(req *types.WorkerRestartReq) (resp *t
 	l.Logger.Infof("[WorkerRestart] Sent restart command to worker: %s", req.Name)
 
 	return &types.WorkerRestartResp{Code: 0, Msg: "重启命令已发送"}, nil
+}
+
+// WorkerSetConcurrencyLogic Worker设置并发数逻辑
+type WorkerSetConcurrencyLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewWorkerSetConcurrencyLogic(ctx context.Context, svcCtx *svc.ServiceContext) *WorkerSetConcurrencyLogic {
+	return &WorkerSetConcurrencyLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *WorkerSetConcurrencyLogic) WorkerSetConcurrency(req *types.WorkerSetConcurrencyReq) (resp *types.WorkerSetConcurrencyResp, err error) {
+	if req.Name == "" {
+		return &types.WorkerSetConcurrencyResp{Code: 400, Msg: "Worker名称不能为空"}, nil
+	}
+
+	if req.Concurrency < 1 || req.Concurrency > 100 {
+		return &types.WorkerSetConcurrencyResp{Code: 400, Msg: "并发数必须在1-100之间"}, nil
+	}
+
+	rdb := l.svcCtx.RedisClient
+
+	// 检查Worker是否存在
+	workerKey := fmt.Sprintf("worker:%s", req.Name)
+	_, err = rdb.Get(l.ctx, workerKey).Result()
+	if err != nil {
+		return &types.WorkerSetConcurrencyResp{Code: 404, Msg: "Worker不存在或已离线"}, nil
+	}
+
+	// 通过Pub/Sub发送设置并发数命令
+	setConcurrencyMsg := fmt.Sprintf(`{"action":"setConcurrency","workerName":"%s","concurrency":%d}`, req.Name, req.Concurrency)
+	rdb.Publish(l.ctx, "cscan:worker:control", setConcurrencyMsg)
+	l.Logger.Infof("[WorkerSetConcurrency] Sent setConcurrency command to worker: %s, concurrency: %d", req.Name, req.Concurrency)
+
+	return &types.WorkerSetConcurrencyResp{Code: 0, Msg: "设置命令已发送"}, nil
 }

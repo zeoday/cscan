@@ -42,8 +42,9 @@ type MainTask struct {
 	StartTime   *time.Time         `bson:"start_time" json:"startTime"`
 	EndTime     *time.Time         `bson:"end_time" json:"endTime"`
 	// 任务进度保存（用于暂停/继续）
-	TaskState   string             `bson:"task_state" json:"taskState"`     // 任务执行状态JSON（保存已完成的阶段和数据）
-	Config      string             `bson:"config" json:"config"`            // 任务配置JSON
+	TaskState    string            `bson:"task_state" json:"taskState"`       // 任务执行状态JSON（保存已完成的阶段和数据）
+	Config       string            `bson:"config" json:"config"`              // 任务配置JSON
+	CurrentPhase string            `bson:"current_phase" json:"currentPhase"` // 当前执行阶段
 	// 子任务拆分（用于分布式并发）
 	SubTaskCount int               `bson:"sub_task_count" json:"subTaskCount"` // 子任务总数
 	SubTaskDone  int               `bson:"sub_task_done" json:"subTaskDone"`   // 已完成子任务数
@@ -189,6 +190,19 @@ func (m *MainTaskModel) BatchDelete(ctx context.Context, ids []string) (int64, e
 func (m *MainTaskModel) UpdateByTaskId(ctx context.Context, taskId string, update bson.M) error {
 	update["update_time"] = time.Now()
 	_, err := m.coll.UpdateOne(ctx, bson.M{"task_id": taskId}, bson.M{"$set": update})
+	return err
+}
+
+// IncrSubTaskDone 递增已完成子任务数
+func (m *MainTaskModel) IncrSubTaskDone(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	_, err = m.coll.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{
+		"$inc": bson.M{"sub_task_done": 1},
+		"$set": bson.M{"update_time": time.Now()},
+	})
 	return err
 }
 

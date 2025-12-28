@@ -29,7 +29,6 @@
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="handleSearch">搜索</el-button>
           <el-button @click="handleImport" :disabled="!tableData.length">导入资产</el-button>
-          <el-button @click="showConfigDialog">API配置</el-button>
           <el-button @click="showHelpDialog">语法帮助</el-button>
         </el-form-item>
       </el-form>
@@ -82,40 +81,6 @@
       />
     </el-card>
 
-    <!-- API配置对话框 -->
-    <el-dialog v-model="configDialogVisible" title="API配置" width="600px">
-      <el-tabs v-model="configTab">
-        <el-tab-pane label="Fofa" name="fofa">
-          <el-form label-width="80px">
-            <el-form-item label="Email">
-              <el-input v-model="apiConfigs.fofa.key" placeholder="Fofa账号邮箱" />
-            </el-form-item>
-            <el-form-item label="API Key">
-              <el-input v-model="apiConfigs.fofa.secret" placeholder="Fofa API Key" show-password />
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-        <el-tab-pane label="Hunter" name="hunter">
-          <el-form label-width="80px">
-            <el-form-item label="API Key">
-              <el-input v-model="apiConfigs.hunter.key" placeholder="Hunter API Key" show-password />
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-        <el-tab-pane label="Quake" name="quake">
-          <el-form label-width="80px">
-            <el-form-item label="API Key">
-              <el-input v-model="apiConfigs.quake.key" placeholder="Quake API Key" show-password />
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-      </el-tabs>
-      <template #footer>
-        <el-button @click="configDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveConfig">保存</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 语法帮助对话框 -->
     <el-dialog v-model="helpDialogVisible" title="语法帮助" width="650px">
       <el-tabs v-model="helpTab">
@@ -157,15 +122,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
 
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
-const configDialogVisible = ref(false)
-const configTab = ref('fofa')
 const helpDialogVisible = ref(false)
 const helpTab = ref('fofa')
 
@@ -175,14 +138,6 @@ const searchForm = reactive({
   page: 1,
   size: 50
 })
-
-const apiConfigs = reactive({
-  fofa: { key: '', secret: '' },
-  hunter: { key: '', secret: '' },
-  quake: { key: '', secret: '' }
-})
-
-onMounted(() => loadConfigs())
 
 const quickQueries = [
   { label: 'IP搜索', query: 'ip="1.1.1.1"' },
@@ -233,39 +188,8 @@ async function handleImport() {
   }
 }
 
-async function loadConfigs() {
-  const res = await request.post('/onlineapi/config/list', {})
-  if (res.code === 0 && res.list) {
-    res.list.forEach(item => {
-      if (apiConfigs[item.platform]) {
-        apiConfigs[item.platform].key = item.key
-        apiConfigs[item.platform].secret = item.secret
-      }
-    })
-  }
-}
-
-function showConfigDialog() {
-  configDialogVisible.value = true
-}
-
 function showHelpDialog() {
   helpDialogVisible.value = true
-}
-
-async function saveConfig() {
-  const platform = configTab.value
-  const config = apiConfigs[platform]
-  const res = await request.post('/onlineapi/config/save', {
-    platform,
-    key: config.key,
-    secret: config.secret
-  })
-  if (res.code === 0) {
-    ElMessage.success('保存成功')
-  } else {
-    ElMessage.error(res.msg || '保存失败')
-  }
 }
 </script>
 

@@ -121,9 +121,26 @@
     <el-card class="table-card">
       <div class="table-header">
         <span class="total-info">共 {{ pagination.total }} 条记录，当前显示 {{ tableData.length }} 条</span>
-        <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-          <el-icon><Delete /></el-icon>批量删除 ({{ selectedRows.length }})
-        </el-button>
+        <div class="table-actions">
+          <el-dropdown :disabled="selectedRows.length === 0" @command="handleQuickScan">
+            <el-button type="primary" size="small" :disabled="selectedRows.length === 0">
+              <el-icon><VideoPlay /></el-icon>快速扫描 ({{ selectedRows.length }})
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="portscan">端口扫描</el-dropdown-item>
+                <el-dropdown-item command="portidentify">端口识别 (Nmap)</el-dropdown-item>
+                <el-dropdown-item command="fingerprint">指纹识别</el-dropdown-item>
+                <el-dropdown-item command="pocscan">漏洞扫描</el-dropdown-item>
+                <el-dropdown-item divided command="custom">自定义扫描...</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
+            <el-icon><Delete /></el-icon>批量删除 ({{ selectedRows.length }})
+          </el-button>
+        </div>
       </div>
       <el-table :data="tableData" v-loading="loading" stripe size="small" max-height="500" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
@@ -273,14 +290,152 @@
         暂无历史记录
       </div>
     </el-dialog>
+
+    <!-- 自定义扫描配置对话框 -->
+    <el-dialog v-model="scanDialogVisible" title="扫描配置" width="650px" top="5vh">
+      <div class="scan-target-info">
+        <el-icon><Aim /></el-icon>
+        <span>已选择 {{ selectedRows.length }} 个资产 (将使用已知的 IP:Port 进行扫描)</span>
+      </div>
+      <el-form label-width="100px" class="scan-form">
+        <el-form-item label="任务名称">
+          <el-input v-model="scanForm.name" placeholder="资产扫描任务" />
+        </el-form-item>
+        
+        <el-divider content-position="left">端口扫描</el-divider>
+        <el-form-item label="启用">
+          <el-switch v-model="scanForm.portscanEnable" />
+          <span class="form-hint">重新扫描端口 (会忽略已知端口)</span>
+        </el-form-item>
+        <template v-if="scanForm.portscanEnable">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="扫描工具">
+                <el-radio-group v-model="scanForm.portscanTool">
+                  <el-radio label="naabu">Naabu</el-radio>
+                  <el-radio label="masscan">Masscan</el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="端口范围">
+                <el-select v-model="scanForm.ports" style="width: 100%">
+                  <el-option label="top100" value="top100" />
+                  <el-option label="top1000" value="top1000" />
+                  <el-option label="全端口 1-65535" value="1-65535" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="扫描速率">
+                <el-input-number v-model="scanForm.portscanRate" :min="100" :max="100000" style="width:100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="端口阈值">
+                <el-input-number v-model="scanForm.portThreshold" :min="0" :max="65535" style="width:100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="超时(秒)">
+                <el-input-number v-model="scanForm.portscanTimeout" :min="5" :max="1200" style="width:100%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="高级选项">
+            <el-checkbox v-model="scanForm.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
+          </el-form-item>
+        </template>
+        
+        <el-divider content-position="left">端口识别</el-divider>
+        <el-form-item label="启用">
+          <el-switch v-model="scanForm.portidentifyEnable" />
+          <span class="form-hint">Nmap 服务版本探测</span>
+        </el-form-item>
+        <template v-if="scanForm.portidentifyEnable">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="超时(秒)">
+                <el-input-number v-model="scanForm.portidentifyTimeout" :min="5" :max="300" style="width:100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="Nmap参数">
+                <el-input v-model="scanForm.portidentifyArgs" placeholder="-sV" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+        
+        <el-divider content-position="left">指纹识别</el-divider>
+        <el-form-item label="启用">
+          <el-switch v-model="scanForm.fingerprintEnable" />
+          <span class="form-hint">Web指纹探测</span>
+        </el-form-item>
+        <template v-if="scanForm.fingerprintEnable">
+          <el-form-item label="探测工具">
+            <el-radio-group v-model="scanForm.fingerprintTool">
+              <el-radio label="httpx">Httpx</el-radio>
+              <el-radio label="builtin">Wappalyzer</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="附加功能">
+            <el-checkbox v-model="scanForm.fingerprintIconHash">IconHash</el-checkbox>
+            <el-checkbox v-model="scanForm.fingerprintCustomEngine">自定义指纹</el-checkbox>
+            <el-checkbox v-model="scanForm.fingerprintScreenshot">截图</el-checkbox>
+          </el-form-item>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="超时(秒)">
+                <el-input-number v-model="scanForm.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
+                <span class="form-hint">并发数由Worker设置控制</span>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+        
+        <el-divider content-position="left">漏洞扫描</el-divider>
+        <el-form-item label="启用">
+          <el-switch v-model="scanForm.pocscanEnable" />
+          <span class="form-hint">Nuclei POC扫描</span>
+        </el-form-item>
+        <template v-if="scanForm.pocscanEnable">
+          <el-form-item label="扫描模式">
+            <el-checkbox v-model="scanForm.pocscanAutoScan" :disabled="scanForm.pocscanCustomOnly">标签映射</el-checkbox>
+            <el-checkbox v-model="scanForm.pocscanAutomaticScan" :disabled="scanForm.pocscanCustomOnly">Wappalyzer自动</el-checkbox>
+            <el-checkbox v-model="scanForm.pocscanCustomOnly">只用自定义POC</el-checkbox>
+          </el-form-item>
+          <el-form-item label="严重级别">
+            <el-checkbox-group v-model="scanForm.pocscanSeverity">
+              <el-checkbox label="critical">Critical</el-checkbox>
+              <el-checkbox label="high">High</el-checkbox>
+              <el-checkbox label="medium">Medium</el-checkbox>
+              <el-checkbox label="low">Low</el-checkbox>
+              <el-checkbox label="info">Info</el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
+          <el-form-item label="目标超时">
+            <el-input-number v-model="scanForm.pocscanTargetTimeout" :min="30" :max="600" />
+            <span class="form-hint">秒</span>
+          </el-form-item>
+        </template>
+      </el-form>
+      <template #footer>
+        <el-button @click="scanDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="scanSubmitting" @click="handleScanSubmit">创建并启动</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Link, Monitor, Connection, Service, Document, Cpu } from '@element-plus/icons-vue'
+import { Delete, Link, Monitor, Connection, Service, Document, Cpu, VideoPlay, ArrowDown, Aim } from '@element-plus/icons-vue'
 import { getAssetList, getAssetStat, deleteAsset, batchDeleteAsset, getAssetHistory } from '@/api/asset'
+import { createTask, startTask } from '@/api/task'
 import { useWorkspaceStore } from '@/stores/workspace'
 import request from '@/api/request'
 
@@ -294,6 +449,35 @@ const historyLoading = ref(false)
 const historyList = ref([])
 const currentAsset = ref(null)
 const organizations = ref([])
+const scanDialogVisible = ref(false)
+const scanSubmitting = ref(false)
+
+const scanForm = reactive({
+  name: '',
+  portscanEnable: false,
+  portscanTool: 'naabu',
+  portscanRate: 1000,
+  ports: 'top100',
+  portThreshold: 100,
+  scanType: 'c',
+  portscanTimeout: 60,
+  skipHostDiscovery: false,
+  portidentifyEnable: false,
+  portidentifyTimeout: 30,
+  portidentifyArgs: '',
+  fingerprintEnable: true,
+  fingerprintTool: 'httpx',
+  fingerprintIconHash: true,
+  fingerprintCustomEngine: true,
+  fingerprintScreenshot: false,
+  fingerprintTimeout: 30,
+  pocscanEnable: false,
+  pocscanAutoScan: true,
+  pocscanAutomaticScan: true,
+  pocscanCustomOnly: false,
+  pocscanSeverity: ['critical', 'high', 'medium'],
+  pocscanTargetTimeout: 600
+})
 
 const stat = reactive({
   total: 0,
@@ -716,6 +900,175 @@ function copyIconHash(hash) {
     ElMessage.success(`已复制IconHash: ${hash}`)
   })
 }
+
+// 快速扫描处理
+function handleQuickScan(command) {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先选择要扫描的资产')
+    return
+  }
+  
+  // 重置扫描表单（与 Task.vue 保持一致）
+  Object.assign(scanForm, {
+    name: '',
+    portscanEnable: false,
+    portscanTool: 'naabu',
+    portscanRate: 1000,
+    ports: 'top100',
+    portThreshold: 100,
+    scanType: 'c',
+    portscanTimeout: 60,
+    skipHostDiscovery: false,
+    portidentifyEnable: false,
+    portidentifyTimeout: 30,
+    portidentifyArgs: '',
+    fingerprintEnable: false,
+    fingerprintTool: 'httpx',
+    fingerprintIconHash: true,
+    fingerprintCustomEngine: true,
+    fingerprintScreenshot: false,
+    fingerprintTimeout: 30,
+    pocscanEnable: false,
+    pocscanAutoScan: true,
+    pocscanAutomaticScan: true,
+    pocscanCustomOnly: false,
+    pocscanSeverity: ['critical', 'high', 'medium'],
+    pocscanTargetTimeout: 600
+  })
+  
+  // 根据命令设置默认配置
+  switch (command) {
+    case 'portscan':
+      scanForm.name = '端口扫描'
+      scanForm.portscanEnable = true
+      break
+    case 'portidentify':
+      scanForm.name = '端口识别'
+      scanForm.portidentifyEnable = true
+      break
+    case 'fingerprint':
+      scanForm.name = '指纹识别'
+      scanForm.fingerprintEnable = true
+      break
+    case 'pocscan':
+      scanForm.name = '漏洞扫描'
+      scanForm.pocscanEnable = true
+      break
+    case 'custom':
+      scanForm.name = '资产扫描'
+      break
+  }
+  
+  // 所有扫描都弹出配置对话框
+  scanDialogVisible.value = true
+}
+
+// 构建扫描目标
+function buildScanTargets() {
+  const targets = []
+  for (const row of selectedRows.value) {
+    // 携带端口信息：IP:Port 格式
+    if (row.host && row.port) {
+      targets.push(`${row.host}:${row.port}`)
+    } else if (row.host) {
+      targets.push(row.host)
+    }
+  }
+  return targets.join('\n')
+}
+
+// 构建扫描配置（与 Task.vue 的 buildConfig 保持一致）
+function buildScanConfig() {
+  return {
+    batchSize: 50,
+    portscan: {
+      enable: scanForm.portscanEnable,
+      tool: scanForm.portscanTool,
+      rate: scanForm.portscanRate,
+      ports: scanForm.ports,
+      portThreshold: scanForm.portThreshold,
+      scanType: scanForm.scanType,
+      timeout: scanForm.portscanTimeout,
+      skipHostDiscovery: scanForm.skipHostDiscovery
+    },
+    portidentify: {
+      enable: scanForm.portidentifyEnable,
+      timeout: scanForm.portidentifyTimeout,
+      args: scanForm.portidentifyArgs
+    },
+    fingerprint: {
+      enable: scanForm.fingerprintEnable,
+      tool: scanForm.fingerprintTool,
+      iconHash: scanForm.fingerprintIconHash,
+      customEngine: scanForm.fingerprintCustomEngine,
+      screenshot: scanForm.fingerprintScreenshot,
+      targetTimeout: scanForm.fingerprintTimeout
+    },
+    pocscan: {
+      enable: scanForm.pocscanEnable,
+      useNuclei: true,
+      autoScan: scanForm.pocscanAutoScan,
+      automaticScan: scanForm.pocscanAutomaticScan,
+      customPocOnly: scanForm.pocscanCustomOnly,
+      severity: scanForm.pocscanSeverity.join(','),
+      targetTimeout: scanForm.pocscanTargetTimeout
+    }
+  }
+}
+
+// 创建扫描任务
+async function doCreateScanTask() {
+  const targets = buildScanTargets()
+  if (!targets) {
+    ElMessage.warning('没有有效的扫描目标')
+    return
+  }
+  
+  const config = buildScanConfig()
+  const taskName = scanForm.name || '资产扫描'
+  
+  try {
+    scanSubmitting.value = true
+    const res = await createTask({
+      name: `${taskName} (${selectedRows.value.length}个资产)`,
+      target: targets,
+      workspaceId: workspaceStore.currentWorkspaceId || '',
+      config: JSON.stringify(config)
+    })
+    
+    if (res.code === 0) {
+      // 创建成功后自动启动任务
+      const taskId = res.id || res.taskId
+      if (taskId) {
+        const startRes = await startTask({ id: taskId })
+        if (startRes.code === 0) {
+          ElMessage.success('扫描任务已创建并启动')
+        } else {
+          ElMessage.success('任务创建成功，但启动失败: ' + (startRes.msg || ''))
+        }
+      } else {
+        ElMessage.success('扫描任务创建成功')
+      }
+      scanDialogVisible.value = false
+      selectedRows.value = []
+    } else {
+      ElMessage.error(res.msg || '创建任务失败')
+    }
+  } catch (e) {
+    ElMessage.error('创建任务失败')
+  } finally {
+    scanSubmitting.value = false
+  }
+}
+
+// 提交自定义扫描
+async function handleScanSubmit() {
+  if (!scanForm.portscanEnable && !scanForm.portidentifyEnable && !scanForm.fingerprintEnable && !scanForm.pocscanEnable) {
+    ElMessage.warning('请至少选择一个扫描阶段')
+    return
+  }
+  await doCreateScanTask()
+}
 </script>
 
 <style lang="scss" scoped>
@@ -1086,6 +1439,36 @@ function copyIconHash(hash) {
     text-align: center;
     padding: 40px;
     color: var(--el-text-color-secondary);
+  }
+  
+  .table-actions {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .scan-target-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--el-color-primary-light-9);
+    border-radius: 6px;
+    margin-bottom: 20px;
+    color: var(--el-color-primary);
+    font-weight: 500;
+  }
+  
+  .scan-form {
+    .form-hint {
+      margin-left: 10px;
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
+    }
+    
+    :deep(.el-divider__text) {
+      font-size: 13px;
+      color: var(--el-text-color-secondary);
+    }
   }
 }
 </style>

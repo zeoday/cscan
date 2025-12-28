@@ -170,22 +170,32 @@ type PortIdentifyConfig struct {
 }
 
 type DomainScanConfig struct {
-	Enable     bool `json:"enable"`
-	Subfinder  bool `json:"subfinder"`
-	Massdns    bool `json:"massdns"`
-	Concurrent int  `json:"concurrent"`
+	Enable             bool     `json:"enable"`
+	Subfinder          bool     `json:"subfinder"`          // 使用Subfinder
+	Timeout            int      `json:"timeout"`            // 超时时间(秒)
+	MaxEnumerationTime int      `json:"maxEnumerationTime"` // 最大枚举时间(分钟)
+	Threads            int      `json:"threads"`            // 并发线程数
+	RateLimit          int      `json:"rateLimit"`          // 速率限制
+	Sources            []string `json:"sources"`            // 指定数据源
+	ExcludeSources     []string `json:"excludeSources"`     // 排除数据源
+	All                bool     `json:"all"`                // 使用所有数据源(慢)
+	Recursive          bool     `json:"recursive"`          // 只使用递归数据源
+	RemoveWildcard     bool     `json:"removeWildcard"`     // 移除泛解析域名
+	ResolveDNS         bool     `json:"resolveDNS"`         // 是否解析DNS
+	Concurrent         int      `json:"concurrent"`         // DNS解析并发数
 }
 
 type FingerprintConfig struct {
-	Enable        bool `json:"enable"`
-	Httpx         bool `json:"httpx"`
-	IconHash      bool `json:"iconHash"`
-	Wappalyzer    bool `json:"wappalyzer"`
-	CustomEngine  bool `json:"customEngine"`  // 使用自定义指纹引擎（ARL格式）
-	Screenshot    bool `json:"screenshot"`
-	Timeout       int  `json:"timeout"`       // 总超时时间(秒)，默认300秒
-	TargetTimeout int  `json:"targetTimeout"` // 单个目标超时时间(秒)，默认30秒
-	Concurrency   int  `json:"concurrency"`   // 指纹识别并发数，默认10
+	Enable        bool   `json:"enable"`
+	Tool          string `json:"tool"`          // 探测工具: httpx, builtin (wappalyzer)
+	Httpx         bool   `json:"httpx"`         // 已废弃，使用Tool字段
+	IconHash      bool   `json:"iconHash"`
+	Wappalyzer    bool   `json:"wappalyzer"`    // 已废弃，builtin模式自动启用
+	CustomEngine  bool   `json:"customEngine"`  // 使用自定义指纹引擎（ARL格式）
+	Screenshot    bool   `json:"screenshot"`
+	Timeout       int    `json:"timeout"`       // 总超时时间(秒)，默认300秒
+	TargetTimeout int    `json:"targetTimeout"` // 单个目标超时时间(秒)，默认30秒
+	Concurrency   int    `json:"concurrency"`   // 指纹识别并发数，默认10
 }
 
 type PocScanConfig struct {

@@ -86,6 +86,20 @@ func AssetBatchDeleteHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+// AssetClearHandler 清空资产
+func AssetClearHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		workspaceId := middleware.GetWorkspaceId(r.Context())
+		l := logic.NewAssetClearLogic(r.Context(), svcCtx)
+		resp, err := l.AssetClear(workspaceId)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
 // AssetHistoryHandler 资产历史
 func AssetHistoryHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

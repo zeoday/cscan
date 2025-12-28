@@ -514,6 +514,37 @@ func (l *AssetBatchDeleteLogic) AssetBatchDelete(req *types.AssetBatchDeleteReq,
 	return &types.BaseResp{Code: 0, Msg: "成功删除 " + strconv.FormatInt(deleted, 10) + " 条资产"}, nil
 }
 
+// AssetClearLogic 清空资产
+type AssetClearLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewAssetClearLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AssetClearLogic {
+	return &AssetClearLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *AssetClearLogic) AssetClear(workspaceId string) (resp *types.BaseResp, err error) {
+	assetModel := l.svcCtx.GetAssetModel(workspaceId)
+	
+	// 清空资产表
+	deleted, err := assetModel.Clear(l.ctx)
+	if err != nil {
+		return &types.BaseResp{Code: 500, Msg: "清空资产失败: " + err.Error()}, nil
+	}
+	
+	// 清空资产历史表
+	historyModel := l.svcCtx.GetAssetHistoryModel(workspaceId)
+	historyModel.Clear(l.ctx)
+	
+	return &types.BaseResp{Code: 0, Msg: "成功清空 " + strconv.FormatInt(deleted, 10) + " 条资产"}, nil
+}
+
 
 // AssetHistoryLogic 资产历史记录
 type AssetHistoryLogic struct {

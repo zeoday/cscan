@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"cscan/model"
@@ -57,13 +55,13 @@ type Worker struct {
 	taskStarted  int
 	taskExecuted int
 	isRunning    bool
-	
+
 	// 健康状态监控
-	lastCPUCheck     time.Time     // 上次CPU检查时间
-	cpuOverloadCount int           // CPU过载计数
-	isThrottled      bool          // 是否处于限流状态
-	throttleUntil    time.Time     // 限流结束时间
-	
+	lastCPUCheck     time.Time // 上次CPU检查时间
+	cpuOverloadCount int       // CPU过载计数
+	isThrottled      bool      // 是否处于限流状态
+	throttleUntil    time.Time // 限流结束时间
+
 	// 日志组件
 	logger *WorkerLogger
 }
@@ -95,15 +93,15 @@ func getMainTaskId(taskId string) string {
 func (w *Worker) taskLog(taskId, level, format string, args ...interface{}) {
 	// 获取主任务ID，确保子任务日志也能在主任务中查看
 	mainTaskId := getMainTaskId(taskId)
-	
+
 	logger := NewTaskLogger(w.redisClient, w.config.Name, mainTaskId)
-	
+
 	// 如果是子任务，在日志消息前加上子任务标识
 	if mainTaskId != taskId {
 		subIndex := taskId[len(mainTaskId)+1:]
 		format = fmt.Sprintf("[Sub-%s] %s", subIndex, format)
 	}
-	
+
 	switch level {
 	case LevelError:
 		logger.Error(format, args...)
@@ -186,7 +184,7 @@ func NewWorker(config WorkerConfig) (*Worker, error) {
 			Password: config.RedisPass,
 			DB:       0,
 		})
-		
+
 		// 测试Redis连接，增加重试机制
 		ctx := context.Background()
 		maxRetries := 3
@@ -201,10 +199,10 @@ func NewWorker(config WorkerConfig) (*Worker, error) {
 				}
 			} else {
 				fmt.Printf("[Worker] Redis connected successfully at %s, logs will be streamed\n", config.RedisAddr)
-				
+
 				// 检查并确保 worker 名称唯一
 				config.Name = ensureUniqueWorkerName(ctx, redisClient, config.Name)
-				
+
 				// 设置logx的输出Writer，将所有日志同时发送到Redis
 				logWriter := NewRedisLogWriter(redisClient, config.Name)
 				logx.SetWriter(logx.NewWriter(logWriter))
@@ -248,7 +246,7 @@ func (w *Worker) registerScanners() {
 	w.scanners["masscan"] = scanner.NewMasscanScanner()
 	w.scanners["nmap"] = scanner.NewNmapScanner()
 	w.scanners["naabu"] = scanner.NewNaabuScanner()
-	// w.scanners["domainscan"] = scanner.NewDomainScanner()
+	w.scanners["subfinder"] = scanner.NewSubfinderScanner()
 	w.scanners["fingerprint"] = scanner.NewFingerprintScanner()
 	w.scanners["nuclei"] = scanner.NewNucleiScanner()
 }
@@ -293,8 +291,8 @@ func (w *Worker) fetchTasks() {
 	defer w.wg.Done()
 
 	emptyCount := 0
-	baseInterval := 1 * time.Second  // 基础间隔改为1秒
-	maxInterval := 5 * time.Second   // 最大间隔改5秒，确保任务能在5秒内被拉取
+	baseInterval := 1 * time.Second // 基础间隔改为1秒
+	maxInterval := 5 * time.Second  // 最大间隔改5秒，确保任务能在5秒内被拉取
 
 	for {
 		select {
@@ -360,10 +358,35 @@ func (w *Worker) pullTask() bool {
 // Stop 停止Worker
 func (w *Worker) Stop() {
 	w.isRunning = false
+
+	// 主动清理 Redis 中的状态数据，让 Worker 立即从列表中消失
+	if w.redisClient != nil {
+		ctx := context.Background()
+		key := fmt.Sprintf("worker:%s", w.config.Name)
+		w.redisClient.Del(ctx, key)
+	}
+
 	w.cancel() // 通知所有 goroutine 停止
 	close(w.stopChan)
 	w.wg.Wait()
 	w.logger.Info("Worker %s stopped", w.config.Name)
+}
+
+// StopImmediate 立即停止Worker（跳过当前任务，不等待完成）
+func (w *Worker) StopImmediate() {
+	w.isRunning = false
+
+	// 主动清理 Redis 中的状态数据
+	if w.redisClient != nil {
+		ctx := context.Background()
+		key := fmt.Sprintf("worker:%s", w.config.Name)
+		w.redisClient.Del(ctx, key)
+	}
+
+	w.cancel() // 通知所有 goroutine 停止
+	close(w.stopChan)
+	// 不等待 wg.Wait()，立即返回，跳过当前正在执行的任务
+	w.logger.Info("Worker %s stopped immediately (tasks skipped)", w.config.Name)
 }
 
 // SubmitTask 提交任务
@@ -398,17 +421,17 @@ func (w *Worker) checkTaskControl(ctx context.Context, taskId string) string {
 	if w.redisClient == nil {
 		return ""
 	}
-	
+
 	// 使用独立的 context 查询 Redis，避免因任务 context 被取消而查询失败
 	queryCtx := context.Background()
-	
+
 	// 先检查当前任务的控制信号
 	ctrlKey := "cscan:task:ctrl:" + taskId
 	ctrl, err := w.redisClient.Get(queryCtx, ctrlKey).Result()
 	if err == nil && ctrl != "" {
 		return ctrl
 	}
-	
+
 	// 如果是子任务，还需要检查主任务的控制信号
 	mainTaskId := getMainTaskId(taskId)
 	if mainTaskId != taskId {
@@ -418,7 +441,7 @@ func (w *Worker) checkTaskControl(ctx context.Context, taskId string) string {
 			return ctrl
 		}
 	}
-	
+
 	return ""
 }
 
@@ -431,14 +454,14 @@ func (w *Worker) saveTaskProgress(ctx context.Context, task *scheduler.TaskInfo,
 			phases = append(phases, phase)
 		}
 	}
-	
+
 	assetsJson, _ := json.Marshal(assets)
 	state := map[string]interface{}{
 		"completedPhases": phases,
 		"assets":          string(assetsJson),
 	}
 	stateJson, _ := json.Marshal(state)
-	
+
 	// 通过RPC保存到数据库
 	w.rpcClient.UpdateTask(ctx, &pb.UpdateTaskReq{
 		TaskId: task.TaskId,
@@ -452,12 +475,12 @@ func (w *Worker) saveTaskProgress(ctx context.Context, task *scheduler.TaskInfo,
 // 当任务被停止时，上下文会被取消
 func (w *Worker) createTaskContext(parentCtx context.Context, taskId string) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parentCtx)
-	
+
 	// 启动一个goroutine定期检查任务控制信号
 	go func() {
 		ticker := time.NewTicker(200 * time.Millisecond) // 检查间隔到200ms
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -471,7 +494,7 @@ func (w *Worker) createTaskContext(parentCtx context.Context, taskId string) (co
 			}
 		}
 	}()
-	
+
 	return ctx, cancel
 }
 
@@ -535,6 +558,9 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 
 	// 输出任务开始日志（包含关键配置信息）
 	var enabledPhases []string
+	if config.DomainScan != nil && config.DomainScan.Enable {
+		enabledPhases = append(enabledPhases, "Domain Scan")
+	}
 	if config.PortScan != nil && config.PortScan.Enable {
 		enabledPhases = append(enabledPhases, "Port Scan")
 	}
@@ -547,7 +573,7 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 	if config.PocScan != nil && config.PocScan.Enable {
 		enabledPhases = append(enabledPhases, "POC Scan")
 	}
-	
+
 	// 解析目标列表
 	targetLines := strings.Split(strings.TrimSpace(target), "\n")
 	var targets []string
@@ -557,11 +583,10 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			targets = append(targets, line)
 		}
 	}
-	
+
 	// 输出任务开始日志
 	w.taskLog(task.TaskId, LevelInfo, "Starting: %s", strings.Join(enabledPhases, " → "))
 	w.taskLog(task.TaskId, LevelInfo, "Targets (%d): %s", len(targets), strings.Join(targets, ", "))
-
 
 	// 解析恢复状态（如果是继续执行的任务）
 	var resumeState map[string]interface{}
@@ -585,16 +610,120 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		}
 	}
 
-	// 当端口扫描禁用但指纹识别启用时，需要从目标生成初始资产列表
-	// 否则指纹识别阶段会因为 allAssets 为空而跳过
-	if config.PortScan != nil && !config.PortScan.Enable && 
-		config.Fingerprint != nil && config.Fingerprint.Enable && 
-		len(allAssets) == 0 {
-		generatedAssets := w.generateAssetsFromTarget(target, config.PortScan)
-		if len(generatedAssets) > 0 {
-			allAssets = generatedAssets
-			w.taskLog(task.TaskId, LevelInfo, "Generated %d targets for fingerprint", len(allAssets))
+	// 当端口扫描禁用时，需要从目标生成初始资产列表
+	// 支持 IP:Port 格式的目标，用于资产扫描场景
+	if config.PortScan != nil && !config.PortScan.Enable && len(allAssets) == 0 {
+		// 检查是否有其他阶段需要资产
+		needAssets := (config.PortIdentify != nil && config.PortIdentify.Enable) ||
+			(config.Fingerprint != nil && config.Fingerprint.Enable) ||
+			(config.PocScan != nil && config.PocScan.Enable)
+
+		if needAssets {
+			generatedAssets := w.generateAssetsFromTarget(target, config.PortScan)
+			if len(generatedAssets) > 0 {
+				allAssets = generatedAssets
+				w.taskLog(task.TaskId, LevelInfo, "Generated %d assets from target (port scan disabled)", len(allAssets))
+			}
 		}
+	}
+
+	// 执行子域名扫描（在端口扫描之前）
+	if config.DomainScan != nil && config.DomainScan.Enable && !completedPhases["domainscan"] {
+		// 检查控制信号
+		if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
+			w.taskLog(task.TaskId, LevelInfo, "Task stopped")
+			return
+		}
+
+		// 更新当前阶段
+		w.updateTaskProgressWithPhase(ctx, task.TaskId, 10, "子域名扫描中", "子域名扫描")
+		w.taskLog(task.TaskId, LevelInfo, "Starting domain scan...")
+
+		// 创建任务日志回调
+		domainTaskLogger := func(level, format string, args ...interface{}) {
+			w.taskLog(task.TaskId, level, format, args...)
+		}
+
+		// 通过RPC获取Subfinder配置
+		var providerConfig map[string][]string
+		providerResp, err := w.rpcClient.GetSubfinderProviders(ctx, &pb.GetSubfinderProvidersReq{
+			WorkspaceId: task.WorkspaceId,
+		})
+		if err != nil {
+			w.taskLog(task.TaskId, LevelWarn, "Failed to get subfinder providers: %v", err)
+		} else if providerResp != nil && len(providerResp.Providers) > 0 {
+			providerConfig = make(map[string][]string)
+			for _, p := range providerResp.Providers {
+				if len(p.Keys) > 0 {
+					providerConfig[p.Provider] = p.Keys
+					w.taskLog(task.TaskId, LevelDebug, "Subfinder provider: %s, keys: %d", p.Provider, len(p.Keys))
+				}
+			}
+			w.taskLog(task.TaskId, LevelInfo, "Loaded %d subfinder providers with keys", len(providerConfig))
+		} else {
+			w.taskLog(task.TaskId, LevelInfo, "No subfinder providers configured in database")
+		}
+
+		// 构建Subfinder选项，使用Worker并发数
+		subfinderOpts := &scanner.SubfinderOptions{
+			Timeout:            config.DomainScan.Timeout,
+			MaxEnumerationTime: config.DomainScan.MaxEnumerationTime,
+			Threads:            w.config.Concurrency, // 使用Worker并发数
+			RateLimit:          config.DomainScan.RateLimit,
+			Sources:            config.DomainScan.Sources,
+			ExcludeSources:     config.DomainScan.ExcludeSources,
+			All:                config.DomainScan.All,
+			Recursive:          config.DomainScan.Recursive,
+			RemoveWildcard:     config.DomainScan.RemoveWildcard,
+			ResolveDNS:         config.DomainScan.ResolveDNS,
+			Concurrent:         w.config.Concurrency * 10, // DNS解析并发数为Worker并发数的10倍
+			ProviderConfig:     providerConfig,
+		}
+
+		// 设置默认值
+		if subfinderOpts.Timeout <= 0 {
+			subfinderOpts.Timeout = 30
+		}
+		if subfinderOpts.MaxEnumerationTime <= 0 {
+			subfinderOpts.MaxEnumerationTime = 10
+		}
+		w.taskLog(task.TaskId, LevelInfo, "Subfinder using worker concurrency: threads=%d, dns_concurrent=%d", subfinderOpts.Threads, subfinderOpts.Concurrent)
+
+		// 执行子域名扫描
+		if s, ok := w.scanners["subfinder"]; ok {
+			result, err := s.Scan(ctx, &scanner.ScanConfig{
+				Target:      target,
+				WorkspaceId: task.WorkspaceId,
+				MainTaskId:  task.MainTaskId,
+				Options:     subfinderOpts,
+				TaskLogger:  domainTaskLogger,
+			})
+
+			if err != nil {
+				w.taskLog(task.TaskId, LevelError, "Domain scan error: %v", err)
+			} else if result != nil && len(result.Assets) > 0 {
+				// 保存子域名扫描结果到数据库
+				w.taskLog(task.TaskId, LevelInfo, "Saving %d subdomains to database", len(result.Assets))
+				w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, result.Assets)
+
+				// 将发现的子域名添加到目标列表
+				var newTargets []string
+				for _, asset := range result.Assets {
+					if asset.Host != "" {
+						newTargets = append(newTargets, asset.Host)
+					}
+				}
+				if len(newTargets) > 0 {
+					// 更新目标（将子域名添加到原始目标）
+					target = target + "\n" + strings.Join(newTargets, "\n")
+					w.taskLog(task.TaskId, LevelInfo, "Domain scan completed: found %d subdomains", len(newTargets))
+				}
+			}
+		} else {
+			w.taskLog(task.TaskId, LevelWarn, "Subfinder scanner not available")
+		}
+
+		completedPhases["domainscan"] = true
 	}
 
 	// 执行端口扫描
@@ -608,6 +737,9 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			w.saveTaskProgress(ctx, task, completedPhases, allAssets)
 			return
 		}
+
+		// 更新当前阶段
+		w.updateTaskProgressWithPhase(ctx, task.TaskId, 20, "端口扫描中", "端口扫描")
 
 		// 创建带超时的上下文，防止端口扫描卡死
 		portScanTimeout := 600 // 默认10分钟总超时
@@ -627,17 +759,17 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		}
 
 		var openPorts []*scanner.Asset
-		
+
 		// 创建任务日志回调
 		taskLogger := func(level, format string, args ...interface{}) {
 			w.taskLog(task.TaskId, level, format, args...)
 		}
-		
+
 		// 创建进度回调
 		onProgress := func(progress int, message string) {
 			w.updateTaskProgress(ctx, task.TaskId, progress, message)
 		}
-		
+
 		// 第一步：端口发现
 		switch portDiscoveryTool {
 		case "masscan":
@@ -693,14 +825,14 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 				w.taskLog(task.TaskId, LevelInfo, "Found %d open ports", len(openPorts))
 			}
 		}
-		
+
 		// 检查是否被停止
 		if ctx.Err() != nil || w.checkTaskControl(ctx, task.TaskId) == "STOP" {
 			portCancel()
 			w.taskLog(task.TaskId, LevelInfo, "Task stopped")
 			return
 		}
-		
+
 		// 端口发现完成，将结果添加到 allAssets
 		if len(openPorts) > 0 {
 			for _, asset := range openPorts {
@@ -708,13 +840,13 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			}
 			allAssets = append(allAssets, openPorts...)
 			w.taskLog(task.TaskId, LevelInfo, "Port scan completed: %d assets", len(allAssets))
-			
+
 			// 端口扫描完成后立即保存结果
 			w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, allAssets)
 		} else {
 			w.taskLog(task.TaskId, LevelInfo, "No open ports found")
 		}
-		
+
 		portCancel() // 释放端口扫描上下文
 		completedPhases["portscan"] = true
 	}
@@ -740,6 +872,9 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			w.saveTaskProgress(ctx, task, completedPhases, allAssets)
 			return
 		}
+
+		// 更新当前阶段
+		w.updateTaskProgressWithPhase(ctx, task.TaskId, 40, "端口识别中", "端口识别")
 
 		identifiedAssets := w.executePortIdentify(ctx, task, allAssets, config.PortIdentify)
 		if len(identifiedAssets) > 0 {
@@ -772,52 +907,57 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			return
 		}
 
+		// 更新当前阶段
+		w.updateTaskProgressWithPhase(ctx, task.TaskId, 60, "指纹识别中", "指纹识别")
+
 		if s, ok := w.scanners["fingerprint"]; ok {
 			// 获取单目标超时配置
 			targetTimeout := config.Fingerprint.TargetTimeout
 			if targetTimeout <= 0 {
 				targetTimeout = 30 // 默认30秒
 			}
-			w.taskLog(task.TaskId, LevelInfo, "Fingerprint: %d assets, timeout %ds/target", len(allAssets), targetTimeout)
-			
+			// 使用Worker并发数覆盖配置中的并发数
+			config.Fingerprint.Concurrency = w.config.Concurrency
+			w.taskLog(task.TaskId, LevelInfo, "Fingerprint: %d assets, timeout %ds/target, concurrency=%d", len(allAssets), targetTimeout, w.config.Concurrency)
+
 			// 每次扫描前实时加载HTTP服务映射配置
 			w.loadHttpServiceMappings()
-			
+
 			// 如果启用自定义指纹引擎，加载自定义指纹
 			if config.Fingerprint.CustomEngine {
 				w.loadCustomFingerprints(ctx, s.(*scanner.FingerprintScanner))
 			}
-			
+
 			// 创建带超时的上下文，防止指纹识别卡死
 			fingerprintTimeout := config.Fingerprint.Timeout
 			if fingerprintTimeout <= 0 {
 				fingerprintTimeout = 300 // 默认5分钟总超时
 			}
 			fpCtx, fpCancel := context.WithTimeout(ctx, time.Duration(fingerprintTimeout)*time.Second)
-			
+
 			// 创建任务日志回调
 			fpTaskLogger := func(level, format string, args ...interface{}) {
 				w.taskLog(task.TaskId, level, format, args...)
 			}
-			
+
 			result, err := s.Scan(fpCtx, &scanner.ScanConfig{
 				Assets:     allAssets,
 				Options:    config.Fingerprint,
 				TaskLogger: fpTaskLogger,
 			})
 			fpCancel()
-			
+
 			// 检查是否超时
 			if fpCtx.Err() == context.DeadlineExceeded {
 				w.taskLog(task.TaskId, LevelWarn, "Fingerprint scan timeout after %ds, continuing with partial results", fingerprintTimeout)
 			}
-			
+
 			// 检查是否被取消
 			if ctx.Err() != nil || w.checkTaskControl(ctx, task.TaskId) == "STOP" {
 				w.taskLog(task.TaskId, LevelInfo, "Task stopped")
 				return
 			}
-			
+
 			if err == nil && result != nil {
 				// 构建 Host:Port -> Asset 的映射，用于匹配指纹结果
 				assetMap := make(map[string]*scanner.Asset)
@@ -825,7 +965,7 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 					key := fmt.Sprintf("%s:%d", asset.Host, asset.Port)
 					assetMap[key] = asset
 				}
-				
+
 				// 通过 Host:Port 匹配来更新资产信息，而不是按索引
 				for _, fpAsset := range result.Assets {
 					key := fmt.Sprintf("%s:%d", fpAsset.Host, fpAsset.Port)
@@ -841,7 +981,7 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 						originalAsset.Screenshot = fpAsset.Screenshot
 					}
 				}
-				
+
 				// 指纹识别完成后保存更新结果
 				w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, allAssets)
 			}
@@ -870,6 +1010,9 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			w.saveTaskProgress(ctx, task, completedPhases, allAssets)
 			return
 		}
+
+		// 更新当前阶段
+		w.updateTaskProgressWithPhase(ctx, task.TaskId, 80, "漏洞扫描中", "漏洞扫描")
 
 		if s, ok := w.scanners["nuclei"]; ok {
 			// 获取单目标超时配置
@@ -955,7 +1098,7 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 
 				// 构建Nuclei扫描选项，设置回调函数批量保存漏洞
 				taskIdForCallback := task.TaskId // 捕获taskId用于回调
-				
+
 				nucleiOpts := &scanner.NucleiOptions{
 					Severity:        config.PocScan.Severity,
 					Tags:            autoTags,
@@ -1038,6 +1181,15 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 
 // updateTaskStatus 更新任务状态
 func (w *Worker) updateTaskStatus(ctx context.Context, taskId, status, result string) {
+	// 如果任务完成（SUCCESS/FAILURE），同时更新Redis中的进度
+	if status == scheduler.TaskStatusSuccess || status == scheduler.TaskStatusFailure {
+		progress := 100
+		if status == scheduler.TaskStatusFailure {
+			progress = 0 // 失败时进度设为0
+		}
+		w.updateTaskProgressWithPhase(ctx, taskId, progress, result, "完成")
+	}
+
 	_, err := w.rpcClient.UpdateTask(ctx, &pb.UpdateTaskReq{
 		TaskId: taskId,
 		State:  status,
@@ -1051,22 +1203,38 @@ func (w *Worker) updateTaskStatus(ctx context.Context, taskId, status, result st
 
 // updateTaskProgress 更新任务进度（通过Redis）
 func (w *Worker) updateTaskProgress(ctx context.Context, taskId string, progress int, message string) {
+	w.updateTaskProgressWithPhase(ctx, taskId, progress, message, "")
+}
+
+// updateTaskProgressWithPhase 更新任务进度和当前阶段（通过Redis）
+func (w *Worker) updateTaskProgressWithPhase(ctx context.Context, taskId string, progress int, message string, currentPhase string) {
 	if w.redisClient == nil {
 		return
 	}
-	
+
 	// 获取主任务ID
 	mainTaskId := getMainTaskId(taskId)
-	
-	// 更新进度到Redis
-	key := fmt.Sprintf("cscan:task:progress:%s", mainTaskId)
-	data := map[string]interface{}{
-		"progress":   progress,
-		"message":    message,
-		"updateTime": time.Now().Format("2006-01-02 15:04:05"),
+
+	// 更新子任务进度到Redis（每个子任务独立的key）
+	subKey := fmt.Sprintf("cscan:task:progress:sub:%s", taskId)
+	subData := map[string]interface{}{
+		"taskId":       taskId,
+		"progress":     progress,
+		"message":      message,
+		"currentPhase": currentPhase,
+		"updateTime":   time.Now().Format("2006-01-02 15:04:05"),
 	}
-	jsonData, _ := json.Marshal(data)
-	w.redisClient.Set(ctx, key, jsonData, 30*time.Minute)
+	subJsonData, _ := json.Marshal(subData)
+	w.redisClient.Set(ctx, subKey, subJsonData, 30*time.Minute)
+
+	// 同时更新主任务的当前阶段（用于显示）
+	mainKey := fmt.Sprintf("cscan:task:progress:%s", mainTaskId)
+	mainData := map[string]interface{}{
+		"currentPhase": currentPhase,
+		"updateTime":   time.Now().Format("2006-01-02 15:04:05"),
+	}
+	mainJsonData, _ := json.Marshal(mainData)
+	w.redisClient.Set(ctx, mainKey, mainJsonData, 30*time.Minute)
 }
 
 // saveAssetResult 保存资产结果
@@ -1075,42 +1243,87 @@ func (w *Worker) saveAssetResult(ctx context.Context, workspaceId, mainTaskId, o
 		return
 	}
 
-	w.taskLog(mainTaskId, LevelInfo, "Saving %d assets to workspace: %s, orgId: %s", len(assets), workspaceId, orgId)
-	
+	// 分批保存，每批最多500个
+	batchSize := 500
+	totalAssets := len(assets)
+	totalBatches := (totalAssets + batchSize - 1) / batchSize
 
-	pbAssets := make([]*pb.AssetDocument, 0, len(assets))
-	for _, asset := range assets {
-		pbAsset := &pb.AssetDocument{
-			Authority:  asset.Authority,
-			Host:       asset.Host,
-			Port:       int32(asset.Port),
-			Category:   asset.Category,
-			Service:    asset.Service,
-			Title:      asset.Title,
-			App:        asset.App,
-			HttpStatus: asset.HttpStatus,
-			HttpHeader: asset.HttpHeader,
-			HttpBody:   asset.HttpBody,
-			IconHash:   asset.IconHash,
-			Screenshot: asset.Screenshot,
-			Server:     asset.Server,
-			Banner:     asset.Banner,
-			IsHttp:     asset.IsHTTP,
+	w.taskLog(mainTaskId, LevelInfo, "Saving %d assets in %d batches", totalAssets, totalBatches)
+
+	var totalNew, totalUpdate int32
+
+	for batchIdx := 0; batchIdx < totalBatches; batchIdx++ {
+		start := batchIdx * batchSize
+		end := start + batchSize
+		if end > totalAssets {
+			end = totalAssets
 		}
-		pbAssets = append(pbAssets, pbAsset)
+
+		batchAssets := assets[start:end]
+		pbAssets := make([]*pb.AssetDocument, 0, len(batchAssets))
+
+		for _, asset := range batchAssets {
+			pbAsset := &pb.AssetDocument{
+				Authority:  asset.Authority,
+				Host:       asset.Host,
+				Port:       int32(asset.Port),
+				Category:   asset.Category,
+				Service:    asset.Service,
+				Title:      asset.Title,
+				App:        asset.App,
+				HttpStatus: asset.HttpStatus,
+				HttpHeader: asset.HttpHeader,
+				HttpBody:   asset.HttpBody,
+				IconHash:   asset.IconHash,
+				Screenshot: asset.Screenshot,
+				Server:     asset.Server,
+				Banner:     asset.Banner,
+				IsHttp:     asset.IsHTTP,
+				Cname:      asset.CName,
+				IsCdn:      asset.IsCDN,
+				IsCloud:    asset.IsCloud,
+				Source:     asset.Source,
+			}
+
+			// 添加IPv4信息
+			for _, ip := range asset.IPV4 {
+				pbAsset.Ipv4 = append(pbAsset.Ipv4, &pb.IPV4{
+					Ip:       ip.IP,
+					Location: ip.Location,
+				})
+			}
+
+			// 添加IPv6信息
+			for _, ip := range asset.IPV6 {
+				pbAsset.Ipv6 = append(pbAsset.Ipv6, &pb.IPV6{
+					Ip:       ip.IP,
+					Location: ip.Location,
+				})
+			}
+
+			pbAssets = append(pbAssets, pbAsset)
+		}
+
+		// 使用独立的超时上下文，每批30秒超时
+		batchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		resp, err := w.rpcClient.SaveTaskResult(batchCtx, &pb.SaveTaskResultReq{
+			WorkspaceId: workspaceId,
+			MainTaskId:  mainTaskId,
+			Assets:      pbAssets,
+			OrgId:       orgId,
+		})
+		cancel()
+
+		if err != nil {
+			w.taskLog(mainTaskId, LevelError, "Batch %d/%d save failed: %v", batchIdx+1, totalBatches, err)
+		} else {
+			totalNew += resp.NewAsset
+			totalUpdate += resp.UpdateAsset
+			w.taskLog(mainTaskId, LevelDebug, "Batch %d/%d saved: new=%d, update=%d", batchIdx+1, totalBatches, resp.NewAsset, resp.UpdateAsset)
+		}
 	}
 
-	resp, err := w.rpcClient.SaveTaskResult(ctx, &pb.SaveTaskResultReq{
-		WorkspaceId: workspaceId,
-		MainTaskId:  mainTaskId,
-		Assets:      pbAssets,
-		OrgId:       orgId,
-	})
-	if err != nil {
-		w.taskLog(mainTaskId, LevelError, "save asset result failed: %v", err)
-	} else {
-		w.taskLog(mainTaskId, LevelInfo, "Save asset result: %s", resp.Message)
-	}
+	w.taskLog(mainTaskId, LevelInfo, "Save completed: total=%d, new=%d, update=%d", totalAssets, totalNew, totalUpdate)
 }
 
 // saveVulResult 保存漏洞结果（支持去重与聚合）
@@ -1239,11 +1452,11 @@ func (w *Worker) keepAlive() {
 
 // CPU负载阈值常量
 const (
-	CPULoadThreshold     = 80.0  // CPU负载阈值，超过此值暂停任务拉取
-	CPULoadRecovery      = 60.0  // CPU负载恢复阈值，低于此值恢复任务拉取
-	CPUCheckInterval     = 5     // CPU检查间隔(秒)
-	CPUOverloadThreshold = 3     // 连续过载次数阈值，超过则进入限流
-	ThrottleDuration     = 30    // 限流持续时间(秒)
+	CPULoadThreshold     = 80.0 // CPU负载阈值，超过此值暂停任务拉取
+	CPULoadRecovery      = 60.0 // CPU负载恢复阈值，低于此值恢复任务拉取
+	CPUCheckInterval     = 5    // CPU检查间隔(秒)
+	CPUOverloadThreshold = 3    // 连续过载次数阈值，超过则进入限流
+	ThrottleDuration     = 30   // 限流持续时间(秒)
 )
 
 // isCPUOverloaded 检查CPU是否过载
@@ -1252,7 +1465,7 @@ const (
 func (w *Worker) isCPUOverloaded() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	// 检查是否处于限流状态
 	if w.isThrottled {
 		if time.Now().Before(w.throttleUntil) {
@@ -1263,13 +1476,13 @@ func (w *Worker) isCPUOverloaded() bool {
 		w.cpuOverloadCount = 0
 		w.logger.Info("CPU throttle period ended, resuming task fetch")
 	}
-	
+
 	// 避免频繁检查CPU
 	if time.Since(w.lastCPUCheck) < time.Duration(CPUCheckInterval)*time.Second {
 		return false
 	}
 	w.lastCPUCheck = time.Now()
-	
+
 	// 快速获取CPU使用率（1秒采样）
 	cpuPercent, err := cpu.Percent(time.Second, false)
 	if err != nil || len(cpuPercent) == 0 {
@@ -1277,12 +1490,12 @@ func (w *Worker) isCPUOverloaded() bool {
 	}
 
 	cpuLoad := cpuPercent[0]
-	
+
 	if cpuLoad >= CPULoadThreshold {
 		w.cpuOverloadCount++
-		w.logger.Warn("CPU load %.1f%% exceeds threshold %.1f%% (count: %d/%d)", 
+		w.logger.Warn("CPU load %.1f%% exceeds threshold %.1f%% (count: %d/%d)",
 			cpuLoad, CPULoadThreshold, w.cpuOverloadCount, CPUOverloadThreshold)
-		
+
 		// 连续多次过载，进入限流状态
 		if w.cpuOverloadCount >= CPUOverloadThreshold {
 			w.isThrottled = true
@@ -1294,11 +1507,11 @@ func (w *Worker) isCPUOverloaded() bool {
 		// CPU负载恢复正常，重置计数
 		if w.cpuOverloadCount > 0 {
 			w.cpuOverloadCount = 0
-			w.logger.Info("CPU load %.1f%% recovered below %.1f%%, resetting overload count", 
+			w.logger.Info("CPU load %.1f%% recovered below %.1f%%, resetting overload count",
 				cpuLoad, CPULoadRecovery)
 		}
 	}
-	
+
 	return false
 }
 
@@ -1345,7 +1558,7 @@ func (w *Worker) sendHeartbeat() {
 		IsDaemon:           false,
 		Ip:                 w.config.IP,
 	})
-	
+
 	// 调试：打印心跳发送的 IP
 	if w.config.IP == "" {
 		fmt.Printf("[Heartbeat] WARNING: IP is empty! config=%+v\n", w.config)
@@ -1450,6 +1663,8 @@ func (w *Worker) reportStatusToRedis() {
 		"healthStatus":       healthStatus,
 		"isThrottled":        isThrottled,
 		"cpuOverloadCount":   cpuOverloadCount,
+		"concurrency":        w.config.Concurrency,
+		"runningTasks":       len(w.taskChan),
 		"updateTime":         time.Now().Format("2006-01-02 15:04:05"),
 		// 工具安装状态
 		"tools": map[string]bool{
@@ -1459,7 +1674,7 @@ func (w *Worker) reportStatusToRedis() {
 	}
 
 	data, _ := json.Marshal(status)
-	w.redisClient.Set(ctx, key, data, 10*time.Minute)
+	w.redisClient.Set(ctx, key, data, 2*time.Minute) // 2分钟过期，离线Worker会更快从列表消失
 }
 
 // GetWorkerName 获取Worker名称
@@ -1485,7 +1700,7 @@ func ensureUniqueWorkerName(ctx context.Context, redisClient *redis.Client, name
 	if redisClient == nil {
 		return name
 	}
-	
+
 	// 检查是否存在同名 worker（通过心跳 key 判断）
 	key := "cscan:worker:heartbeat:" + name
 	exists, err := redisClient.Exists(ctx, key).Result()
@@ -1493,7 +1708,7 @@ func ensureUniqueWorkerName(ctx context.Context, redisClient *redis.Client, name
 		// 不存在同名 worker，直接使用
 		return name
 	}
-	
+
 	// 存在同名 worker，生成新名称
 	baseName := name
 	for i := 1; i <= 100; i++ {
@@ -1505,7 +1720,7 @@ func ensureUniqueWorkerName(ctx context.Context, redisClient *redis.Client, name
 			return newName
 		}
 	}
-	
+
 	// 极端情况：100次都冲突，使用时间戳
 	newName := fmt.Sprintf("%s-%d", baseName, time.Now().UnixNano())
 	fmt.Printf("[Worker] Name conflict detected, renamed from '%s' to '%s'\n", baseName, newName)
@@ -1533,7 +1748,7 @@ func GetLocalIP() string {
 	if err != nil {
 		return ""
 	}
-	
+
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
@@ -2152,15 +2367,15 @@ func (w *Worker) executePortIdentify(ctx context.Context, task *scheduler.TaskIn
 // - URL: http://example.com:8080
 func (w *Worker) generateAssetsFromTarget(target string, portConfig *scheduler.PortScanConfig) []*scanner.Asset {
 	var assets []*scanner.Asset
-	
+
 	// 默认端口列表
 	defaultPorts := []int{80, 443, 8080, 8443}
-	
+
 	// 如果配置了端口，解析端口列表
 	if portConfig != nil && portConfig.Ports != "" {
 		defaultPorts = parsePortList(portConfig.Ports)
 	}
-	
+
 	// 解析目标
 	targets := strings.Split(target, "\n")
 	for _, t := range targets {
@@ -2168,7 +2383,7 @@ func (w *Worker) generateAssetsFromTarget(target string, portConfig *scheduler.P
 		if t == "" {
 			continue
 		}
-		
+
 		// 处理URL格式
 		if strings.HasPrefix(t, "http://") || strings.HasPrefix(t, "https://") {
 			asset := w.parseURLToAsset(t)
@@ -2177,7 +2392,7 @@ func (w *Worker) generateAssetsFromTarget(target string, portConfig *scheduler.P
 			}
 			continue
 		}
-		
+
 		// 处理带端口的格式 host:port
 		if strings.Contains(t, ":") && !strings.Contains(t, "/") {
 			parts := strings.Split(t, ":")
@@ -2197,19 +2412,19 @@ func (w *Worker) generateAssetsFromTarget(target string, portConfig *scheduler.P
 				continue
 			}
 		}
-		
+
 		// 处理CIDR格式 - 跳过，因为没有端口扫描无法确定开放端口
 		if strings.Contains(t, "/") {
 			w.logger.Warn("CIDR target %s skipped: port scan disabled, cannot determine open ports", t)
 			continue
 		}
-		
+
 		// 处理IP范围格式 - 跳过
 		if strings.Contains(t, "-") && !strings.Contains(t, ".") {
 			w.logger.Warn("IP range target %s skipped: port scan disabled, cannot determine open ports", t)
 			continue
 		}
-		
+
 		// 单个主机（IP或域名），使用默认端口
 		for _, port := range defaultPorts {
 			asset := &scanner.Asset{
@@ -2221,7 +2436,7 @@ func (w *Worker) generateAssetsFromTarget(target string, portConfig *scheduler.P
 			assets = append(assets, asset)
 		}
 	}
-	
+
 	return assets
 }
 
@@ -2231,7 +2446,7 @@ func (w *Worker) parseURLToAsset(urlStr string) *scanner.Asset {
 	scheme := "http"
 	host := ""
 	port := 80
-	
+
 	if strings.HasPrefix(urlStr, "https://") {
 		scheme = "https"
 		port = 443
@@ -2239,12 +2454,12 @@ func (w *Worker) parseURLToAsset(urlStr string) *scanner.Asset {
 	} else if strings.HasPrefix(urlStr, "http://") {
 		urlStr = strings.TrimPrefix(urlStr, "http://")
 	}
-	
+
 	// 移除路径部分
 	if idx := strings.Index(urlStr, "/"); idx > 0 {
 		urlStr = urlStr[:idx]
 	}
-	
+
 	// 解析host:port
 	if strings.Contains(urlStr, ":") {
 		parts := strings.Split(urlStr, ":")
@@ -2255,11 +2470,11 @@ func (w *Worker) parseURLToAsset(urlStr string) *scanner.Asset {
 	} else {
 		host = urlStr
 	}
-	
+
 	if host == "" {
 		return nil
 	}
-	
+
 	return &scanner.Asset{
 		Host:      host,
 		Port:      port,
@@ -2273,14 +2488,14 @@ func (w *Worker) parseURLToAsset(urlStr string) *scanner.Asset {
 func parsePortList(portsStr string) []int {
 	var ports []int
 	seen := make(map[int]bool)
-	
+
 	parts := strings.Split(portsStr, ",")
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
-		
+
 		// 处理端口范围 (如 80-90)
 		if strings.Contains(part, "-") {
 			rangeParts := strings.Split(part, "-")
@@ -2306,7 +2521,7 @@ func parsePortList(portsStr string) []int {
 			}
 		}
 	}
-	
+
 	return ports
 }
 
@@ -2369,9 +2584,10 @@ func (w *Worker) subscribeControlCommand() {
 // handleControlCommand 处理控制命令
 func (w *Worker) handleControlCommand(payload string) {
 	var cmd struct {
-		Action     string `json:"action"`
-		WorkerName string `json:"workerName"`
-		NewName    string `json:"newName"`
+		Action      string `json:"action"`
+		WorkerName  string `json:"workerName"`
+		NewName     string `json:"newName"`
+		Concurrency int    `json:"concurrency"`
 	}
 
 	if err := json.Unmarshal([]byte(payload), &cmd); err != nil {
@@ -2396,36 +2612,27 @@ func (w *Worker) handleControlCommand(payload string) {
 	case "restart":
 		w.logger.Info("Received restart command, restarting worker %s", w.config.Name)
 		go func() {
-			executable, err := os.Executable()
+			// 快速停止当前 Worker（跳过当前任务，不等待完成）
+			w.logger.Info("Stopping current worker immediately (skipping current tasks)...")
+			w.StopImmediate()
+			w.logger.Info("Worker stopped, restarting in same process...")
+
+			// 在同一进程内重新初始化 Worker
+			time.Sleep(1 * time.Second) // 短暂等待确保资源释放
+
+			// 创建新的 Worker 实例
+			newWorker, err := NewWorker(w.config)
 			if err != nil {
-				w.logger.Error("Failed to get executable path: %v", err)
+				w.logger.Error("Failed to create new worker: %v", err)
 				os.Exit(1)
 			}
 
-			if runtime.GOOS == "windows" {
-				// Windows: 启动新进程后退出当前进程
-				cmd := exec.Command(executable, os.Args[1:]...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				cmd.Stdin = os.Stdin
-				
-				if err := cmd.Start(); err != nil {
-					w.logger.Error("Failed to start new worker process: %v", err)
-					os.Exit(1)
-				}
-				
-				w.logger.Info("New worker process started, stopping current process")
-				w.Stop()
-				os.Exit(0)
-			} else {
-				// Linux/Unix: 使用 syscall.Exec 原地替换进程
-				w.Stop()
-				err = syscall.Exec(executable, os.Args, os.Environ())
-				if err != nil {
-					w.logger.Error("Failed to restart worker: %v", err)
-					os.Exit(1)
-				}
-			}
+			// 启动新 Worker
+			newWorker.Start()
+			w.logger.Info("Worker restarted successfully in same process")
+
+			// 阻塞等待信号（保持进程运行）
+			select {}
 		}()
 	case "rename":
 		if cmd.NewName != "" {
@@ -2433,6 +2640,16 @@ func (w *Worker) handleControlCommand(payload string) {
 			w.config.Name = cmd.NewName
 			// 立即上报新状态
 			w.reportStatusToRedis()
+		}
+	case "setConcurrency":
+		if cmd.Concurrency >= 1 && cmd.Concurrency <= 100 {
+			oldConcurrency := w.config.Concurrency
+			w.config.Concurrency = cmd.Concurrency
+			w.logger.Info("Received setConcurrency command, changed concurrency from %d to %d (note: restart required to add more workers)", oldConcurrency, cmd.Concurrency)
+			// 立即上报新状态
+			w.reportStatusToRedis()
+		} else {
+			w.logger.Warn("Invalid concurrency value: %d, must be between 1 and 100", cmd.Concurrency)
 		}
 	default:
 		w.logger.Warn("Unknown control command: %s", cmd.Action)

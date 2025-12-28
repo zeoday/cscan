@@ -16,71 +16,34 @@
           <el-icon><Odometer /></el-icon>
           <template #title>工作台</template>
         </el-menu-item>
-        
-        <!-- 扫描管理分组 -->
-        <el-sub-menu index="scan">
-          <template #title>
-            <el-icon><Cpu /></el-icon>
-            <span>扫描管理</span>
-          </template>
-          <el-menu-item index="/asset">
-            <el-icon><Monitor /></el-icon>
-            <template #title>资产管理</template>
-          </el-menu-item>
-          <el-menu-item index="/task">
-            <el-icon><List /></el-icon>
-            <template #title>任务管理</template>
-          </el-menu-item>
-          <el-menu-item index="/vul">
-            <el-icon><Warning /></el-icon>
-            <template #title>漏洞管理</template>
-          </el-menu-item>
-          <el-menu-item index="/online-search">
-            <el-icon><Search /></el-icon>
-            <template #title>在线搜索</template>
-          </el-menu-item>
-        </el-sub-menu>
-        
-        <!-- 策略管理分组 -->
-        <el-sub-menu index="policy">
-          <template #title>
-            <el-icon><Setting /></el-icon>
-            <span>策略管理</span>
-          </template>
-          <el-menu-item index="/poc">
-            <el-icon><Aim /></el-icon>
-            <template #title>POC管理</template>
-          </el-menu-item>
-          <el-menu-item index="/fingerprint">
-            <el-icon><Stamp /></el-icon>
-            <template #title>指纹管理</template>
-          </el-menu-item>
-
-        </el-sub-menu>
-        
-        <!-- 系统管理分组 -->
-        <el-sub-menu index="system">
-          <template #title>
-            <el-icon><Tools /></el-icon>
-            <span>系统管理</span>
-          </template>
-          <el-menu-item index="/worker">
-            <el-icon><Connection /></el-icon>
-            <template #title>Worker管理</template>
-          </el-menu-item>
-          <el-menu-item index="/workspace">
-            <el-icon><Folder /></el-icon>
-            <template #title>工作空间</template>
-          </el-menu-item>
-          <el-menu-item index="/user">
-            <el-icon><User /></el-icon>
-            <template #title>用户管理</template>
-          </el-menu-item>
-          <el-menu-item index="/organization">
-            <el-icon><OfficeBuilding /></el-icon>
-            <template #title>组织管理</template>
-          </el-menu-item>
-        </el-sub-menu>
+        <el-menu-item index="/asset-management">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>资产管理</template>
+        </el-menu-item>
+        <el-menu-item index="/task">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>任务管理</template>
+        </el-menu-item>
+        <el-menu-item index="/online-search">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>在线搜索</template>
+        </el-menu-item>
+        <el-menu-item index="/poc">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>POC管理</template>
+        </el-menu-item>
+        <el-menu-item index="/fingerprint">
+          <el-icon><Stamp /></el-icon>
+          <template #title>指纹管理</template>
+        </el-menu-item>
+        <el-menu-item index="/worker">
+          <el-icon><Connection /></el-icon>
+          <template #title>Worker管理</template>
+        </el-menu-item>
+        <el-menu-item index="/settings">
+          <el-icon><Setting /></el-icon>
+          <template #title>系统配置</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -146,7 +109,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { Setting, Sunny, Moon, Cpu, Tools, OfficeBuilding } from '@element-plus/icons-vue'
+import { Setting, Sunny, Moon, Cpu, Tools, OfficeBuilding, DataAnalysis, Link, Position } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()

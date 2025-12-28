@@ -54,9 +54,10 @@ type Asset struct {
 	IsCDN      bool     `json:"isCdn"`
 	CName      string   `json:"cname"`
 	IsCloud    bool     `json:"isCloud"`
-	IsHTTP     bool     `json:"isHttp"` // 是否为HTTP服务
+	IsHTTP     bool     `json:"isHttp"`   // 是否为HTTP服务
 	IPV4       []IPInfo `json:"ipv4"`
 	IPV6       []IPInfo `json:"ipv6"`
+	Source     string   `json:"source"`   // 资产来源: subfinder, portscan, etc.
 }
 
 // IPInfo IP信息

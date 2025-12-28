@@ -9,6 +9,7 @@ import (
 	"cscan/api/internal/handler/organization"
 	"cscan/api/internal/handler/poc"
 	"cscan/api/internal/handler/report"
+	"cscan/api/internal/handler/subfinder"
 	"cscan/api/internal/handler/task"
 	"cscan/api/internal/handler/user"
 	"cscan/api/internal/handler/vul"
@@ -61,7 +62,24 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/asset/stat", Handler: asset.AssetStatHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/asset/delete", Handler: asset.AssetDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/asset/batchDelete", Handler: asset.AssetBatchDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/clear", Handler: asset.AssetClearHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/asset/history", Handler: asset.AssetHistoryHandler(svcCtx)},
+
+		// 站点管理
+		{Method: http.MethodPost, Path: "/api/v1/asset/site/list", Handler: asset.SiteListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/site/stat", Handler: asset.SiteStatHandler(svcCtx)},
+
+		// 域名管理
+		{Method: http.MethodPost, Path: "/api/v1/asset/domain/list", Handler: asset.DomainListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/domain/stat", Handler: asset.DomainStatHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/domain/delete", Handler: asset.DomainDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/domain/batchDelete", Handler: asset.DomainBatchDeleteHandler(svcCtx)},
+
+		// IP管理
+		{Method: http.MethodPost, Path: "/api/v1/asset/ip/list", Handler: asset.IPListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/ip/stat", Handler: asset.IPStatHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/ip/delete", Handler: asset.IPDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/ip/batchDelete", Handler: asset.IPBatchDeleteHandler(svcCtx)},
 
 		// 任务管理
 		{Method: http.MethodPost, Path: "/api/v1/task/list", Handler: task.MainTaskListHandler(svcCtx)},
@@ -87,12 +105,14 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/vul/stat", Handler: vul.VulStatHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/vul/delete", Handler: vul.VulDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/vul/batchDelete", Handler: vul.VulBatchDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/vul/clear", Handler: vul.VulClearHandler(svcCtx)},
 
 		// Worker管理
 		{Method: http.MethodPost, Path: "/api/v1/worker/list", Handler: worker.WorkerListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/delete", Handler: worker.WorkerDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/rename", Handler: worker.WorkerRenameHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/restart", Handler: worker.WorkerRestartHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/worker/concurrency", Handler: worker.WorkerSetConcurrencyHandler(svcCtx)},
 
 		// 在线API搜索
 		{Method: http.MethodPost, Path: "/api/v1/onlineapi/search", Handler: onlineapi.OnlineSearchHandler(svcCtx)},
@@ -146,6 +166,11 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		// 报告管理
 		{Method: http.MethodPost, Path: "/api/v1/report/detail", Handler: report.ReportDetailHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/report/export", Handler: report.ReportExportHandler(svcCtx)},
+
+		// Subfinder数据源配置
+		{Method: http.MethodPost, Path: "/api/v1/subfinder/provider/list", Handler: subfinder.SubfinderProviderListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/subfinder/provider/save", Handler: subfinder.SubfinderProviderSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/subfinder/provider/info", Handler: subfinder.SubfinderProviderInfoHandler(svcCtx)},
 	}
 
 	// 为每个路由包装认证中间件

@@ -120,6 +120,14 @@ func (m *AssetModel) FindByAuthority(ctx context.Context, authority, taskId stri
 	return &doc, err
 }
 
+// FindByAuthorityOnly 只按authority查找资产（不限制taskId）
+func (m *AssetModel) FindByAuthorityOnly(ctx context.Context, authority string) (*Asset, error) {
+	var doc Asset
+	filter := bson.M{"authority": authority}
+	err := m.coll.FindOne(ctx, filter).Decode(&doc)
+	return &doc, err
+}
+
 func (m *AssetModel) FindByHostPort(ctx context.Context, host string, port int) (*Asset, error) {
 	var doc Asset
 	filter := bson.M{"host": host, "port": port}
@@ -270,6 +278,15 @@ func (m *AssetModel) BatchDelete(ctx context.Context, ids []string) (int64, erro
 	return result.DeletedCount, nil
 }
 
+// Clear 清空所有资产
+func (m *AssetModel) Clear(ctx context.Context) (int64, error) {
+	result, err := m.coll.DeleteMany(ctx, bson.M{})
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
+}
+
 func (m *AssetModel) Aggregate(ctx context.Context, field string, limit int) ([]StatResult, error) {
 	pipeline := mongo.Pipeline{
 		{{Key: "$group", Value: bson.D{
@@ -405,6 +422,15 @@ func (m *AssetHistoryModel) FindByAuthority(ctx context.Context, authority strin
 		return nil, err
 	}
 	return docs, nil
+}
+
+// Clear 清空所有历史记录
+func (m *AssetHistoryModel) Clear(ctx context.Context) (int64, error) {
+	result, err := m.coll.DeleteMany(ctx, bson.M{})
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
 }
 
 // Upsert 插入或更新资产

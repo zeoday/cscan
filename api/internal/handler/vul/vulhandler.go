@@ -105,6 +105,20 @@ func VulBatchDeleteHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+// VulClearHandler 清空漏洞
+func VulClearHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		workspaceId := middleware.GetWorkspaceId(r.Context())
+		l := logic.NewVulLogic(r.Context(), svcCtx)
+		resp, err := l.VulClear(workspaceId)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
 // VulStatHandler 漏洞统计
 func VulStatHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

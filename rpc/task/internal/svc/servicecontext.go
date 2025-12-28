@@ -22,6 +22,7 @@ type ServiceContext struct {
 	CustomPocModel          *model.CustomPocModel
 	HttpServiceMappingModel *model.HttpServiceMappingModel
 	WorkspaceModel          *model.WorkspaceModel
+	SubfinderProviderModel  *model.SubfinderProviderModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -52,6 +53,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		CustomPocModel:          model.NewCustomPocModel(mongoDB),
 		HttpServiceMappingModel: model.NewHttpServiceMappingModel(mongoDB),
 		WorkspaceModel:          model.NewWorkspaceModel(mongoDB),
+		SubfinderProviderModel:  model.NewSubfinderProviderModel(mongoDB),
 	}
 }
 

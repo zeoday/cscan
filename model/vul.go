@@ -182,6 +182,15 @@ func (m *VulModel) BatchDelete(ctx context.Context, ids []string) (int64, error)
 	return result.DeletedCount, nil
 }
 
+// Clear 清空所有漏洞
+func (m *VulModel) Clear(ctx context.Context) (int64, error) {
+	result, err := m.coll.DeleteMany(ctx, bson.M{})
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
+}
+
 // FindByHostPort 根据host和port查找漏洞列表（用于风险评分计算）
 func (m *VulModel) FindByHostPort(ctx context.Context, host string, port int) ([]Vul, error) {
 	filter := bson.M{
