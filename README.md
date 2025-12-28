@@ -220,4 +220,4 @@ docker-compose up -d --scale cscan-worker=3
 MIT
 
 ## 加入交流群
-<img src="images/cscan.jpg" alt="交流群" width="200"/>
+<img src="images/cscan.png" alt="交流群" width="200"/>
