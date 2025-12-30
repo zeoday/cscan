@@ -24,12 +24,10 @@
 
 <details open>
 <summary>⭐ 快速开始 </summary>
-
 ```bash
 git clone https://github.com/tangxiaofeng7/cscan.git
 cd cscan
-# 直接启动
-docker-compose up -d --build
+docker-compose up -d
 ```
 
 访问 `http://localhost:3000`，默认账号 `admin / 123456`

@@ -37,17 +37,12 @@ services:
 
   # CSCAN API 服务
   cscan-api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.api
-    image: cscan/api:latest
+    image: registry.cn-hangzhou.aliyuncs.com/txf7/cscan:api-latest
     container_name: cscan_api
     environment:
       - TZ=Asia/Shanghai
       - MONGO_URI=mongodb://mongodb:27017
       - REDIS_HOST=redis:6379
-    volumes:
-      - ./poc:/app/poc:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -59,10 +54,7 @@ services:
 
   # CSCAN RPC 服务
   cscan-rpc:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.rpc
-    image: cscan/rpc:latest
+    image: registry.cn-hangzhou.aliyuncs.com/txf7/cscan:rpc-latest
     container_name: cscan_rpc
     environment:
       - TZ=Asia/Shanghai
@@ -79,10 +71,7 @@ services:
 
   # CSCAN Worker 扫描节点 (可扩展)
   cscan-worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.worker
-    image: cscan/worker:latest
+    image: registry.cn-hangzhou.aliyuncs.com/txf7/cscan:worker-latest
     environment:
       - TZ=Asia/Shanghai
       - SERVER_ADDR=cscan-rpc:9000
@@ -99,10 +88,7 @@ services:
 
   # CSCAN Web 前端
   cscan-web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    image: cscan/web:latest
+    image: registry.cn-hangzhou.aliyuncs.com/txf7/cscan:web-latest
     container_name: cscan_web
     environment:
       - TZ=Asia/Shanghai
