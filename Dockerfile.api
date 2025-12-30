@@ -33,8 +33,8 @@ RUN nuclei -update-templates -v || true
 ENV TZ=Asia/Shanghai
 
 COPY --from=builder /cscan-api .
-COPY api/etc/cscan.yaml ./etc/
+COPY docker/cscan-api.yaml ./etc/
 
 EXPOSE 8888
 
-CMD ["./cscan-api", "-f", "etc/cscan.yaml"]
+CMD ["./cscan-api", "-f", "etc/cscan-api.yaml"]

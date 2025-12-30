@@ -23,7 +23,7 @@ RUN apk add --no-cache ca-certificates tzdata
 ENV TZ=Asia/Shanghai
 
 COPY --from=builder /cscan-rpc .
-COPY rpc/task/etc/task.yaml ./etc/
+COPY docker/task.yaml ./etc/
 
 EXPOSE 9000
 

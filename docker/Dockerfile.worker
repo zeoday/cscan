@@ -39,13 +39,6 @@ RUN apk add --no-cache \
 ENV CHROME_BIN=/usr/bin/chromium-browser
 ENV CHROMEDP_NO_SANDBOX=true
 
-# 安装 nuclei (仅 amd64)
-COPY poc/nuclei_3.6.1_linux_amd64.zip /tmp/nuclei.zip
-RUN unzip /tmp/nuclei.zip -d /tmp/ \
-    && find /tmp -name "nuclei" -type f -exec mv {} /usr/local/bin/ \; \
-    && rm -rf /tmp/nuclei* \
-    && chmod +x /usr/local/bin/nuclei
-
 # 安装 httpx (仅 amd64)
 COPY poc/httpx_1.7.4_linux_amd64.zip /tmp/httpx.zip
 RUN unzip /tmp/httpx.zip -d /tmp/ \
