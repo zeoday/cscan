@@ -237,9 +237,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="160">
+            <el-table-column label="操作" width="300">
               <template #default="{ row }">
                 <el-button type="success" link size="small" @click="showPocValidateDialog(row)">验证</el-button>
+                <el-button type="warning" link size="small" @click="showScanAssetsDialog(row)">扫描资产</el-button>
                 <el-button type="primary" link size="small" @click="showCustomPocForm(row)">编辑</el-button>
                 <el-button type="danger" link size="small" @click="handleDeleteCustomPoc(row)">删除</el-button>
               </template>
@@ -676,6 +677,71 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 扫描现有资产对话框 -->
+    <el-dialog v-model="scanAssetsDialogVisible" title="扫描现有资产" width="900px" @close="handleScanAssetsDialogClose">
+      <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
+        <el-descriptions-item label="POC名称">{{ scanAssetsPoc.name }}</el-descriptions-item>
+        <el-descriptions-item label="模板ID">{{ scanAssetsPoc.templateId }}</el-descriptions-item>
+        <el-descriptions-item label="严重级别">
+          <el-tag :type="getSeverityType(scanAssetsPoc.severity)" size="small">{{ scanAssetsPoc.severity }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="标签">
+          <el-tag v-for="tag in (scanAssetsPoc.tags || [])" :key="tag" size="small" style="margin-right: 3px">{{ tag }}</el-tag>
+        </el-descriptions-item>
+      </el-descriptions>
+      
+      <div v-if="!scanAssetsStarted" class="scan-assets-tip">
+        <el-alert type="info" :closable="false" show-icon>
+          <template #title>
+            点击"开始扫描"将使用此POC对当前工作空间的所有HTTP资产进行漏洞扫描
+          </template>
+          <template #default>
+            <div style="margin-top: 5px; color: #909399; font-size: 12px">
+              扫描任务将异步执行，发现的漏洞会显示在"漏洞管理"页面
+            </div>
+          </template>
+        </el-alert>
+      </div>
+      
+      <!-- 扫描进度 -->
+      <div v-if="scanAssetsStarted" class="scan-assets-progress">
+        <div class="progress-header">
+          <span>扫描进度: {{ scanAssetsProgress.completed }}/{{ scanAssetsProgress.total }}</span>
+          <el-progress 
+            :percentage="scanAssetsProgress.total > 0 ? Math.round(scanAssetsProgress.completed / scanAssetsProgress.total * 100) : 0" 
+            :status="scanAssetsLoading ? '' : 'success'"
+            style="width: 200px; margin-left: 15px"
+          />
+          <el-tag v-if="scanAssetsProgress.vulnCount > 0" type="danger" size="small" style="margin-left: 15px">
+            发现漏洞: {{ scanAssetsProgress.vulnCount }}
+          </el-tag>
+        </div>
+        
+        <!-- 执行日志 -->
+        <div class="validate-logs" style="margin-top: 15px">
+          <div class="logs-header">
+            <span>执行日志</span>
+            <el-tag v-if="scanAssetsLoading" type="warning" size="small">扫描中...</el-tag>
+            <el-tag v-else type="success" size="small">扫描完成</el-tag>
+          </div>
+          <div class="logs-content" ref="scanAssetsLogsRef" style="max-height: 300px;">
+            <div v-for="(log, index) in scanAssetsLogs" :key="index" :class="['log-line', 'log-' + log.level.toLowerCase()]">
+              <span class="log-time">{{ log.timestamp }}</span>
+              <span class="log-level">[{{ log.level }}]</span>
+              <span class="log-msg">{{ log.message }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="scanAssetsDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="handleScanAssets" :loading="scanAssetsLoading" :disabled="scanAssetsLoading">
+          {{ scanAssetsStarted ? '重新扫描' : '开始扫描' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -683,7 +749,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete } from '@element-plus/icons-vue'
-import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult } from '@/api/poc'
+import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc } from '@/api/poc'
 import jsYaml from 'js-yaml'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
@@ -793,6 +859,22 @@ const pocValidateLogs = ref([])
 const logsContainerRef = ref(null)
 let logEventSource = null
 let currentTaskId = null
+
+// 扫描现有资产
+const scanAssetsDialogVisible = ref(false)
+const scanAssetsPoc = ref({})
+const scanAssetsLoading = ref(false)
+const scanAssetsStarted = ref(false)
+const scanAssetsLogs = ref([])
+const scanAssetsLogsRef = ref(null)
+const scanAssetsProgress = reactive({
+  total: 0,
+  completed: 0,
+  vulnCount: 0
+})
+let scanAssetsTaskIds = []
+let scanAssetsEventSource = null
+let scanAssetsPollTimer = null
 
 // 默认模板批量验证
 const templateBatchValidateDialogVisible = ref(false)
@@ -2089,12 +2171,228 @@ function showPocValidateDialog(row) {
   pocValidateDialogVisible.value = true
 }
 
+// 显示扫描现有资产对话框
+function showScanAssetsDialog(row) {
+  scanAssetsPoc.value = row
+  scanAssetsStarted.value = false
+  scanAssetsLogs.value = []
+  scanAssetsTaskIds = []
+  scanAssetsProgress.total = 0
+  scanAssetsProgress.completed = 0
+  scanAssetsProgress.vulnCount = 0
+  scanAssetsDialogVisible.value = true
+}
+
+// 清理扫描资产相关资源
+function cleanupScanAssets() {
+  if (scanAssetsPollTimer) {
+    clearInterval(scanAssetsPollTimer)
+    scanAssetsPollTimer = null
+  }
+  if (scanAssetsEventSource) {
+    scanAssetsEventSource.close()
+    scanAssetsEventSource = null
+  }
+  scanAssetsTaskIds = []
+}
+
+// 对话框关闭时清理
+function handleScanAssetsDialogClose() {
+  cleanupScanAssets()
+  scanAssetsLoading.value = false
+}
+
+// 开始监听扫描资产日志流
+function startScanAssetsLogStream(taskIds) {
+  // 关闭之前的连接
+  if (scanAssetsEventSource) {
+    scanAssetsEventSource.close()
+  }
+  
+  scanAssetsTaskIds = taskIds
+  
+  // 连接SSE日志流
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  const token = localStorage.getItem('token')
+  scanAssetsEventSource = new EventSource(`${baseUrl}/api/v1/worker/logs/stream?token=${token}`)
+  
+  scanAssetsEventSource.onmessage = (event) => {
+    try {
+      const log = JSON.parse(event.data)
+      // 检查日志是否属于当前扫描的任务
+      const matchedTaskId = scanAssetsTaskIds.find(tid => log.message && log.message.includes(tid))
+      if (matchedTaskId) {
+        // 提取日志中的关键信息，去掉taskId前缀
+        let displayMsg = log.message
+        const taskIdPrefix = `[${matchedTaskId}] `
+        if (displayMsg.startsWith(taskIdPrefix)) {
+          displayMsg = displayMsg.substring(taskIdPrefix.length)
+        }
+        
+        scanAssetsLogs.value.push({
+          level: log.level || 'INFO',
+          message: displayMsg,
+          timestamp: log.timestamp || new Date().toLocaleTimeString()
+        })
+        
+        // 检查是否发现漏洞（匹配日志中的漏洞标记）
+        if (displayMsg.includes('✓') || displayMsg.includes('Vulnerability found') || displayMsg.includes('发现漏洞')) {
+          scanAssetsProgress.vulnCount++
+        }
+        
+        // 从完成日志中提取漏洞数（格式：Batch scan completed: targets=X, vuls=Y, duration=Zs）
+        const vulMatch = displayMsg.match(/vuls[=:]\s*(\d+)/i)
+        if (vulMatch) {
+          scanAssetsProgress.vulnCount = parseInt(vulMatch[1])
+        }
+        
+        // 限制日志数量
+        if (scanAssetsLogs.value.length > 200) {
+          scanAssetsLogs.value.shift()
+        }
+        // 滚动到底部
+        scrollScanAssetsLogsToBottom()
+      }
+    } catch (e) {
+      // 忽略解析错误
+    }
+  }
+  
+  scanAssetsEventSource.onerror = () => {
+    // 连接错误时不做处理
+  }
+}
+
+// 滚动扫描日志到底部
+function scrollScanAssetsLogsToBottom() {
+  if (scanAssetsLogsRef.value) {
+    scanAssetsLogsRef.value.scrollTop = scanAssetsLogsRef.value.scrollHeight
+  }
+}
+
+// 轮询扫描任务状态
+function startScanAssetsPoll() {
+  if (scanAssetsPollTimer) {
+    clearInterval(scanAssetsPollTimer)
+  }
+  
+  scanAssetsPollTimer = setInterval(async () => {
+    if (scanAssetsTaskIds.length === 0) {
+      clearInterval(scanAssetsPollTimer)
+      scanAssetsPollTimer = null
+      return
+    }
+    
+    // 只有一个批量任务，检查它的状态
+    const taskId = scanAssetsTaskIds[0]
+    
+    try {
+      const res = await getPocValidationResult({ taskId })
+      if (res.code === 0 && (res.status === 'SUCCESS' || res.status === 'FAILURE')) {
+        clearInterval(scanAssetsPollTimer)
+        scanAssetsPollTimer = null
+        scanAssetsLoading.value = false
+        
+        // 从结果中获取漏洞数
+        let vulnCount = 0
+        if (res.results && res.results.length > 0) {
+          vulnCount = res.results.filter(r => r.matched).length
+        }
+        scanAssetsProgress.vulnCount = vulnCount
+        scanAssetsProgress.completed = scanAssetsProgress.total
+        
+        scanAssetsLogs.value.push({
+          level: 'INFO',
+          message: `扫描完成，共扫描 ${scanAssetsProgress.total} 个资产，发现 ${vulnCount} 个漏洞`,
+          timestamp: new Date().toLocaleTimeString()
+        })
+        scrollScanAssetsLogsToBottom()
+        
+        if (vulnCount > 0) {
+          ElMessage.warning(`扫描完成，发现 ${vulnCount} 个漏洞`)
+        } else {
+          ElMessage.success('扫描完成，未发现漏洞')
+        }
+      }
+    } catch (e) {
+      // 忽略查询错误
+    }
+  }, 2000)
+}
+
+// 执行扫描现有资产
+async function handleScanAssets() {
+  // 清理之前的资源
+  cleanupScanAssets()
+  
+  scanAssetsLoading.value = true
+  scanAssetsStarted.value = true
+  scanAssetsLogs.value = []
+  scanAssetsProgress.total = 0
+  scanAssetsProgress.completed = 0
+  scanAssetsProgress.vulnCount = 0
+
+  // 添加初始日志
+  scanAssetsLogs.value.push({
+    level: 'INFO',
+    message: '正在提交扫描任务...',
+    timestamp: new Date().toLocaleTimeString()
+  })
+
+  try {
+    const res = await scanAssetsWithPoc({
+      pocId: scanAssetsPoc.value.id
+    })
+
+    if (res.code === 0) {
+      scanAssetsProgress.total = res.totalScanned
+      
+      scanAssetsLogs.value.push({
+        level: 'INFO',
+        message: `已创建批量扫描任务，目标: ${res.totalScanned} 个资产`,
+        timestamp: new Date().toLocaleTimeString()
+      })
+      
+      if (res.taskIds && res.taskIds.length > 0) {
+        // 开始监听日志流
+        startScanAssetsLogStream(res.taskIds)
+        // 开始轮询任务状态
+        startScanAssetsPoll()
+      } else {
+        scanAssetsLoading.value = false
+        scanAssetsLogs.value.push({
+          level: 'INFO',
+          message: res.msg || '扫描任务已提交',
+          timestamp: new Date().toLocaleTimeString()
+        })
+      }
+    } else {
+      scanAssetsLoading.value = false
+      scanAssetsLogs.value.push({
+        level: 'ERROR',
+        message: res.msg || '扫描失败',
+        timestamp: new Date().toLocaleTimeString()
+      })
+      ElMessage.error(res.msg || '扫描失败')
+    }
+  } catch (e) {
+    scanAssetsLoading.value = false
+    scanAssetsLogs.value.push({
+      level: 'ERROR',
+      message: '扫描请求失败: ' + e.message,
+      timestamp: new Date().toLocaleTimeString()
+    })
+    ElMessage.error('扫描请求失败: ' + e.message)
+  }
+}
+
 // 轮询定时器
 let pollTimer = null
 
 // 清理轮询定时器和日志流
 onUnmounted(() => {
   cleanupValidation()
+  cleanupScanAssets()
 })
 
 // 清理验证相关资源
@@ -2874,6 +3172,22 @@ function startBatchPolling(batchId, taskIds) {
       display: flex;
       align-items: center;
       font-weight: 500;
+    }
+  }
+
+  .scan-assets-tip {
+    margin-bottom: 15px;
+  }
+
+  .scan-assets-result {
+    .result-header {
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+    }
+
+    .vuln-list {
+      margin-top: 15px;
     }
   }
 }

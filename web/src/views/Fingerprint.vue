@@ -1484,7 +1484,6 @@ async function handleMatchAssets() {
   try {
     const res = await matchFingerprintAssets({
       fingerprintId: matchAssetsFingerprint.value.id,
-      limit: 100,
       updateAsset: matchAssetsUpdateAsset.value
     })
 

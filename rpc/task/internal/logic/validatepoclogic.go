@@ -33,22 +33,48 @@ func (l *ValidatePocLogic) ValidatePoc(in *pb.ValidatePocReq) (*pb.ValidatePocRe
 	// 生成任务ID
 	taskId := uuid.New().String()
 
+	// 获取workspaceId，如果未指定则使用default
+	workspaceId := in.WorkspaceId
+	if workspaceId == "" {
+		workspaceId = "default"
+	}
+
+	// 判断是批量模式还是单目标模式
+	taskType := "poc_validate"
+	var targetUrls []string
+	if in.BatchMode && len(in.Urls) > 0 {
+		taskType = "poc_batch_validate"
+		targetUrls = in.Urls
+	} else if in.Url != "" {
+		targetUrls = []string{in.Url}
+	}
+
 	// 构建任务配置
 	taskConfig := map[string]interface{}{
-		"taskType": "poc_validate",
-		"url":      in.Url,
-		"pocId":    in.PocId,
-		"pocType":  in.PocType,
-		"timeout":  in.Timeout,
+		"taskType":    taskType,
+		"urls":        targetUrls,
+		"pocId":       in.PocId,
+		"pocType":     in.PocType,
+		"timeout":     in.Timeout,
+		"workspaceId": workspaceId,
+		"batchMode":   in.BatchMode,
+	}
+	// 兼容单目标模式
+	if len(targetUrls) == 1 {
+		taskConfig["url"] = targetUrls[0]
 	}
 	configBytes, _ := json.Marshal(taskConfig)
 
 	// 创建任务信息
+	taskName := "POC验证"
+	if in.BatchMode {
+		taskName = "POC批量扫描"
+	}
 	task := &scheduler.TaskInfo{
 		TaskId:      taskId,
 		MainTaskId:  taskId,
-		WorkspaceId: "default",
-		TaskName:    "POC验证",
+		WorkspaceId: workspaceId,
+		TaskName:    taskName,
 		Config:      string(configBytes),
 		Priority:    2, // 高优先级
 	}
@@ -83,17 +109,19 @@ func (l *ValidatePocLogic) ValidatePoc(in *pb.ValidatePocReq) (*pb.ValidatePocRe
 	// 保存任务信息到Redis（用于结果查询）
 	taskInfoKey := "cscan:task:info:" + taskId
 	taskInfoData, _ := json.Marshal(map[string]interface{}{
-		"workspaceId": "default",
+		"workspaceId": workspaceId,
 		"mainTaskId":  taskId,
-		"taskType":    "poc_validate",
-		"url":         in.Url,
+		"taskType":    taskType,
+		"urls":        targetUrls,
 		"pocId":       in.PocId,
 		"pocType":     in.PocType,
+		"batchMode":   in.BatchMode,
 		"createTime":  time.Now().Local().Format("2006-01-02 15:04:05"),
 	})
 	l.svcCtx.RedisClient.Set(l.ctx, taskInfoKey, taskInfoData, 24*time.Hour)
 
-	l.Logger.Infof("ValidatePoc: task created, taskId=%s, url=%s, pocId=%s", taskId, in.Url, in.PocId)
+	l.Logger.Infof("ValidatePoc: task created, taskId=%s, targets=%d, pocId=%s, workspaceId=%s, batchMode=%v", 
+		taskId, len(targetUrls), in.PocId, workspaceId, in.BatchMode)
 
 	return &pb.ValidatePocResp{
 		Success: true,

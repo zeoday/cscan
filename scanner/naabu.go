@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -175,8 +176,8 @@ func (s *NaabuScanner) runNaabuWithLogger(ctx context.Context, targets []string,
 	case "top1000":
 		topPorts = "1000"
 	default:
-		ports := parsePorts(opts.Ports)
-		portsStr = portsToString(ports)
+		// 优化端口参数，避免命令行参数过长
+		portsStr = optimizePortsForNaabu(opts.Ports)
 	}
 
 	timeout := opts.Timeout
@@ -333,4 +334,44 @@ func (s *NaabuScanner) scanSingleTargetWithLogger(ctx context.Context, target, p
 	}
 
 	return assets, thresholdExceeded
+}
+
+// optimizePortsForNaabu 优化端口参数格式，避免参数过长
+// naabu 原生支持范围格式（如 1-65535），直接使用比展开更高效
+func optimizePortsForNaabu(portStr string) string {
+	portStr = strings.TrimSpace(portStr)
+
+	// 检查是否包含大范围端口（如 1-65535）
+	parts := strings.Split(portStr, ",")
+
+	// 如果只有一个部分且是范围格式，直接返回
+	if len(parts) == 1 && strings.Contains(parts[0], "-") {
+		return portStr
+	}
+
+	// 检查是否有大范围（超过1000个端口的范围）
+	hasLargeRange := false
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.Contains(part, "-") {
+			rangeParts := strings.Split(part, "-")
+			if len(rangeParts) == 2 {
+				start, _ := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+				end, _ := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
+				if end-start > 1000 {
+					hasLargeRange = true
+					break
+				}
+			}
+		}
+	}
+
+	// 如果有大范围，直接返回原始字符串
+	if hasLargeRange {
+		return portStr
+	}
+
+	// 否则展开为具体端口列表（小范围时更精确）
+	ports := parsePorts(portStr)
+	return portsToString(ports)
 }

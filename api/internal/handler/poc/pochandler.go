@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"cscan/api/internal/logic"
+	"cscan/api/internal/middleware"
 	"cscan/api/internal/svc"
 	"cscan/api/internal/types"
 	"cscan/pkg/response"
@@ -151,6 +152,26 @@ func CustomPocClearAllHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	}
 }
 
+// CustomPocScanAssetsHandler 自定义POC扫描现有资产
+func CustomPocScanAssetsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.CustomPocScanAssetsReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		workspaceId := middleware.GetWorkspaceId(r.Context())
+		l := logic.NewCustomPocScanAssetsLogic(r.Context(), svcCtx)
+		resp, err := l.CustomPocScanAssets(&req, workspaceId)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
 // NucleiTemplateListHandler Nuclei模板列表
 func NucleiTemplateListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -247,8 +268,9 @@ func PocValidateHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
+		workspaceId := middleware.GetWorkspaceId(r.Context())
 		l := logic.NewPocValidateLogic(r.Context(), svcCtx)
-		resp, err := l.PocValidate(&req)
+		resp, err := l.PocValidate(&req, workspaceId)
 		if err != nil {
 			response.Error(w, err)
 			return
@@ -266,8 +288,9 @@ func PocBatchValidateHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
+		workspaceId := middleware.GetWorkspaceId(r.Context())
 		l := logic.NewPocBatchValidateLogic(r.Context(), svcCtx)
-		resp, err := l.PocBatchValidate(&req)
+		resp, err := l.PocBatchValidate(&req, workspaceId)
 		if err != nil {
 			response.Error(w, err)
 			return

@@ -533,6 +533,10 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		w.executePocValidateTask(ctx, task, taskConfig, startTime)
 		return
 	}
+	if taskType == "poc_batch_validate" {
+		w.executePocBatchValidateTask(ctx, task, taskConfig, startTime)
+		return
+	}
 
 	// 获取目标
 	target, _ := taskConfig["target"].(string)
@@ -1973,6 +1977,13 @@ func (w *Worker) executePocValidateTask(ctx context.Context, task *scheduler.Tas
 	pocType, _ := taskConfig["pocType"].(string)
 	timeout, _ := taskConfig["timeout"].(float64)
 	batchId, _ := taskConfig["batchId"].(string)
+	workspaceId, _ := taskConfig["workspaceId"].(string)
+	if workspaceId == "" {
+		workspaceId = task.WorkspaceId
+	}
+	if workspaceId == "" {
+		workspaceId = "default"
+	}
 
 	// 立即输出任务接收日志
 	w.taskLog(task.TaskId, LevelInfo, "[%s] 收到POC验证任务, 目标: %s", task.TaskId, url)
@@ -2132,6 +2143,8 @@ func (w *Worker) executePocValidateTask(ctx context.Context, task *scheduler.Tas
 			logx.Infof("[%s] Vulnerability found! Matched URL: %s", task.TaskId, vul.Url)
 			w.taskLog(task.TaskId, LevelInfo, "[%s] Vulnerability found! Matched URL: %s", task.TaskId, vul.Url)
 		}
+		// 保存漏洞到数据库
+		w.saveVulResult(ctx, workspaceId, task.TaskId, result.Vulnerabilities)
 	} else {
 		// 没有发现漏洞，添加一个未匹配的结果
 		resultPocName := pocName
@@ -2155,6 +2168,147 @@ func (w *Worker) executePocValidateTask(ctx context.Context, task *scheduler.Tas
 
 	// 更新任务状态
 	resultMsg := fmt.Sprintf("Validation completed: matched=%v, vuls=%d, duration=%.2fs", matched, vulCount, duration)
+	w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusSuccess, resultMsg)
+
+	w.mu.Lock()
+	w.taskExecuted++
+	w.mu.Unlock()
+}
+
+// executePocBatchValidateTask 执行POC批量验证任务（使用单个Nuclei引擎扫描所有目标）
+func (w *Worker) executePocBatchValidateTask(ctx context.Context, task *scheduler.TaskInfo, taskConfig map[string]interface{}, startTime time.Time) {
+	// 解析配置
+	pocId, _ := taskConfig["pocId"].(string)
+	pocType, _ := taskConfig["pocType"].(string)
+	timeout, _ := taskConfig["timeout"].(float64)
+	workspaceId, _ := taskConfig["workspaceId"].(string)
+	if workspaceId == "" {
+		workspaceId = task.WorkspaceId
+	}
+	if workspaceId == "" {
+		workspaceId = "default"
+	}
+
+	// 解析目标URL列表
+	var urls []string
+	if urlsInterface, ok := taskConfig["urls"].([]interface{}); ok {
+		for _, u := range urlsInterface {
+			if urlStr, ok := u.(string); ok && urlStr != "" {
+				urls = append(urls, urlStr)
+			}
+		}
+	}
+
+	w.taskLog(task.TaskId, LevelInfo, "[%s] 收到POC批量扫描任务, 目标数: %d", task.TaskId, len(urls))
+
+	if len(urls) == 0 {
+		w.taskLog(task.TaskId, LevelError, "[%s] POC批量扫描失败: 目标列表为空", task.TaskId)
+		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "目标列表为空")
+		return
+	}
+
+	if timeout == 0 {
+		// 每个目标30秒，最少60秒
+		timeout = float64(len(urls) * 30)
+		if timeout < 60 {
+			timeout = 60
+		}
+	}
+
+	// 获取Nuclei扫描器
+	nucleiScanner, ok := w.scanners["nuclei"].(*scanner.NucleiScanner)
+	if !ok {
+		w.taskLog(task.TaskId, LevelError, "[%s] POC批量扫描失败: Nuclei扫描器未初始化", task.TaskId)
+		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "Nuclei扫描器未初始化")
+		return
+	}
+
+	// 获取POC模板
+	var templates []string
+	var pocName string
+	var pocSeverity string
+
+	if pocId != "" {
+		w.taskLog(task.TaskId, LevelInfo, "[%s] Loading POC template...", task.TaskId)
+		resp, err := w.rpcClient.GetPocById(ctx, &pb.GetPocByIdReq{
+			PocId:   pocId,
+			PocType: pocType,
+		})
+		if err != nil {
+			w.taskLog(task.TaskId, LevelError, "[%s] POC批量扫描失败: 获取POC失败 - %v", task.TaskId, err)
+			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "获取POC失败: "+err.Error())
+			return
+		}
+		if !resp.Success || resp.Content == "" {
+			w.taskLog(task.TaskId, LevelError, "[%s] POC批量扫描失败: POC不存在或内容为空", task.TaskId)
+			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "POC不存在或内容为空")
+			return
+		}
+		templates = []string{resp.Content}
+		pocName = resp.Name
+		pocSeverity = resp.Severity
+		pocType = resp.PocType
+		w.taskLog(task.TaskId, LevelInfo, "[%s] POC template loaded: %s", task.TaskId, pocName)
+	} else {
+		w.taskLog(task.TaskId, LevelError, "[%s] POC批量扫描失败: 未指定POC ID", task.TaskId)
+		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "未指定POC ID")
+		return
+	}
+
+	// 构建Nuclei扫描选项
+	nucleiOpts := &scanner.NucleiOptions{
+		RateLimit:       150,
+		Concurrency:     25,
+		Timeout:         int(timeout),
+		CustomTemplates: templates,
+		CustomPocOnly:   true,
+	}
+
+	// 使用批量扫描方法
+	w.taskLog(task.TaskId, LevelInfo, "[%s] Starting batch scan: %d targets, timeout %ds", task.TaskId, len(urls), int(timeout))
+
+	vuls, err := nucleiScanner.ScanBatch(ctx, urls, nucleiOpts, func(level, format string, args ...interface{}) {
+		w.taskLog(task.TaskId, level, "[%s] "+format, append([]interface{}{task.TaskId}, args...)...)
+	})
+
+	duration := time.Since(startTime).Seconds()
+
+	if err != nil {
+		w.taskLog(task.TaskId, LevelError, "[%s] POC批量扫描出错: %v", task.TaskId, err)
+	}
+
+	vulCount := len(vuls)
+	w.taskLog(task.TaskId, LevelInfo, "[%s] Batch scan completed, duration: %.2fs, vuls: %d", task.TaskId, duration, vulCount)
+
+	// 保存漏洞到数据库
+	if vulCount > 0 {
+		w.saveVulResult(ctx, workspaceId, task.TaskId, vuls)
+		w.taskLog(task.TaskId, LevelInfo, "[%s] Saved %d vulnerabilities to database", task.TaskId, vulCount)
+	}
+
+	// 构建验证结果
+	var validationResults []*PocValidationResult
+	if vulCount > 0 {
+		for _, vul := range vuls {
+			validationResults = append(validationResults, &PocValidationResult{
+				PocId:      pocId,
+				PocName:    pocName,
+				TemplateId: pocId,
+				Severity:   pocSeverity,
+				Matched:    true,
+				MatchedUrl: vul.Url,
+				Details:    vul.Result,
+				Output:     vul.Extra,
+				PocType:    pocType,
+			})
+		}
+	}
+
+	// 保存结果到Redis
+	w.savePocValidationResult(ctx, task.TaskId, "", validationResults, "")
+
+	// 更新任务状态
+	resultMsg := fmt.Sprintf("Batch scan completed: targets=%d, vuls=%d, duration=%.2fs", len(urls), vulCount, duration)
 	w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusSuccess, resultMsg)
 
 	w.mu.Lock()

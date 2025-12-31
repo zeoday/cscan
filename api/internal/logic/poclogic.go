@@ -546,7 +546,7 @@ func NewPocValidateLogic(ctx context.Context, svcCtx *svc.ServiceContext) *PocVa
 	}
 }
 
-func (l *PocValidateLogic) PocValidate(req *types.PocValidateReq) (resp *types.PocValidateResp, err error) {
+func (l *PocValidateLogic) PocValidate(req *types.PocValidateReq, workspaceId string) (resp *types.PocValidateResp, err error) {
 	if req.Url == "" {
 		return &types.PocValidateResp{Code: 400, Msg: "URL不能为空"}, nil
 	}
@@ -586,6 +586,7 @@ func (l *PocValidateLogic) PocValidate(req *types.PocValidateReq) (resp *types.P
 		Timeout:     30,
 		UseTemplate: pocType == "nuclei",
 		UseCustom:   pocType == "custom",
+		WorkspaceId: workspaceId,
 	}
 
 	rpcResp, err := l.svcCtx.TaskRpcClient.ValidatePoc(l.ctx, rpcReq)
@@ -624,7 +625,7 @@ func NewPocBatchValidateLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 	}
 }
 
-func (l *PocBatchValidateLogic) PocBatchValidate(req *types.PocBatchValidateReq) (resp *types.PocBatchValidateResp, err error) {
+func (l *PocBatchValidateLogic) PocBatchValidate(req *types.PocBatchValidateReq, workspaceId string) (resp *types.PocBatchValidateResp, err error) {
 	if len(req.Urls) == 0 {
 		return &types.PocBatchValidateResp{Code: 400, Msg: "URL列表不能为空"}, nil
 	}
@@ -654,6 +655,7 @@ func (l *PocBatchValidateLogic) PocBatchValidate(req *types.PocBatchValidateReq)
 		UseTemplate: req.UseTemplate,
 		UseCustom:   req.UseCustom,
 		Concurrency: int32(req.Concurrency),
+		WorkspaceId: workspaceId,
 	}
 
 	rpcResp, err := l.svcCtx.TaskRpcClient.BatchValidatePoc(l.ctx, rpcReq)
@@ -779,4 +781,184 @@ func (l *CustomPocClearAllLogic) CustomPocClearAll() (resp *types.CustomPocClear
 		Msg:     "清空成功",
 		Deleted: int(deleted),
 	}, nil
+}
+
+// ==================== 自定义POC扫描现有资产 ====================
+
+type CustomPocScanAssetsLogic struct {
+	logx.Logger
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewCustomPocScanAssetsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CustomPocScanAssetsLogic {
+	return &CustomPocScanAssetsLogic{
+		Logger: logx.WithContext(ctx),
+		ctx:    ctx,
+		svcCtx: svcCtx,
+	}
+}
+
+func (l *CustomPocScanAssetsLogic) CustomPocScanAssets(req *types.CustomPocScanAssetsReq, workspaceId string) (*types.CustomPocScanAssetsResp, error) {
+	if req.PocId == "" {
+		return &types.CustomPocScanAssetsResp{Code: 400, Msg: "POC ID不能为空"}, nil
+	}
+
+	// 获取POC
+	poc, err := l.svcCtx.CustomPocModel.FindById(l.ctx, req.PocId)
+	if err != nil {
+		return &types.CustomPocScanAssetsResp{Code: 404, Msg: "POC不存在"}, nil
+	}
+
+	// 常见HTTP端口
+	httpPorts := []int{80, 8080, 8000, 8888, 8081, 8082, 8008, 9000, 9080, 3000, 5000}
+	httpsPorts := []int{443, 8443, 9443, 4443}
+	allHttpPorts := append(httpPorts, httpsPorts...)
+
+	// 获取所有HTTP资产（扩展过滤条件）
+	assetModel := l.svcCtx.GetAssetModel(workspaceId)
+	filter := bson.M{
+		"$or": []bson.M{
+			{"is_http": true},                                                  // is_http 标记为 true
+			{"service": bson.M{"$in": []string{"http", "https", "http-proxy"}}}, // service 为 http/https
+			{"port": bson.M{"$in": allHttpPorts}},                               // 常见 HTTP 端口
+			{"title": bson.M{"$exists": true, "$ne": ""}},                       // 有 title（说明是 HTTP 服务）
+			{"authority": bson.M{"$regex": "^https?://", "$options": "i"}},      // authority 以 http:// 或 https:// 开头
+		},
+	}
+	assets, err := assetModel.Find(l.ctx, filter, 0, 0)
+	if err != nil {
+		return &types.CustomPocScanAssetsResp{Code: 500, Msg: "获取资产列表失败: " + err.Error()}, nil
+	}
+
+	if len(assets) == 0 {
+		return &types.CustomPocScanAssetsResp{
+			Code:         0,
+			Msg:          "没有可扫描的HTTP资产",
+			TotalScanned: 0,
+			VulnCount:    0,
+			Duration:     "0s",
+			VulnList:     []types.CustomPocScanVulnItem{},
+			TaskIds:      []string{},
+		}, nil
+	}
+
+	l.Logger.Infof("CustomPocScanAssets: pocId=%s, name=%s, totalAssets=%d", req.PocId, poc.Name, len(assets))
+
+	// 准备目标URL列表（去重）
+	urlSet := make(map[string]bool)
+	var urls []string
+	for i := range assets {
+		asset := &assets[i]
+		url := buildAssetUrl(asset, httpsPorts)
+		if url == "" {
+			continue
+		}
+		// 去重
+		if urlSet[url] {
+			continue
+		}
+		urlSet[url] = true
+		urls = append(urls, url)
+	}
+
+	if len(urls) == 0 {
+		return &types.CustomPocScanAssetsResp{
+			Code:         0,
+			Msg:          "没有有效的目标URL",
+			TotalScanned: 0,
+			VulnCount:    0,
+			Duration:     "0s",
+			VulnList:     []types.CustomPocScanVulnItem{},
+			TaskIds:      []string{},
+		}, nil
+	}
+
+	// 创建一个批量扫描任务（使用批量模式）
+	rpcReq := &pb.ValidatePocReq{
+		PocId:       req.PocId,
+		PocType:     "custom",
+		Timeout:     int32(len(urls) * 30), // 每个目标30秒
+		UseTemplate: false,
+		UseCustom:   true,
+		WorkspaceId: workspaceId,
+		Urls:        urls,
+		BatchMode:   true,
+	}
+
+	resp, err := l.svcCtx.TaskRpcClient.ValidatePoc(l.ctx, rpcReq)
+	if err != nil {
+		l.Logger.Errorf("Failed to create batch scan task: %v", err)
+		return &types.CustomPocScanAssetsResp{Code: 500, Msg: "创建扫描任务失败: " + err.Error()}, nil
+	}
+
+	if !resp.Success {
+		return &types.CustomPocScanAssetsResp{Code: 500, Msg: resp.Message}, nil
+	}
+
+	msg := fmt.Sprintf("已创建批量扫描任务（POC: %s，目标: %d个），发现的漏洞将显示在漏洞页面", poc.Name, len(urls))
+
+	return &types.CustomPocScanAssetsResp{
+		Code:         0,
+		Msg:          msg,
+		TotalScanned: len(urls),
+		VulnCount:    0,
+		Duration:     "异步执行中",
+		VulnList:     []types.CustomPocScanVulnItem{},
+		TaskIds:      []string{resp.TaskId},
+	}, nil
+}
+
+// buildAssetUrl 根据资产信息构建正确的URL
+func buildAssetUrl(asset *model.Asset, httpsPorts []int) string {
+	// 如果 authority 已经有协议前缀，直接返回
+	if strings.HasPrefix(asset.Authority, "http://") || strings.HasPrefix(asset.Authority, "https://") {
+		return asset.Authority
+	}
+
+	// 判断是否使用 HTTPS
+	useHttps := false
+
+	// 1. 根据 service 判断
+	if asset.Service == "https" || asset.Service == "ssl" || asset.Service == "tls" {
+		useHttps = true
+	}
+
+	// 2. 根据端口判断
+	if !useHttps {
+		for _, p := range httpsPorts {
+			if asset.Port == p {
+				useHttps = true
+				break
+			}
+		}
+	}
+
+	// 构建 URL
+	var url string
+	if asset.Authority != "" {
+		// 使用 authority（通常是 host:port 格式）
+		if useHttps {
+			url = "https://" + asset.Authority
+		} else {
+			url = "http://" + asset.Authority
+		}
+	} else if asset.Host != "" {
+		// 使用 host:port 构建
+		if useHttps {
+			if asset.Port == 443 {
+				url = fmt.Sprintf("https://%s", asset.Host)
+			} else {
+				url = fmt.Sprintf("https://%s:%d", asset.Host, asset.Port)
+			}
+		} else {
+			if asset.Port == 80 {
+				url = fmt.Sprintf("http://%s", asset.Host)
+			} else {
+				url = fmt.Sprintf("http://%s:%d", asset.Host, asset.Port)
+			}
+		}
+	}
+
+	return url
 }

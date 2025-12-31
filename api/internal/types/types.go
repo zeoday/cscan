@@ -722,6 +722,23 @@ type OnlineImportReq struct {
 	Assets []OnlineSearchResult `json:"assets"`
 }
 
+// OnlineImportAllReq 导入全部资产请求
+type OnlineImportAllReq struct {
+	Platform string `json:"platform"` // fofa/hunter/quake
+	Query    string `json:"query"`
+	PageSize int    `json:"pageSize,default=100"`
+	MaxPages int    `json:"maxPages,default=10"` // 最大导入页数，防止过多消耗API配额
+}
+
+// OnlineImportAllResp 导入全部资产响应
+type OnlineImportAllResp struct {
+	Code         int    `json:"code"`
+	Msg          string `json:"msg"`
+	TotalFetched int    `json:"totalFetched"` // 获取到的总数
+	TotalImport  int    `json:"totalImport"`  // 成功导入数
+	TotalPages   int    `json:"totalPages"`   // 总页数
+}
+
 // ==================== API配置 ====================
 type APIConfig struct {
 	Id         string `json:"id"`
@@ -840,6 +857,34 @@ type CustomPocClearAllResp struct {
 	Code    int    `json:"code"`
 	Msg     string `json:"msg"`
 	Deleted int    `json:"deleted"` // 删除数量
+}
+
+// CustomPocScanAssetsReq 自定义POC扫描现有资产请求
+type CustomPocScanAssetsReq struct {
+	PocId       string `json:"pocId"`                 // POC ID
+	UpdateAsset bool   `json:"updateAsset,optional"`  // 发现漏洞后是否更新资产
+}
+
+// CustomPocScanAssetsResp 自定义POC扫描现有资产响应
+type CustomPocScanAssetsResp struct {
+	Code         int                      `json:"code"`
+	Msg          string                   `json:"msg"`
+	TotalScanned int                      `json:"totalScanned"` // 扫描的资产总数
+	VulnCount    int                      `json:"vulnCount"`    // 发现的漏洞数
+	Duration     string                   `json:"duration"`     // 耗时
+	VulnList     []CustomPocScanVulnItem  `json:"vulnList"`     // 漏洞列表
+	TaskIds      []string                 `json:"taskIds"`      // 任务ID列表（用于前端监听日志）
+}
+
+// CustomPocScanVulnItem 扫描发现的漏洞项
+type CustomPocScanVulnItem struct {
+	AssetId   string `json:"assetId"`
+	Authority string `json:"authority"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	Title     string `json:"title"`
+	Matched   bool   `json:"matched"`
+	Details   string `json:"details,omitempty"`
 }
 
 // ==================== Nuclei默认模板 ====================

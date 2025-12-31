@@ -117,6 +117,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		// 在线API搜索
 		{Method: http.MethodPost, Path: "/api/v1/onlineapi/search", Handler: onlineapi.OnlineSearchHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/onlineapi/import", Handler: onlineapi.OnlineImportHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/onlineapi/importAll", Handler: onlineapi.OnlineImportAllHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/onlineapi/config/list", Handler: onlineapi.APIConfigListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/onlineapi/config/save", Handler: onlineapi.APIConfigSaveHandler(svcCtx)},
 
@@ -131,6 +132,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/poc/custom/delete", Handler: poc.CustomPocDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/custom/batchImport", Handler: poc.CustomPocBatchImportHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/custom/clearAll", Handler: poc.CustomPocClearAllHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/poc/custom/scanAssets", Handler: poc.CustomPocScanAssetsHandler(svcCtx)},
 
 		// Nuclei默认模板
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/templates", Handler: poc.NucleiTemplateListHandler(svcCtx)},

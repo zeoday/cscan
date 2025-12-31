@@ -417,6 +417,173 @@ func (s *NucleiScanner) scanSingleTarget(ctx context.Context, target string, opt
 	return vuls
 }
 
+// ScanBatch 批量扫描多个目标（使用单个Nuclei引擎实例）
+// 适用于使用同一个POC扫描大量目标的场景
+func (s *NucleiScanner) ScanBatch(ctx context.Context, targets []string, opts *NucleiOptions, taskLogger func(level, format string, args ...interface{})) ([]*Vulnerability, error) {
+	var vuls []*Vulnerability
+	seen := make(map[string]bool)
+	startTime := time.Now()
+
+	if len(targets) == 0 {
+		return vuls, nil
+	}
+
+	// 日志辅助函数
+	taskLog := func(level, format string, args ...interface{}) {
+		if taskLogger != nil {
+			taskLogger(level, format, args...)
+		}
+	}
+
+	taskLog("INFO", "Batch scan: %d targets", len(targets))
+
+	// 处理自定义POC - 写入临时文件
+	var customTemplatePaths []string
+	var tempDir string
+	if len(opts.CustomTemplates) > 0 {
+		var err error
+		tempDir, err = os.MkdirTemp("", "nuclei-batch-*")
+		if err != nil {
+			logx.Errorf("Failed to create temp dir for custom templates: %v", err)
+			return nil, err
+		}
+		defer os.RemoveAll(tempDir)
+
+		for i, content := range opts.CustomTemplates {
+			templatePath := filepath.Join(tempDir, fmt.Sprintf("custom-%d.yaml", i))
+			if err := os.WriteFile(templatePath, []byte(content), 0644); err != nil {
+				logx.Errorf("Failed to write custom template %d: %v", i, err)
+				continue
+			}
+			customTemplatePaths = append(customTemplatePaths, templatePath)
+		}
+		taskLog("INFO", "Loaded %d POC templates", len(customTemplatePaths))
+	}
+
+	if len(customTemplatePaths) == 0 {
+		taskLog("ERROR", "No POC templates loaded")
+		return nil, fmt.Errorf("no POC templates loaded")
+	}
+
+	// 设置超时时间：基于目标数量动态计算
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		// 每个目标30秒，最少60秒，最多3600秒
+		timeout = len(targets) * 30
+		if timeout < 60 {
+			timeout = 60
+		}
+		if timeout > 3600 {
+			timeout = 3600
+		}
+	}
+
+	// 创建带超时的context
+	engineCtx, engineCancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	defer engineCancel()
+
+	// 构建Nuclei SDK选项
+	nucleiOpts := s.buildNucleiOptions(opts, customTemplatePaths)
+
+	// 创建Nuclei引擎
+	taskLog("INFO", "Initializing Nuclei engine...")
+	ne, err := nuclei.NewNucleiEngineCtx(engineCtx, nucleiOpts...)
+	if err != nil {
+		taskLog("ERROR", "Failed to create nuclei engine: %v", err)
+		return nil, err
+	}
+	defer ne.Close()
+
+	// 启用请求/响应存储（用于证据链）
+	if engineOpts := ne.Options(); engineOpts != nil {
+		engineOpts.StoreResponse = true
+	}
+
+	// 加载模板
+	taskLog("INFO", "Loading templates...")
+	if err := ne.LoadAllTemplates(); err != nil {
+		taskLog("ERROR", "Failed to load templates: %v", err)
+		return nil, err
+	}
+
+	loadedTemplates := ne.GetTemplates()
+	if len(loadedTemplates) == 0 {
+		taskLog("WARN", "No templates loaded after filtering")
+		return vuls, nil
+	}
+	taskLog("INFO", "Loaded %d templates", len(loadedTemplates))
+
+	// 批量加载所有目标
+	taskLog("INFO", "Loading %d targets...", len(targets))
+	ne.LoadTargets(targets, false)
+
+	// 统计变量
+	scannedCount := 0
+	foundCount := 0
+	totalTasks := len(targets) * len(loadedTemplates)
+
+	// 监听父context取消
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			logx.Infof("Nuclei batch scan: parent context cancelled")
+			taskLog("WARN", "Scan interrupted")
+			engineCancel()
+		case <-done:
+			return
+		}
+	}()
+	defer close(done)
+
+	// 执行扫描
+	taskLog("INFO", "Starting batch scan (timeout: %ds)...", timeout)
+	err = ne.ExecuteCallbackWithCtx(engineCtx, func(event *output.ResultEvent) {
+		scannedCount++
+
+		// 判断是否匹配成功
+		if event.Matched != "" {
+			vulKey := fmt.Sprintf("%s:%s:%s", event.Host, event.TemplateID, event.MatcherName)
+			if !seen[vulKey] {
+				seen[vulKey] = true
+				foundCount++
+
+				taskLog("INFO", "[%d/%d] ✓ %s - %s [%s]", scannedCount, totalTasks, event.Host, event.TemplateID, event.Info.SeverityHolder.Severity.String())
+
+				vul := s.convertResult(event)
+				if vul != nil {
+					vuls = append(vuls, vul)
+					// 实时回调
+					if opts.OnVulnerabilityFound != nil {
+						opts.OnVulnerabilityFound(vul)
+					}
+				}
+			}
+		} else {
+			// 每100个任务或完成时显示进度
+			if scannedCount%100 == 0 || scannedCount == totalTasks {
+				taskLog("INFO", "[%d/%d] Scanning... %d vuls found", scannedCount, totalTasks, foundCount)
+			}
+		}
+	})
+
+	elapsed := time.Since(startTime).Seconds()
+
+	if err != nil {
+		if engineCtx.Err() == context.DeadlineExceeded {
+			taskLog("WARN", "Scan timeout after %.0fs", elapsed)
+		} else if engineCtx.Err() == context.Canceled {
+			taskLog("WARN", "Scan cancelled after %.0fs", elapsed)
+		} else {
+			taskLog("ERROR", "Scan error: %v", err)
+		}
+	}
+
+	taskLog("INFO", "Batch scan completed: %d targets, %d vuls found, %.0fs", len(targets), foundCount, elapsed)
+
+	return vuls, nil
+}
+
 // prepareTargets 准备目标URL列表（跳过非HTTP资产）
 func (s *NucleiScanner) prepareTargets(assets []*Asset) []string {
 	targets := make([]string, 0, len(assets))

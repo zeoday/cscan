@@ -1750,12 +1750,7 @@ func (l *FingerprintMatchAssetsLogic) FingerprintMatchAssets(req *types.Fingerpr
 	// 创建指纹引擎
 	engine := NewSingleFingerprintEngine(fp)
 
-	// 匹配资产
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 100
-	}
-
+	// 匹配资产（匹配所有资产，不再限制数量）
 	var matchedList []types.FingerprintMatchedAsset
 	var updatedCount int
 	for _, asset := range assets {
@@ -1803,11 +1798,6 @@ func (l *FingerprintMatchAssetsLogic) FingerprintMatchAssets(req *types.Fingerpr
 						updatedCount++
 					}
 				}
-			}
-
-			// 达到限制数量后停止
-			if len(matchedList) >= limit {
-				break
 			}
 		}
 	}

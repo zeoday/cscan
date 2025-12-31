@@ -2,9 +2,9 @@
   <div class="online-search-page">
     <!-- 搜索区域 -->
     <el-card class="search-card">
-      <el-form :model="searchForm" inline>
+      <el-form :model="store.searchForm" inline>
         <el-form-item label="数据源">
-          <el-select v-model="searchForm.source" style="width: 120px">
+          <el-select v-model="store.searchForm.source" style="width: 120px">
             <el-option label="Fofa" value="fofa" />
             <el-option label="Hunter" value="hunter" />
             <el-option label="Quake" value="quake" />
@@ -12,14 +12,14 @@
         </el-form-item>
         <el-form-item label="查询语句" style="flex: 1">
           <el-input
-            v-model="searchForm.query"
+            v-model="store.searchForm.query"
             placeholder="输入查询语句，如: ip=1.1.1.1 或 domain=example.com"
             style="width: 400px"
             @keyup.enter="handleSearch"
           />
         </el-form-item>
         <el-form-item label="数量">
-          <el-select v-model="searchForm.size" style="width: 100px">
+          <el-select v-model="store.searchForm.size" style="width: 100px">
             <el-option :value="10" label="10" />
             <el-option :value="50" label="50" />
             <el-option :value="100" label="100" />
@@ -28,7 +28,8 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleImport" :disabled="!tableData.length">导入资产</el-button>
+          <el-button @click="handleImport" :disabled="!tableData.length">导入当前页</el-button>
+          <el-button type="success" @click="handleImportAll" :disabled="!total" :loading="importAllLoading">导入全部</el-button>
           <el-button @click="showHelpDialog">语法帮助</el-button>
         </el-form-item>
       </el-form>
@@ -72,8 +73,8 @@
 
       <el-pagination
         v-if="total > 0"
-        v-model:current-page="searchForm.page"
-        :page-size="searchForm.size"
+        v-model:current-page="store.searchForm.page"
+        :page-size="store.searchForm.size"
         :total="total"
         layout="total, prev, pager, next"
         class="pagination"
@@ -122,22 +123,21 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
+import { useOnlineSearchStore } from '@/stores/onlineSearch'
+
+const store = useOnlineSearchStore()
 
 const loading = ref(false)
-const tableData = ref([])
-const total = ref(0)
+const importAllLoading = ref(false)
 const helpDialogVisible = ref(false)
 const helpTab = ref('fofa')
 
-const searchForm = reactive({
-  source: 'fofa',
-  query: '',
-  page: 1,
-  size: 50
-})
+// 使用 store 中的数据
+const tableData = computed(() => store.tableData)
+const total = computed(() => store.total)
 
 const quickQueries = [
   { label: 'IP搜索', query: 'ip="1.1.1.1"' },
@@ -148,7 +148,7 @@ const quickQueries = [
 ]
 
 async function handleSearch() {
-  if (!searchForm.query) {
+  if (!store.searchForm.query) {
     ElMessage.warning('请输入查询语句')
     return
   }
@@ -156,14 +156,13 @@ async function handleSearch() {
   loading.value = true
   try {
     const res = await request.post('/onlineapi/search', {
-      platform: searchForm.source,
-      query: searchForm.query,
-      page: searchForm.page,
-      pageSize: searchForm.size
+      platform: store.searchForm.source,
+      query: store.searchForm.query,
+      page: store.searchForm.page,
+      pageSize: store.searchForm.size
     })
     if (res.code === 0) {
-      tableData.value = res.list || []
-      total.value = res.total || 0
+      store.saveState(store.searchForm, res.list || [], res.total || 0)
     } else {
       ElMessage.error(res.msg || '搜索失败')
     }
@@ -173,11 +172,11 @@ async function handleSearch() {
 }
 
 function applyQuickQuery(item) {
-  searchForm.query = item.query
+  store.searchForm.query = item.query
 }
 
 async function handleImport() {
-  await ElMessageBox.confirm(`确定将 ${tableData.value.length} 条数据导入到资产库吗？`, '提示')
+  await ElMessageBox.confirm(`确定将当前页 ${tableData.value.length} 条数据导入到资产库吗？`, '提示')
   
   const res = await request.post('/onlineapi/import', { assets: tableData.value })
   
@@ -185,6 +184,37 @@ async function handleImport() {
     ElMessage.success(res.msg || '导入成功')
   } else {
     ElMessage.error(res.msg || '导入失败')
+  }
+}
+
+async function handleImportAll() {
+  if (!store.searchForm.query) {
+    ElMessage.warning('请先输入查询语句并搜索')
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `确定导入全部资产吗？将自动遍历所有页面（最多10页），预计导入约 ${Math.min(total.value, store.searchForm.size * 10)} 条数据`,
+    '导入全部资产',
+    { type: 'warning' }
+  )
+
+  importAllLoading.value = true
+  try {
+    const res = await request.post('/onlineapi/importAll', {
+      platform: store.searchForm.source,
+      query: store.searchForm.query,
+      pageSize: store.searchForm.size,
+      maxPages: 10
+    })
+
+    if (res.code === 0) {
+      ElMessage.success(res.msg || `成功导入${res.totalImport}条资产`)
+    } else {
+      ElMessage.error(res.msg || '导入失败')
+    }
+  } finally {
+    importAllLoading.value = false
   }
 }
 

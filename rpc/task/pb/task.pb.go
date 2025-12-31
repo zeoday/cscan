@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v3.19.4
-// source: task.proto
+// source: rpc/task/task.proto
 
 package pb
 
@@ -31,7 +31,7 @@ type CheckTaskReq struct {
 
 func (x *CheckTaskReq) Reset() {
 	*x = CheckTaskReq{}
-	mi := &file_task_proto_msgTypes[0]
+	mi := &file_rpc_task_task_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *CheckTaskReq) String() string {
 func (*CheckTaskReq) ProtoMessage() {}
 
 func (x *CheckTaskReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[0]
+	mi := &file_rpc_task_task_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *CheckTaskReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckTaskReq.ProtoReflect.Descriptor instead.
 func (*CheckTaskReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{0}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CheckTaskReq) GetTaskId() string {
@@ -89,7 +89,7 @@ type CheckTaskResp struct {
 
 func (x *CheckTaskResp) Reset() {
 	*x = CheckTaskResp{}
-	mi := &file_task_proto_msgTypes[1]
+	mi := &file_rpc_task_task_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -101,7 +101,7 @@ func (x *CheckTaskResp) String() string {
 func (*CheckTaskResp) ProtoMessage() {}
 
 func (x *CheckTaskResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[1]
+	mi := &file_rpc_task_task_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -114,7 +114,7 @@ func (x *CheckTaskResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckTaskResp.ProtoReflect.Descriptor instead.
 func (*CheckTaskResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{1}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CheckTaskResp) GetIsExist() bool {
@@ -185,7 +185,7 @@ type UpdateTaskReq struct {
 
 func (x *UpdateTaskReq) Reset() {
 	*x = UpdateTaskReq{}
-	mi := &file_task_proto_msgTypes[2]
+	mi := &file_rpc_task_task_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -197,7 +197,7 @@ func (x *UpdateTaskReq) String() string {
 func (*UpdateTaskReq) ProtoMessage() {}
 
 func (x *UpdateTaskReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[2]
+	mi := &file_rpc_task_task_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -210,7 +210,7 @@ func (x *UpdateTaskReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskReq.ProtoReflect.Descriptor instead.
 func (*UpdateTaskReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{2}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UpdateTaskReq) GetTaskId() string {
@@ -251,7 +251,7 @@ type UpdateTaskResp struct {
 
 func (x *UpdateTaskResp) Reset() {
 	*x = UpdateTaskResp{}
-	mi := &file_task_proto_msgTypes[3]
+	mi := &file_rpc_task_task_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -263,7 +263,7 @@ func (x *UpdateTaskResp) String() string {
 func (*UpdateTaskResp) ProtoMessage() {}
 
 func (x *UpdateTaskResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[3]
+	mi := &file_rpc_task_task_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -276,7 +276,7 @@ func (x *UpdateTaskResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskResp.ProtoReflect.Descriptor instead.
 func (*UpdateTaskResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{3}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UpdateTaskResp) GetSuccess() bool {
@@ -306,7 +306,7 @@ type NewTaskReq struct {
 
 func (x *NewTaskReq) Reset() {
 	*x = NewTaskReq{}
-	mi := &file_task_proto_msgTypes[4]
+	mi := &file_rpc_task_task_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -318,7 +318,7 @@ func (x *NewTaskReq) String() string {
 func (*NewTaskReq) ProtoMessage() {}
 
 func (x *NewTaskReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[4]
+	mi := &file_rpc_task_task_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -331,7 +331,7 @@ func (x *NewTaskReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewTaskReq.ProtoReflect.Descriptor instead.
 func (*NewTaskReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{4}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *NewTaskReq) GetTaskId() string {
@@ -379,7 +379,7 @@ type NewTaskResp struct {
 
 func (x *NewTaskResp) Reset() {
 	*x = NewTaskResp{}
-	mi := &file_task_proto_msgTypes[5]
+	mi := &file_rpc_task_task_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +391,7 @@ func (x *NewTaskResp) String() string {
 func (*NewTaskResp) ProtoMessage() {}
 
 func (x *NewTaskResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[5]
+	mi := &file_rpc_task_task_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +404,7 @@ func (x *NewTaskResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewTaskResp.ProtoReflect.Descriptor instead.
 func (*NewTaskResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{5}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *NewTaskResp) GetSuccess() bool {
@@ -452,7 +452,7 @@ type AssetDocument struct {
 
 func (x *AssetDocument) Reset() {
 	*x = AssetDocument{}
-	mi := &file_task_proto_msgTypes[6]
+	mi := &file_rpc_task_task_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -464,7 +464,7 @@ func (x *AssetDocument) String() string {
 func (*AssetDocument) ProtoMessage() {}
 
 func (x *AssetDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[6]
+	mi := &file_rpc_task_task_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -477,7 +477,7 @@ func (x *AssetDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssetDocument.ProtoReflect.Descriptor instead.
 func (*AssetDocument) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{6}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AssetDocument) GetAuthority() string {
@@ -652,7 +652,7 @@ type IPV4 struct {
 
 func (x *IPV4) Reset() {
 	*x = IPV4{}
-	mi := &file_task_proto_msgTypes[7]
+	mi := &file_rpc_task_task_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -664,7 +664,7 @@ func (x *IPV4) String() string {
 func (*IPV4) ProtoMessage() {}
 
 func (x *IPV4) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[7]
+	mi := &file_rpc_task_task_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -677,7 +677,7 @@ func (x *IPV4) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPV4.ProtoReflect.Descriptor instead.
 func (*IPV4) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{7}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *IPV4) GetIp() string {
@@ -711,7 +711,7 @@ type IPV6 struct {
 
 func (x *IPV6) Reset() {
 	*x = IPV6{}
-	mi := &file_task_proto_msgTypes[8]
+	mi := &file_rpc_task_task_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -723,7 +723,7 @@ func (x *IPV6) String() string {
 func (*IPV6) ProtoMessage() {}
 
 func (x *IPV6) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[8]
+	mi := &file_rpc_task_task_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -736,7 +736,7 @@ func (x *IPV6) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPV6.ProtoReflect.Descriptor instead.
 func (*IPV6) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{8}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *IPV6) GetIp() string {
@@ -765,7 +765,7 @@ type SaveTaskResultReq struct {
 
 func (x *SaveTaskResultReq) Reset() {
 	*x = SaveTaskResultReq{}
-	mi := &file_task_proto_msgTypes[9]
+	mi := &file_rpc_task_task_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +777,7 @@ func (x *SaveTaskResultReq) String() string {
 func (*SaveTaskResultReq) ProtoMessage() {}
 
 func (x *SaveTaskResultReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[9]
+	mi := &file_rpc_task_task_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +790,7 @@ func (x *SaveTaskResultReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveTaskResultReq.ProtoReflect.Descriptor instead.
 func (*SaveTaskResultReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{9}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SaveTaskResultReq) GetWorkspaceId() string {
@@ -834,7 +834,7 @@ type SaveTaskResultResp struct {
 
 func (x *SaveTaskResultResp) Reset() {
 	*x = SaveTaskResultResp{}
-	mi := &file_task_proto_msgTypes[10]
+	mi := &file_rpc_task_task_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -846,7 +846,7 @@ func (x *SaveTaskResultResp) String() string {
 func (*SaveTaskResultResp) ProtoMessage() {}
 
 func (x *SaveTaskResultResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[10]
+	mi := &file_rpc_task_task_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -859,7 +859,7 @@ func (x *SaveTaskResultResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveTaskResultResp.ProtoReflect.Descriptor instead.
 func (*SaveTaskResultResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{10}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SaveTaskResultResp) GetSuccess() bool {
@@ -928,7 +928,7 @@ type VulDocument struct {
 
 func (x *VulDocument) Reset() {
 	*x = VulDocument{}
-	mi := &file_task_proto_msgTypes[11]
+	mi := &file_rpc_task_task_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -940,7 +940,7 @@ func (x *VulDocument) String() string {
 func (*VulDocument) ProtoMessage() {}
 
 func (x *VulDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[11]
+	mi := &file_rpc_task_task_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -953,7 +953,7 @@ func (x *VulDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VulDocument.ProtoReflect.Descriptor instead.
 func (*VulDocument) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{11}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *VulDocument) GetAuthority() string {
@@ -1114,7 +1114,7 @@ type SaveVulResultReq struct {
 
 func (x *SaveVulResultReq) Reset() {
 	*x = SaveVulResultReq{}
-	mi := &file_task_proto_msgTypes[12]
+	mi := &file_rpc_task_task_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1126,7 +1126,7 @@ func (x *SaveVulResultReq) String() string {
 func (*SaveVulResultReq) ProtoMessage() {}
 
 func (x *SaveVulResultReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[12]
+	mi := &file_rpc_task_task_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1139,7 +1139,7 @@ func (x *SaveVulResultReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveVulResultReq.ProtoReflect.Descriptor instead.
 func (*SaveVulResultReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{12}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SaveVulResultReq) GetWorkspaceId() string {
@@ -1174,7 +1174,7 @@ type SaveVulResultResp struct {
 
 func (x *SaveVulResultResp) Reset() {
 	*x = SaveVulResultResp{}
-	mi := &file_task_proto_msgTypes[13]
+	mi := &file_rpc_task_task_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1186,7 +1186,7 @@ func (x *SaveVulResultResp) String() string {
 func (*SaveVulResultResp) ProtoMessage() {}
 
 func (x *SaveVulResultResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[13]
+	mi := &file_rpc_task_task_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1199,7 +1199,7 @@ func (x *SaveVulResultResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveVulResultResp.ProtoReflect.Descriptor instead.
 func (*SaveVulResultResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{13}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SaveVulResultResp) GetSuccess() bool {
@@ -1238,7 +1238,7 @@ type KeepAliveReq struct {
 
 func (x *KeepAliveReq) Reset() {
 	*x = KeepAliveReq{}
-	mi := &file_task_proto_msgTypes[14]
+	mi := &file_rpc_task_task_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1250,7 +1250,7 @@ func (x *KeepAliveReq) String() string {
 func (*KeepAliveReq) ProtoMessage() {}
 
 func (x *KeepAliveReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[14]
+	mi := &file_rpc_task_task_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1263,7 +1263,7 @@ func (x *KeepAliveReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeepAliveReq.ProtoReflect.Descriptor instead.
 func (*KeepAliveReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{14}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *KeepAliveReq) GetWorkerName() string {
@@ -1328,7 +1328,7 @@ type KeepAliveResp struct {
 
 func (x *KeepAliveResp) Reset() {
 	*x = KeepAliveResp{}
-	mi := &file_task_proto_msgTypes[15]
+	mi := &file_rpc_task_task_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1340,7 +1340,7 @@ func (x *KeepAliveResp) String() string {
 func (*KeepAliveResp) ProtoMessage() {}
 
 func (x *KeepAliveResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[15]
+	mi := &file_rpc_task_task_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1353,7 +1353,7 @@ func (x *KeepAliveResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeepAliveResp.ProtoReflect.Descriptor instead.
 func (*KeepAliveResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{15}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *KeepAliveResp) GetStatus() string {
@@ -1400,7 +1400,7 @@ type GetWorkerConfigReq struct {
 
 func (x *GetWorkerConfigReq) Reset() {
 	*x = GetWorkerConfigReq{}
-	mi := &file_task_proto_msgTypes[16]
+	mi := &file_rpc_task_task_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1412,7 +1412,7 @@ func (x *GetWorkerConfigReq) String() string {
 func (*GetWorkerConfigReq) ProtoMessage() {}
 
 func (x *GetWorkerConfigReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[16]
+	mi := &file_rpc_task_task_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1425,7 +1425,7 @@ func (x *GetWorkerConfigReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkerConfigReq.ProtoReflect.Descriptor instead.
 func (*GetWorkerConfigReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{16}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetWorkerConfigReq) GetWorkerName() string {
@@ -1444,7 +1444,7 @@ type GetWorkerConfigResp struct {
 
 func (x *GetWorkerConfigResp) Reset() {
 	*x = GetWorkerConfigResp{}
-	mi := &file_task_proto_msgTypes[17]
+	mi := &file_rpc_task_task_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1456,7 +1456,7 @@ func (x *GetWorkerConfigResp) String() string {
 func (*GetWorkerConfigResp) ProtoMessage() {}
 
 func (x *GetWorkerConfigResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[17]
+	mi := &file_rpc_task_task_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1469,7 +1469,7 @@ func (x *GetWorkerConfigResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkerConfigResp.ProtoReflect.Descriptor instead.
 func (*GetWorkerConfigResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{17}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetWorkerConfigResp) GetConfig() string {
@@ -1489,7 +1489,7 @@ type RequestResourceReq struct {
 
 func (x *RequestResourceReq) Reset() {
 	*x = RequestResourceReq{}
-	mi := &file_task_proto_msgTypes[18]
+	mi := &file_rpc_task_task_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1501,7 +1501,7 @@ func (x *RequestResourceReq) String() string {
 func (*RequestResourceReq) ProtoMessage() {}
 
 func (x *RequestResourceReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[18]
+	mi := &file_rpc_task_task_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1514,7 +1514,7 @@ func (x *RequestResourceReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestResourceReq.ProtoReflect.Descriptor instead.
 func (*RequestResourceReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{18}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RequestResourceReq) GetCategory() string {
@@ -1542,7 +1542,7 @@ type RequestResourceResp struct {
 
 func (x *RequestResourceResp) Reset() {
 	*x = RequestResourceResp{}
-	mi := &file_task_proto_msgTypes[19]
+	mi := &file_rpc_task_task_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1554,7 +1554,7 @@ func (x *RequestResourceResp) String() string {
 func (*RequestResourceResp) ProtoMessage() {}
 
 func (x *RequestResourceResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[19]
+	mi := &file_rpc_task_task_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1567,7 +1567,7 @@ func (x *RequestResourceResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestResourceResp.ProtoReflect.Descriptor instead.
 func (*RequestResourceResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{19}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RequestResourceResp) GetPath() string {
@@ -1602,7 +1602,7 @@ type GetTemplatesByTagsReq struct {
 
 func (x *GetTemplatesByTagsReq) Reset() {
 	*x = GetTemplatesByTagsReq{}
-	mi := &file_task_proto_msgTypes[20]
+	mi := &file_rpc_task_task_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1614,7 +1614,7 @@ func (x *GetTemplatesByTagsReq) String() string {
 func (*GetTemplatesByTagsReq) ProtoMessage() {}
 
 func (x *GetTemplatesByTagsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[20]
+	mi := &file_rpc_task_task_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1627,7 +1627,7 @@ func (x *GetTemplatesByTagsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplatesByTagsReq.ProtoReflect.Descriptor instead.
 func (*GetTemplatesByTagsReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{20}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetTemplatesByTagsReq) GetTags() []string {
@@ -1657,7 +1657,7 @@ type GetTemplatesByTagsResp struct {
 
 func (x *GetTemplatesByTagsResp) Reset() {
 	*x = GetTemplatesByTagsResp{}
-	mi := &file_task_proto_msgTypes[21]
+	mi := &file_rpc_task_task_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1669,7 +1669,7 @@ func (x *GetTemplatesByTagsResp) String() string {
 func (*GetTemplatesByTagsResp) ProtoMessage() {}
 
 func (x *GetTemplatesByTagsResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[21]
+	mi := &file_rpc_task_task_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1682,7 +1682,7 @@ func (x *GetTemplatesByTagsResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplatesByTagsResp.ProtoReflect.Descriptor instead.
 func (*GetTemplatesByTagsResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{21}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetTemplatesByTagsResp) GetSuccess() bool {
@@ -1723,7 +1723,7 @@ type GetCustomFingerprintsReq struct {
 
 func (x *GetCustomFingerprintsReq) Reset() {
 	*x = GetCustomFingerprintsReq{}
-	mi := &file_task_proto_msgTypes[22]
+	mi := &file_rpc_task_task_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1735,7 +1735,7 @@ func (x *GetCustomFingerprintsReq) String() string {
 func (*GetCustomFingerprintsReq) ProtoMessage() {}
 
 func (x *GetCustomFingerprintsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[22]
+	mi := &file_rpc_task_task_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1748,7 +1748,7 @@ func (x *GetCustomFingerprintsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCustomFingerprintsReq.ProtoReflect.Descriptor instead.
 func (*GetCustomFingerprintsReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{22}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetCustomFingerprintsReq) GetEnabledOnly() bool {
@@ -1782,7 +1782,7 @@ type FingerprintDocument struct {
 
 func (x *FingerprintDocument) Reset() {
 	*x = FingerprintDocument{}
-	mi := &file_task_proto_msgTypes[23]
+	mi := &file_rpc_task_task_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1794,7 +1794,7 @@ func (x *FingerprintDocument) String() string {
 func (*FingerprintDocument) ProtoMessage() {}
 
 func (x *FingerprintDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[23]
+	mi := &file_rpc_task_task_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1807,7 +1807,7 @@ func (x *FingerprintDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FingerprintDocument.ProtoReflect.Descriptor instead.
 func (*FingerprintDocument) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{23}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *FingerprintDocument) GetId() string {
@@ -1928,7 +1928,7 @@ type GetCustomFingerprintsResp struct {
 
 func (x *GetCustomFingerprintsResp) Reset() {
 	*x = GetCustomFingerprintsResp{}
-	mi := &file_task_proto_msgTypes[24]
+	mi := &file_rpc_task_task_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1940,7 +1940,7 @@ func (x *GetCustomFingerprintsResp) String() string {
 func (*GetCustomFingerprintsResp) ProtoMessage() {}
 
 func (x *GetCustomFingerprintsResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[24]
+	mi := &file_rpc_task_task_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1953,7 +1953,7 @@ func (x *GetCustomFingerprintsResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCustomFingerprintsResp.ProtoReflect.Descriptor instead.
 func (*GetCustomFingerprintsResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{24}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetCustomFingerprintsResp) GetSuccess() bool {
@@ -1996,7 +1996,7 @@ type ValidateFingerprintReq struct {
 
 func (x *ValidateFingerprintReq) Reset() {
 	*x = ValidateFingerprintReq{}
-	mi := &file_task_proto_msgTypes[25]
+	mi := &file_rpc_task_task_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2008,7 +2008,7 @@ func (x *ValidateFingerprintReq) String() string {
 func (*ValidateFingerprintReq) ProtoMessage() {}
 
 func (x *ValidateFingerprintReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[25]
+	mi := &file_rpc_task_task_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2021,7 +2021,7 @@ func (x *ValidateFingerprintReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateFingerprintReq.ProtoReflect.Descriptor instead.
 func (*ValidateFingerprintReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{25}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ValidateFingerprintReq) GetUrl() string {
@@ -2059,7 +2059,7 @@ type MatchedFingerprintInfo struct {
 
 func (x *MatchedFingerprintInfo) Reset() {
 	*x = MatchedFingerprintInfo{}
-	mi := &file_task_proto_msgTypes[26]
+	mi := &file_rpc_task_task_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2071,7 +2071,7 @@ func (x *MatchedFingerprintInfo) String() string {
 func (*MatchedFingerprintInfo) ProtoMessage() {}
 
 func (x *MatchedFingerprintInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[26]
+	mi := &file_rpc_task_task_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2084,7 +2084,7 @@ func (x *MatchedFingerprintInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MatchedFingerprintInfo.ProtoReflect.Descriptor instead.
 func (*MatchedFingerprintInfo) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{26}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *MatchedFingerprintInfo) GetId() string {
@@ -2138,7 +2138,7 @@ type ValidateFingerprintResp struct {
 
 func (x *ValidateFingerprintResp) Reset() {
 	*x = ValidateFingerprintResp{}
-	mi := &file_task_proto_msgTypes[27]
+	mi := &file_rpc_task_task_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2150,7 +2150,7 @@ func (x *ValidateFingerprintResp) String() string {
 func (*ValidateFingerprintResp) ProtoMessage() {}
 
 func (x *ValidateFingerprintResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[27]
+	mi := &file_rpc_task_task_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2163,7 +2163,7 @@ func (x *ValidateFingerprintResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateFingerprintResp.ProtoReflect.Descriptor instead.
 func (*ValidateFingerprintResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{27}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ValidateFingerprintResp) GetSuccess() bool {
@@ -2218,7 +2218,7 @@ func (x *ValidateFingerprintResp) GetMatchedList() []*MatchedFingerprintInfo {
 // POC验证请求
 type ValidatePocReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                  // 目标URL
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`                  // 目标URL（单个目标时使用）
 	PocId         string                 `protobuf:"bytes,2,opt,name=pocId,proto3" json:"pocId,omitempty"`              // POC ID（可选，为空则验证所有）
 	PocType       string                 `protobuf:"bytes,3,opt,name=pocType,proto3" json:"pocType,omitempty"`          // POC类型: nuclei, custom, all
 	Severities    []string               `protobuf:"bytes,4,rep,name=severities,proto3" json:"severities,omitempty"`    // 严重级别过滤
@@ -2226,13 +2226,16 @@ type ValidatePocReq struct {
 	Timeout       int32                  `protobuf:"varint,6,opt,name=timeout,proto3" json:"timeout,omitempty"`         // 超时时间（秒）
 	UseTemplate   bool                   `protobuf:"varint,7,opt,name=useTemplate,proto3" json:"useTemplate,omitempty"` // 是否使用默认模板
 	UseCustom     bool                   `protobuf:"varint,8,opt,name=useCustom,proto3" json:"useCustom,omitempty"`     // 是否使用自定义POC
+	WorkspaceId   string                 `protobuf:"bytes,9,opt,name=workspaceId,proto3" json:"workspaceId,omitempty"`  // 工作空间ID（用于保存漏洞结果）
+	Urls          []string               `protobuf:"bytes,10,rep,name=urls,proto3" json:"urls,omitempty"`               // 目标URL列表（批量扫描时使用）
+	BatchMode     bool                   `protobuf:"varint,11,opt,name=batchMode,proto3" json:"batchMode,omitempty"`    // 是否批量模式（使用单个Nuclei引擎扫描所有目标）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ValidatePocReq) Reset() {
 	*x = ValidatePocReq{}
-	mi := &file_task_proto_msgTypes[28]
+	mi := &file_rpc_task_task_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2244,7 +2247,7 @@ func (x *ValidatePocReq) String() string {
 func (*ValidatePocReq) ProtoMessage() {}
 
 func (x *ValidatePocReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[28]
+	mi := &file_rpc_task_task_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2257,7 +2260,7 @@ func (x *ValidatePocReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidatePocReq.ProtoReflect.Descriptor instead.
 func (*ValidatePocReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{28}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ValidatePocReq) GetUrl() string {
@@ -2316,6 +2319,27 @@ func (x *ValidatePocReq) GetUseCustom() bool {
 	return false
 }
 
+func (x *ValidatePocReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *ValidatePocReq) GetUrls() []string {
+	if x != nil {
+		return x.Urls
+	}
+	return nil
+}
+
+func (x *ValidatePocReq) GetBatchMode() bool {
+	if x != nil {
+		return x.BatchMode
+	}
+	return false
+}
+
 // POC验证结果
 type PocValidationResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2335,7 +2359,7 @@ type PocValidationResult struct {
 
 func (x *PocValidationResult) Reset() {
 	*x = PocValidationResult{}
-	mi := &file_task_proto_msgTypes[29]
+	mi := &file_rpc_task_task_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2347,7 +2371,7 @@ func (x *PocValidationResult) String() string {
 func (*PocValidationResult) ProtoMessage() {}
 
 func (x *PocValidationResult) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[29]
+	mi := &file_rpc_task_task_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2360,7 +2384,7 @@ func (x *PocValidationResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PocValidationResult.ProtoReflect.Descriptor instead.
 func (*PocValidationResult) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{29}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *PocValidationResult) GetPocId() string {
@@ -2451,7 +2475,7 @@ type ValidatePocResp struct {
 
 func (x *ValidatePocResp) Reset() {
 	*x = ValidatePocResp{}
-	mi := &file_task_proto_msgTypes[30]
+	mi := &file_rpc_task_task_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2463,7 +2487,7 @@ func (x *ValidatePocResp) String() string {
 func (*ValidatePocResp) ProtoMessage() {}
 
 func (x *ValidatePocResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[30]
+	mi := &file_rpc_task_task_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2476,7 +2500,7 @@ func (x *ValidatePocResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidatePocResp.ProtoReflect.Descriptor instead.
 func (*ValidatePocResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{30}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ValidatePocResp) GetSuccess() bool {
@@ -2553,13 +2577,14 @@ type BatchValidatePocReq struct {
 	UseTemplate   bool                   `protobuf:"varint,6,opt,name=useTemplate,proto3" json:"useTemplate,omitempty"` // 是否使用默认模板
 	UseCustom     bool                   `protobuf:"varint,7,opt,name=useCustom,proto3" json:"useCustom,omitempty"`     // 是否使用自定义POC
 	Concurrency   int32                  `protobuf:"varint,8,opt,name=concurrency,proto3" json:"concurrency,omitempty"` // 并发数
+	WorkspaceId   string                 `protobuf:"bytes,9,opt,name=workspaceId,proto3" json:"workspaceId,omitempty"`  // 工作空间ID（用于保存漏洞结果）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BatchValidatePocReq) Reset() {
 	*x = BatchValidatePocReq{}
-	mi := &file_task_proto_msgTypes[31]
+	mi := &file_rpc_task_task_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2571,7 +2596,7 @@ func (x *BatchValidatePocReq) String() string {
 func (*BatchValidatePocReq) ProtoMessage() {}
 
 func (x *BatchValidatePocReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[31]
+	mi := &file_rpc_task_task_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2584,7 +2609,7 @@ func (x *BatchValidatePocReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchValidatePocReq.ProtoReflect.Descriptor instead.
 func (*BatchValidatePocReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{31}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *BatchValidatePocReq) GetUrls() []string {
@@ -2643,6 +2668,13 @@ func (x *BatchValidatePocReq) GetConcurrency() int32 {
 	return 0
 }
 
+func (x *BatchValidatePocReq) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
 // 批量POC验证响应
 type BatchValidatePocResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2661,7 +2693,7 @@ type BatchValidatePocResp struct {
 
 func (x *BatchValidatePocResp) Reset() {
 	*x = BatchValidatePocResp{}
-	mi := &file_task_proto_msgTypes[32]
+	mi := &file_rpc_task_task_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2673,7 +2705,7 @@ func (x *BatchValidatePocResp) String() string {
 func (*BatchValidatePocResp) ProtoMessage() {}
 
 func (x *BatchValidatePocResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[32]
+	mi := &file_rpc_task_task_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2686,7 +2718,7 @@ func (x *BatchValidatePocResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchValidatePocResp.ProtoReflect.Descriptor instead.
 func (*BatchValidatePocResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{32}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *BatchValidatePocResp) GetSuccess() bool {
@@ -2763,7 +2795,7 @@ type GetPocValidationResultReq struct {
 
 func (x *GetPocValidationResultReq) Reset() {
 	*x = GetPocValidationResultReq{}
-	mi := &file_task_proto_msgTypes[33]
+	mi := &file_rpc_task_task_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2775,7 +2807,7 @@ func (x *GetPocValidationResultReq) String() string {
 func (*GetPocValidationResultReq) ProtoMessage() {}
 
 func (x *GetPocValidationResultReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[33]
+	mi := &file_rpc_task_task_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2788,7 +2820,7 @@ func (x *GetPocValidationResultReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPocValidationResultReq.ProtoReflect.Descriptor instead.
 func (*GetPocValidationResultReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{33}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetPocValidationResultReq) GetTaskId() string {
@@ -2822,7 +2854,7 @@ type GetPocValidationResultResp struct {
 
 func (x *GetPocValidationResultResp) Reset() {
 	*x = GetPocValidationResultResp{}
-	mi := &file_task_proto_msgTypes[34]
+	mi := &file_rpc_task_task_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2834,7 +2866,7 @@ func (x *GetPocValidationResultResp) String() string {
 func (*GetPocValidationResultResp) ProtoMessage() {}
 
 func (x *GetPocValidationResultResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[34]
+	mi := &file_rpc_task_task_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2847,7 +2879,7 @@ func (x *GetPocValidationResultResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPocValidationResultResp.ProtoReflect.Descriptor instead.
 func (*GetPocValidationResultResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{34}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetPocValidationResultResp) GetSuccess() bool {
@@ -2917,7 +2949,7 @@ type GetPocByIdReq struct {
 
 func (x *GetPocByIdReq) Reset() {
 	*x = GetPocByIdReq{}
-	mi := &file_task_proto_msgTypes[35]
+	mi := &file_rpc_task_task_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2929,7 +2961,7 @@ func (x *GetPocByIdReq) String() string {
 func (*GetPocByIdReq) ProtoMessage() {}
 
 func (x *GetPocByIdReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[35]
+	mi := &file_rpc_task_task_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2942,7 +2974,7 @@ func (x *GetPocByIdReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPocByIdReq.ProtoReflect.Descriptor instead.
 func (*GetPocByIdReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{35}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetPocByIdReq) GetPocId() string {
@@ -2977,7 +3009,7 @@ type GetPocByIdResp struct {
 
 func (x *GetPocByIdResp) Reset() {
 	*x = GetPocByIdResp{}
-	mi := &file_task_proto_msgTypes[36]
+	mi := &file_rpc_task_task_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2989,7 +3021,7 @@ func (x *GetPocByIdResp) String() string {
 func (*GetPocByIdResp) ProtoMessage() {}
 
 func (x *GetPocByIdResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[36]
+	mi := &file_rpc_task_task_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3002,7 +3034,7 @@ func (x *GetPocByIdResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPocByIdResp.ProtoReflect.Descriptor instead.
 func (*GetPocByIdResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{36}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetPocByIdResp) GetSuccess() bool {
@@ -3079,7 +3111,7 @@ type GetTemplatesByIdsReq struct {
 
 func (x *GetTemplatesByIdsReq) Reset() {
 	*x = GetTemplatesByIdsReq{}
-	mi := &file_task_proto_msgTypes[37]
+	mi := &file_rpc_task_task_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3091,7 +3123,7 @@ func (x *GetTemplatesByIdsReq) String() string {
 func (*GetTemplatesByIdsReq) ProtoMessage() {}
 
 func (x *GetTemplatesByIdsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[37]
+	mi := &file_rpc_task_task_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3104,7 +3136,7 @@ func (x *GetTemplatesByIdsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplatesByIdsReq.ProtoReflect.Descriptor instead.
 func (*GetTemplatesByIdsReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{37}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetTemplatesByIdsReq) GetNucleiTemplateIds() []string {
@@ -3134,7 +3166,7 @@ type GetTemplatesByIdsResp struct {
 
 func (x *GetTemplatesByIdsResp) Reset() {
 	*x = GetTemplatesByIdsResp{}
-	mi := &file_task_proto_msgTypes[38]
+	mi := &file_rpc_task_task_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3146,7 +3178,7 @@ func (x *GetTemplatesByIdsResp) String() string {
 func (*GetTemplatesByIdsResp) ProtoMessage() {}
 
 func (x *GetTemplatesByIdsResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[38]
+	mi := &file_rpc_task_task_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3159,7 +3191,7 @@ func (x *GetTemplatesByIdsResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplatesByIdsResp.ProtoReflect.Descriptor instead.
 func (*GetTemplatesByIdsResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{38}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetTemplatesByIdsResp) GetSuccess() bool {
@@ -3200,7 +3232,7 @@ type GetHttpServiceMappingsReq struct {
 
 func (x *GetHttpServiceMappingsReq) Reset() {
 	*x = GetHttpServiceMappingsReq{}
-	mi := &file_task_proto_msgTypes[39]
+	mi := &file_rpc_task_task_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3212,7 +3244,7 @@ func (x *GetHttpServiceMappingsReq) String() string {
 func (*GetHttpServiceMappingsReq) ProtoMessage() {}
 
 func (x *GetHttpServiceMappingsReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[39]
+	mi := &file_rpc_task_task_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3225,7 +3257,7 @@ func (x *GetHttpServiceMappingsReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHttpServiceMappingsReq.ProtoReflect.Descriptor instead.
 func (*GetHttpServiceMappingsReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{39}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetHttpServiceMappingsReq) GetEnabledOnly() bool {
@@ -3249,7 +3281,7 @@ type HttpServiceMappingDocument struct {
 
 func (x *HttpServiceMappingDocument) Reset() {
 	*x = HttpServiceMappingDocument{}
-	mi := &file_task_proto_msgTypes[40]
+	mi := &file_rpc_task_task_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3261,7 +3293,7 @@ func (x *HttpServiceMappingDocument) String() string {
 func (*HttpServiceMappingDocument) ProtoMessage() {}
 
 func (x *HttpServiceMappingDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[40]
+	mi := &file_rpc_task_task_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3274,7 +3306,7 @@ func (x *HttpServiceMappingDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpServiceMappingDocument.ProtoReflect.Descriptor instead.
 func (*HttpServiceMappingDocument) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{40}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *HttpServiceMappingDocument) GetId() string {
@@ -3325,7 +3357,7 @@ type GetHttpServiceMappingsResp struct {
 
 func (x *GetHttpServiceMappingsResp) Reset() {
 	*x = GetHttpServiceMappingsResp{}
-	mi := &file_task_proto_msgTypes[41]
+	mi := &file_rpc_task_task_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3337,7 +3369,7 @@ func (x *GetHttpServiceMappingsResp) String() string {
 func (*GetHttpServiceMappingsResp) ProtoMessage() {}
 
 func (x *GetHttpServiceMappingsResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[41]
+	mi := &file_rpc_task_task_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3350,7 +3382,7 @@ func (x *GetHttpServiceMappingsResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHttpServiceMappingsResp.ProtoReflect.Descriptor instead.
 func (*GetHttpServiceMappingsResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{41}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetHttpServiceMappingsResp) GetSuccess() bool {
@@ -3391,7 +3423,7 @@ type GetSubfinderProvidersReq struct {
 
 func (x *GetSubfinderProvidersReq) Reset() {
 	*x = GetSubfinderProvidersReq{}
-	mi := &file_task_proto_msgTypes[42]
+	mi := &file_rpc_task_task_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3403,7 +3435,7 @@ func (x *GetSubfinderProvidersReq) String() string {
 func (*GetSubfinderProvidersReq) ProtoMessage() {}
 
 func (x *GetSubfinderProvidersReq) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[42]
+	mi := &file_rpc_task_task_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3416,7 +3448,7 @@ func (x *GetSubfinderProvidersReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubfinderProvidersReq.ProtoReflect.Descriptor instead.
 func (*GetSubfinderProvidersReq) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{42}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetSubfinderProvidersReq) GetWorkspaceId() string {
@@ -3440,7 +3472,7 @@ type SubfinderProviderDocument struct {
 
 func (x *SubfinderProviderDocument) Reset() {
 	*x = SubfinderProviderDocument{}
-	mi := &file_task_proto_msgTypes[43]
+	mi := &file_rpc_task_task_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3452,7 +3484,7 @@ func (x *SubfinderProviderDocument) String() string {
 func (*SubfinderProviderDocument) ProtoMessage() {}
 
 func (x *SubfinderProviderDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[43]
+	mi := &file_rpc_task_task_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3465,7 +3497,7 @@ func (x *SubfinderProviderDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubfinderProviderDocument.ProtoReflect.Descriptor instead.
 func (*SubfinderProviderDocument) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{43}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *SubfinderProviderDocument) GetId() string {
@@ -3516,7 +3548,7 @@ type GetSubfinderProvidersResp struct {
 
 func (x *GetSubfinderProvidersResp) Reset() {
 	*x = GetSubfinderProvidersResp{}
-	mi := &file_task_proto_msgTypes[44]
+	mi := &file_rpc_task_task_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3528,7 +3560,7 @@ func (x *GetSubfinderProvidersResp) String() string {
 func (*GetSubfinderProvidersResp) ProtoMessage() {}
 
 func (x *GetSubfinderProvidersResp) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[44]
+	mi := &file_rpc_task_task_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3541,7 +3573,7 @@ func (x *GetSubfinderProvidersResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSubfinderProvidersResp.ProtoReflect.Descriptor instead.
 func (*GetSubfinderProvidersResp) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{44}
+	return file_rpc_task_task_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *GetSubfinderProvidersResp) GetSuccess() bool {
@@ -3572,12 +3604,11 @@ func (x *GetSubfinderProvidersResp) GetCount() int32 {
 	return 0
 }
 
-var File_task_proto protoreflect.FileDescriptor
+var File_rpc_task_task_proto protoreflect.FileDescriptor
 
-const file_task_proto_rawDesc = "" +
+const file_rpc_task_task_proto_rawDesc = "" +
 	"\n" +
-	"\n" +
-	"task.proto\x12\x04task\"F\n" +
+	"\x13rpc/task/task.proto\x12\x04task\"F\n" +
 	"\fCheckTaskReq\x12\x16\n" +
 	"\x06taskId\x18\x01 \x01(\tR\x06taskId\x12\x1e\n" +
 	"\n" +
@@ -3804,7 +3835,7 @@ const file_task_proto_rawDesc = "" +
 	"\fmatchedCount\x18\x04 \x01(\x05R\fmatchedCount\x12\x1a\n" +
 	"\bduration\x18\x05 \x01(\tR\bduration\x12\x18\n" +
 	"\adetails\x18\x06 \x01(\tR\adetails\x12>\n" +
-	"\vmatchedList\x18\a \x03(\v2\x1c.task.MatchedFingerprintInfoR\vmatchedList\"\xe0\x01\n" +
+	"\vmatchedList\x18\a \x03(\v2\x1c.task.MatchedFingerprintInfoR\vmatchedList\"\xb4\x02\n" +
 	"\x0eValidatePocReq\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
 	"\x05pocId\x18\x02 \x01(\tR\x05pocId\x12\x18\n" +
@@ -3815,7 +3846,11 @@ const file_task_proto_rawDesc = "" +
 	"\x04tags\x18\x05 \x03(\tR\x04tags\x12\x18\n" +
 	"\atimeout\x18\x06 \x01(\x05R\atimeout\x12 \n" +
 	"\vuseTemplate\x18\a \x01(\bR\vuseTemplate\x12\x1c\n" +
-	"\tuseCustom\x18\b \x01(\bR\tuseCustom\"\x9b\x02\n" +
+	"\tuseCustom\x18\b \x01(\bR\tuseCustom\x12 \n" +
+	"\vworkspaceId\x18\t \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04urls\x18\n" +
+	" \x03(\tR\x04urls\x12\x1c\n" +
+	"\tbatchMode\x18\v \x01(\bR\tbatchMode\"\x9b\x02\n" +
 	"\x13PocValidationResult\x12\x14\n" +
 	"\x05pocId\x18\x01 \x01(\tR\x05pocId\x12\x18\n" +
 	"\apocName\x18\x02 \x01(\tR\apocName\x12\x1e\n" +
@@ -3843,7 +3878,7 @@ const file_task_proto_rawDesc = "" +
 	"\bduration\x18\x06 \x01(\tR\bduration\x12\x18\n" +
 	"\adetails\x18\a \x01(\tR\adetails\x123\n" +
 	"\aresults\x18\b \x03(\v2\x19.task.PocValidationResultR\aresults\x12\x16\n" +
-	"\x06taskId\x18\t \x01(\tR\x06taskId\"\xf3\x01\n" +
+	"\x06taskId\x18\t \x01(\tR\x06taskId\"\x95\x02\n" +
 	"\x13BatchValidatePocReq\x12\x12\n" +
 	"\x04urls\x18\x01 \x03(\tR\x04urls\x12\x18\n" +
 	"\apocType\x18\x02 \x01(\tR\apocType\x12\x1e\n" +
@@ -3854,7 +3889,8 @@ const file_task_proto_rawDesc = "" +
 	"\atimeout\x18\x05 \x01(\x05R\atimeout\x12 \n" +
 	"\vuseTemplate\x18\x06 \x01(\bR\vuseTemplate\x12\x1c\n" +
 	"\tuseCustom\x18\a \x01(\bR\tuseCustom\x12 \n" +
-	"\vconcurrency\x18\b \x01(\x05R\vconcurrency\"\x98\x03\n" +
+	"\vconcurrency\x18\b \x01(\x05R\vconcurrency\x12 \n" +
+	"\vworkspaceId\x18\t \x01(\tR\vworkspaceId\"\x98\x03\n" +
 	"\x14BatchValidatePocResp\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +
@@ -3959,19 +3995,19 @@ const file_task_proto_rawDesc = "" +
 	"\x15GetSubfinderProviders\x12\x1e.task.GetSubfinderProvidersReq\x1a\x1f.task.GetSubfinderProvidersRespB\x06Z\x04./pbb\x06proto3"
 
 var (
-	file_task_proto_rawDescOnce sync.Once
-	file_task_proto_rawDescData []byte
+	file_rpc_task_task_proto_rawDescOnce sync.Once
+	file_rpc_task_task_proto_rawDescData []byte
 )
 
-func file_task_proto_rawDescGZIP() []byte {
-	file_task_proto_rawDescOnce.Do(func() {
-		file_task_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_task_proto_rawDesc), len(file_task_proto_rawDesc)))
+func file_rpc_task_task_proto_rawDescGZIP() []byte {
+	file_rpc_task_task_proto_rawDescOnce.Do(func() {
+		file_rpc_task_task_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_rpc_task_task_proto_rawDesc), len(file_rpc_task_task_proto_rawDesc)))
 	})
-	return file_task_proto_rawDescData
+	return file_rpc_task_task_proto_rawDescData
 }
 
-var file_task_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
-var file_task_proto_goTypes = []any{
+var file_rpc_task_task_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_rpc_task_task_proto_goTypes = []any{
 	(*CheckTaskReq)(nil),               // 0: task.CheckTaskReq
 	(*CheckTaskResp)(nil),              // 1: task.CheckTaskResp
 	(*UpdateTaskReq)(nil),              // 2: task.UpdateTaskReq
@@ -4022,7 +4058,7 @@ var file_task_proto_goTypes = []any{
 	nil,                                // 47: task.FingerprintDocument.MetaEntry
 	nil,                                // 48: task.BatchValidatePocResp.UrlStatsEntry
 }
-var file_task_proto_depIdxs = []int32{
+var file_rpc_task_task_proto_depIdxs = []int32{
 	7,  // 0: task.AssetDocument.ipv4:type_name -> task.IPV4
 	8,  // 1: task.AssetDocument.ipv6:type_name -> task.IPV6
 	6,  // 2: task.SaveTaskResultReq.assets:type_name -> task.AssetDocument
@@ -4081,27 +4117,27 @@ var file_task_proto_depIdxs = []int32{
 	0,  // [0:15] is the sub-list for field type_name
 }
 
-func init() { file_task_proto_init() }
-func file_task_proto_init() {
-	if File_task_proto != nil {
+func init() { file_rpc_task_task_proto_init() }
+func file_rpc_task_task_proto_init() {
+	if File_rpc_task_task_proto != nil {
 		return
 	}
-	file_task_proto_msgTypes[11].OneofWrappers = []any{}
+	file_rpc_task_task_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_task_proto_rawDesc), len(file_task_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rpc_task_task_proto_rawDesc), len(file_rpc_task_task_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_task_proto_goTypes,
-		DependencyIndexes: file_task_proto_depIdxs,
-		MessageInfos:      file_task_proto_msgTypes,
+		GoTypes:           file_rpc_task_task_proto_goTypes,
+		DependencyIndexes: file_rpc_task_task_proto_depIdxs,
+		MessageInfos:      file_rpc_task_task_proto_msgTypes,
 	}.Build()
-	File_task_proto = out.File
-	file_task_proto_goTypes = nil
-	file_task_proto_depIdxs = nil
+	File_rpc_task_task_proto = out.File
+	file_rpc_task_task_proto_goTypes = nil
+	file_rpc_task_task_proto_depIdxs = nil
 }

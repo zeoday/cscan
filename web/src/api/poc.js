@@ -75,3 +75,8 @@ export function batchValidatePoc(data) {
 export function getPocValidationResult(data) {
   return request.post('/poc/queryResult', data)
 }
+
+// 自定义POC扫描现有资产
+export function scanAssetsWithPoc(data) {
+  return request.post('/poc/custom/scanAssets', data)
+}

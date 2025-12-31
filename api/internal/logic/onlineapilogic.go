@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"context"
+	"strings"
 	"cscan/api/internal/svc"
 	"cscan/api/internal/types"
 	"cscan/model"
@@ -20,6 +21,28 @@ type OnlineAPILogic struct {
 
 func NewOnlineAPILogic(ctx context.Context, svc *svc.ServiceContext) *OnlineAPILogic {
 	return &OnlineAPILogic{ctx: ctx, svc: svc}
+}
+
+// parseApps 解析指纹字符串，支持逗号分隔，过滤空值
+func parseApps(product string) []string {
+	if product == "" {
+		return nil
+	}
+	
+	var apps []string
+	// 支持中英文逗号分隔
+	parts := strings.FieldsFunc(product, func(r rune) bool {
+		return r == ',' || r == '，' || r == ';' || r == '；'
+	})
+	
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			apps = append(apps, p)
+		}
+	}
+	
+	return apps
 }
 
 func (l *OnlineAPILogic) Search(req *types.OnlineSearchReq, workspaceId string) (*types.OnlineSearchResp, error) {
@@ -96,13 +119,14 @@ func (l *OnlineAPILogic) Import(req *types.OnlineImportReq, workspaceId string) 
 
 	count := 0
 	for _, a := range req.Assets {
+		apps := parseApps(a.Product)
 		asset := &model.Asset{
 			Authority: a.Host,
 			Host:      a.IP,
 			Port:      a.Port,
 			Service:   a.Protocol,
 			Title:     a.Title,
-			App:       []string{a.Product},
+			App:       apps,
 			Source:    "onlineapi",
 		}
 		if err := assetModel.Upsert(l.ctx, asset); err == nil {
@@ -111,6 +135,139 @@ func (l *OnlineAPILogic) Import(req *types.OnlineImportReq, workspaceId string) 
 	}
 
 	return &types.BaseResp{Code: 0, Msg: fmt.Sprintf("成功导入%d条资产", count)}, nil
+}
+
+// ImportAll 导入全部资产（自动遍历所有页面）
+func (l *OnlineAPILogic) ImportAll(req *types.OnlineImportAllReq, workspaceId string) (*types.OnlineImportAllResp, error) {
+	// 获取API配置
+	configModel := model.NewAPIConfigModel(l.svc.MongoDB, workspaceId)
+	config, err := configModel.FindByPlatform(l.ctx, req.Platform)
+	if err != nil {
+		return &types.OnlineImportAllResp{Code: 404, Msg: "未配置" + req.Platform + "的API密钥"}, nil
+	}
+
+	assetModel := l.svc.GetAssetModel(workspaceId)
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+	maxPages := req.MaxPages
+	if maxPages <= 0 {
+		maxPages = 10
+	}
+
+	totalFetched := 0
+	totalImport := 0
+	currentPage := 1
+
+	for currentPage <= maxPages {
+		var results []types.OnlineSearchResult
+		var total int
+
+		switch req.Platform {
+		case "fofa":
+			client := onlineapi.NewFofaClient(config.Key, config.Secret)
+			result, err := client.Search(l.ctx, req.Query, currentPage, pageSize)
+			if err != nil {
+				if currentPage == 1 {
+					return &types.OnlineImportAllResp{Code: 500, Msg: "查询失败: " + err.Error()}, nil
+				}
+				break
+			}
+			total = result.Size
+			assets := client.ParseResults(result)
+			for _, a := range assets {
+				results = append(results, types.OnlineSearchResult{
+					Host: a.Host, IP: a.IP, Port: a.Port, Protocol: a.Protocol,
+					Domain: a.Domain, Title: a.Title, Server: a.Server,
+					Country: a.Country, City: a.City, Banner: a.Banner,
+					ICP: a.ICP, Product: a.Product, OS: a.OS,
+				})
+			}
+		case "hunter":
+			client := onlineapi.NewHunterClient(config.Key)
+			result, err := client.Search(l.ctx, req.Query, currentPage, pageSize, "", "")
+			if err != nil {
+				if currentPage == 1 {
+					return &types.OnlineImportAllResp{Code: 500, Msg: "查询失败: " + err.Error()}, nil
+				}
+				break
+			}
+			total = result.Data.Total
+			for _, a := range result.Data.Arr {
+				component := ""
+				if len(a.Component) > 0 {
+					component = a.Component[0].Name
+				}
+				results = append(results, types.OnlineSearchResult{
+					Host: a.URL, IP: a.IP, Port: a.Port, Protocol: a.Protocol,
+					Domain: a.Domain, Title: a.WebTitle, Server: component,
+					Country: a.Country, City: a.City, Banner: a.Banner,
+					ICP: a.Number, Product: component, OS: a.OS,
+				})
+			}
+		case "quake":
+			client := onlineapi.NewQuakeClient(config.Key)
+			result, err := client.Search(l.ctx, req.Query, currentPage, pageSize)
+			if err != nil {
+				if currentPage == 1 {
+					return &types.OnlineImportAllResp{Code: 500, Msg: "查询失败: " + err.Error()}, nil
+				}
+				break
+			}
+			total = result.Meta.Pagination.Total
+			for _, a := range result.Data {
+				results = append(results, types.OnlineSearchResult{
+					Host: a.Service.HTTP.Host, IP: a.IP, Port: a.Port, Protocol: a.Service.Name,
+					Title: a.Service.HTTP.Title, Server: a.Service.HTTP.Server,
+					Country: a.Location.CountryCN, City: a.Location.CityCN,
+				})
+			}
+		default:
+			return &types.OnlineImportAllResp{Code: 400, Msg: "不支持的平台"}, nil
+		}
+
+		// 没有更多数据了
+		if len(results) == 0 {
+			break
+		}
+
+		totalFetched += len(results)
+
+		// 导入当前页的资产
+		for _, a := range results {
+			apps := parseApps(a.Product)
+			asset := &model.Asset{
+				Authority: a.Host,
+				Host:      a.IP,
+				Port:      a.Port,
+				Service:   a.Protocol,
+				Title:     a.Title,
+				App:       apps,
+				Source:    "onlineapi",
+			}
+			if err := assetModel.Upsert(l.ctx, asset); err == nil {
+				totalImport++
+			}
+		}
+
+		// 计算总页数，判断是否还有下一页
+		totalPages := (total + pageSize - 1) / pageSize
+		if currentPage >= totalPages {
+			break
+		}
+
+		currentPage++
+	}
+
+	totalPages := currentPage
+	return &types.OnlineImportAllResp{
+		Code:         0,
+		Msg:          fmt.Sprintf("成功导入%d条资产（共获取%d条，%d页）", totalImport, totalFetched, totalPages),
+		TotalFetched: totalFetched,
+		TotalImport:  totalImport,
+		TotalPages:   totalPages,
+	}, nil
 }
 
 func (l *OnlineAPILogic) ConfigList(workspaceId string) (*types.APIConfigListResp, error) {
