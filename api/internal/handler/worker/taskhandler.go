@@ -66,8 +66,9 @@ func WorkerTaskCheckHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 
 		// 调用RPC CheckTask
+		// 注意：RPC 的 TaskId 字段实际用于传递 WorkerName
 		rpcReq := &pb.CheckTaskReq{
-			TaskId:     "",
+			TaskId:     req.WorkerName,
 			MainTaskId: "",
 		}
 
@@ -184,11 +185,16 @@ func WorkerTaskControlHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			ctrlKey := "cscan:task:ctrl:" + taskId
 			action, err := svcCtx.RedisClient.Get(ctx, ctrlKey).Result()
 			if err == nil && action != "" {
+				logx.Infof("[WorkerTaskControl] Found control signal for task %s: %s", taskId, action)
 				signals = append(signals, TaskControlSignal{
 					TaskId: taskId,
 					Action: action,
 				})
 			}
+		}
+
+		if len(signals) > 0 {
+			logx.Infof("[WorkerTaskControl] Returning %d control signals to worker", len(signals))
 		}
 
 		httpx.OkJson(w, &WorkerTaskControlResp{

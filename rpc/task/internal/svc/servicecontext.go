@@ -2,6 +2,7 @@ package svc
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cscan/model"
@@ -26,22 +27,36 @@ type ServiceContext struct {
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
+	fmt.Println("Connecting to MongoDB:", c.Mongo.Uri)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(c.Mongo.Uri))
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to connect MongoDB: %v", err))
 	}
+
+	// 测试 MongoDB 连接
+	if err := mongoClient.Ping(ctx, nil); err != nil {
+		panic(fmt.Sprintf("MongoDB ping failed: %v\nPlease ensure MongoDB is running: docker-compose -f docker-compose.dev.yaml up -d", err))
+	}
+	fmt.Println("MongoDB connected successfully")
 
 	mongoDB := mongoClient.Database(c.Mongo.DbName)
 
 	// 使用go-zero Redis配置
+	fmt.Println("Connecting to Redis:", c.RedisConf.Host)
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     c.RedisConf.Host,
 		Password: c.RedisConf.Pass,
 		DB:       0,
 	})
+
+	// 测试 Redis 连接
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		panic(fmt.Sprintf("Redis ping failed: %v\nPlease ensure Redis is running: docker-compose -f docker-compose.dev.yaml up -d", err))
+	}
+	fmt.Println("Redis connected successfully")
 
 	return &ServiceContext{
 		Config:                  c,

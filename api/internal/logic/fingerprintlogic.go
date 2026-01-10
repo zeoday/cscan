@@ -137,6 +137,36 @@ func (l *FingerprintSaveLogic) FingerprintSave(req *types.FingerprintSaveReq) (*
 		source = "custom"
 	}
 
+	// 如果是主动指纹类型，需要同时保存到两个集合
+	if req.Type == "active" && len(req.ActivePaths) > 0 {
+		// 1. 保存/更新主动指纹（探测路径）到 ActiveFingerprintModel
+		activeDoc := &model.ActiveFingerprint{
+			Name:        req.Name,
+			Paths:       req.ActivePaths,
+			Description: req.Description,
+			Enabled:     req.Enabled,
+		}
+		
+		// 检查是否已存在同名主动指纹
+		existingActive, _ := l.svcCtx.ActiveFingerprintModel.FindByName(l.ctx, req.Name)
+		if existingActive != nil {
+			// 更新
+			if err := l.svcCtx.ActiveFingerprintModel.Update(l.ctx, existingActive.Id.Hex(), map[string]interface{}{
+				"paths":       req.ActivePaths,
+				"description": req.Description,
+				"enabled":     req.Enabled,
+			}); err != nil {
+				return &types.BaseResp{Code: 500, Msg: "更新主动指纹失败: " + err.Error()}, nil
+			}
+		} else {
+			// 新增
+			if err := l.svcCtx.ActiveFingerprintModel.Insert(l.ctx, activeDoc); err != nil {
+				return &types.BaseResp{Code: 500, Msg: "保存主动指纹失败: " + err.Error()}, nil
+			}
+		}
+	}
+
+	// 2. 保存被动指纹（匹配规则）到 FingerprintModel
 	doc := &model.Fingerprint{
 		Name:        req.Name,
 		Website:     req.Website,
@@ -229,6 +259,12 @@ func NewFingerprintCategoriesLogic(ctx context.Context, svcCtx *svc.ServiceConte
 func (l *FingerprintCategoriesLogic) FingerprintCategories() (*types.FingerprintCategoriesResp, error) {
 	categories, _ := l.svcCtx.FingerprintModel.GetCategories(l.ctx)
 	stats, _ := l.svcCtx.FingerprintModel.GetStats(l.ctx)
+
+	// 从 ActiveFingerprintModel 获取主动指纹数量
+	activeStats, _ := l.svcCtx.ActiveFingerprintModel.GetStats(l.ctx)
+	if activeStats != nil {
+		stats["active"] = activeStats["total"]
+	}
 
 	return &types.FingerprintCategoriesResp{
 		Code:       0,
@@ -1415,11 +1451,13 @@ func matchSingleConditionWithDetails(condition string, data *FingerprintData) (b
 
 	if idx := strings.Index(condition, "!=\""); idx > 0 {
 		condType = strings.TrimSpace(condition[:idx])
-		value = extractQuotedValue(condition[idx+3:])
+		// idx+2 跳过 !=" 中的 !=，保留开头的引号给 extractQuotedValue 处理
+		value = extractQuotedValue(condition[idx+2:])
 		negate = true
 	} else if idx := strings.Index(condition, "=\""); idx > 0 {
 		condType = strings.TrimSpace(condition[:idx])
-		value = extractQuotedValue(condition[idx+2:])
+		// idx+1 跳过 ="中的 =，保留开头的引号给 extractQuotedValue 处理
+		value = extractQuotedValue(condition[idx+1:])
 		negate = false
 	} else if idx := strings.Index(condition, "="); idx > 0 {
 		condType = strings.TrimSpace(condition[:idx])
@@ -1535,13 +1573,28 @@ func extractQuotedValue(s string) string {
 		quoteChar := s[0]
 		for i := 1; i < len(s); i++ {
 			if s[i] == quoteChar && (i <= 1 || s[i-1] != '\\') {
-				return s[1:i]
+				// 提取值并处理转义引号
+				value := s[1:i]
+				return unescapeQuotes(value, quoteChar)
 			}
 		}
-		return s[1:]
+		// 没有找到结束引号，返回去掉开头引号的内容，并处理转义
+		value := s[1:]
+		return unescapeQuotes(value, quoteChar)
 	}
 	if s[len(s)-1] == '"' || s[len(s)-1] == '\'' {
 		return s[:len(s)-1]
+	}
+	return s
+}
+
+// unescapeQuotes 将转义的引号还原
+// 例如：id=\"swagger-ui 还原为 id="swagger-ui
+func unescapeQuotes(s string, quoteChar byte) string {
+	if quoteChar == '"' {
+		return strings.ReplaceAll(s, `\"`, `"`)
+	} else if quoteChar == '\'' {
+		return strings.ReplaceAll(s, `\'`, `'`)
 	}
 	return s
 }

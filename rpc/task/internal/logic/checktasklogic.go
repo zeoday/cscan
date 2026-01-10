@@ -32,6 +32,8 @@ func NewCheckTaskLogic(ctx context.Context, svcCtx *svc.ServiceContext) *CheckTa
 // 优先从 Worker 专属队列获取任务，然后从公共队列获取
 func (l *CheckTaskLogic) CheckTask(in *pb.CheckTaskReq) (*pb.CheckTaskResp, error) {
 	workerName := in.TaskId // TaskId 实际上是 Worker 名称
+	l.Logger.Infof("CheckTask: received request from worker '%s'", workerName)
+	
 	publicQueueKey := "cscan:task:queue"
 	workerQueueKey := "cscan:task:queue:worker:" + strings.ToLower(workerName)
 	processingKey := "cscan:task:processing"
@@ -97,11 +99,11 @@ func (l *CheckTaskLogic) popTaskFromQueue(queueKey, processingKey, workerName st
 // updateMainTaskToStarted 更新主任务状态为 STARTED
 func (l *CheckTaskLogic) updateMainTaskToStarted(mainTaskId, workspaceId string) {
 	if mainTaskId == "" || workspaceId == "" {
-		l.Logger.Errorf("CheckTask: updateMainTaskToStarted called with empty params: mainTaskId=%s, workspaceId=%s", mainTaskId, workspaceId)
+		l.Logger.Errorf("CheckTask: updateMainTaskToStarted called with empty params: mainTaskId='%s', workspaceId='%s'", mainTaskId, workspaceId)
 		return
 	}
 
-	l.Logger.Infof("CheckTask: updating main task status, mainTaskId=%s, workspaceId=%s", mainTaskId, workspaceId)
+	l.Logger.Infof("CheckTask: updating main task status to STARTED, mainTaskId=%s, workspaceId=%s", mainTaskId, workspaceId)
 
 	taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
 	task, err := taskModel.FindById(l.ctx, mainTaskId)
@@ -110,7 +112,7 @@ func (l *CheckTaskLogic) updateMainTaskToStarted(mainTaskId, workspaceId string)
 		return
 	}
 
-	l.Logger.Infof("CheckTask: found main task, current status=%s", task.Status)
+	l.Logger.Infof("CheckTask: found main task, id=%s, taskId=%s, current status='%s'", task.Id.Hex(), task.TaskId, task.Status)
 
 	// PENDING、CREATED 或空状态都更新为 STARTED
 	if task.Status == "PENDING" || task.Status == "CREATED" || task.Status == "" {
@@ -122,9 +124,9 @@ func (l *CheckTaskLogic) updateMainTaskToStarted(mainTaskId, workspaceId string)
 		if err := taskModel.Update(l.ctx, mainTaskId, update); err != nil {
 			l.Logger.Errorf("CheckTask: failed to update main task status: %v", err)
 		} else {
-			l.Logger.Infof("CheckTask: main task %s status updated from %s to STARTED", mainTaskId, task.Status)
+			l.Logger.Infof("CheckTask: main task %s status updated from '%s' to STARTED successfully", mainTaskId, task.Status)
 		}
 	} else {
-		l.Logger.Infof("CheckTask: main task %s status is %s, not updating", mainTaskId, task.Status)
+		l.Logger.Infof("CheckTask: main task %s status is '%s', not updating to STARTED", mainTaskId, task.Status)
 	}
 }

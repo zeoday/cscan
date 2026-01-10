@@ -125,13 +125,13 @@
         </el-table-column>
         <el-table-column label="IP" width="140">
           <template #default="{ row }">
-            <div>{{ row.host }}</div>
+            <div>{{ getDisplayIP(row) }}</div>
             <div v-if="row.location" class="location-text">{{ row.location }}</div>
           </template>
         </el-table-column>
         <el-table-column label="端口/服务" width="120">
           <template #default="{ row }">
-            <span class="port-text">{{ row.port }}</span>
+            <span class="port-text">{{ row.port > 0 ? row.port : '-' }}</span>
             <span v-if="row.service" class="service-text">{{ row.service }}</span>
           </template>
         </el-table-column>
@@ -771,6 +771,35 @@ async function handleClear() {
 function getAssetUrl(row) {
   const scheme = row.service === 'https' || row.port === 443 ? 'https' : 'http'
   return `${scheme}://${row.host}:${row.port}`
+}
+
+// 获取显示的IP地址
+// 如果资产有解析到的IP地址，优先显示IP；否则显示host（可能是域名）
+function getDisplayIP(row) {
+  // 检查是否有解析到的IPv4地址
+  if (row.ip && row.ip.ipv4 && row.ip.ipv4.length > 0 && row.ip.ipv4[0].ip) {
+    return row.ip.ipv4[0].ip
+  }
+  // 检查是否有解析到的IPv6地址
+  if (row.ip && row.ip.ipv6 && row.ip.ipv6.length > 0 && row.ip.ipv6[0].ip) {
+    return row.ip.ipv6[0].ip
+  }
+  // 如果host本身就是IP地址，直接返回
+  if (isIPAddress(row.host)) {
+    return row.host
+  }
+  // 否则返回 "-"，表示没有IP信息
+  return '-'
+}
+
+// 判断是否为IP地址
+function isIPAddress(str) {
+  if (!str) return false
+  // IPv4 正则
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/
+  // IPv6 简单正则
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/
+  return ipv4Regex.test(str) || ipv6Regex.test(str)
 }
 
 function getAppName(app) {

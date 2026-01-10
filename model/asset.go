@@ -57,6 +57,7 @@ type Asset struct {
 	IsNewAsset    bool               `bson:"new" json:"isNew"`
 	IsUpdated     bool               `bson:"update" json:"isUpdated"`
 	TaskId        string             `bson:"taskId" json:"taskId"`
+	LastTaskId    string             `bson:"last_task_id,omitempty" json:"lastTaskId"` // 上一个发现此资产的任务ID
 	Source        string             `bson:"source,omitempty" json:"source"`
 	CreateTime    time.Time          `bson:"create_time" json:"createTime"`
 	UpdateTime    time.Time          `bson:"update_time" json:"updateTime"`

@@ -13,13 +13,15 @@ import (
 	"cscan/model"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // CustomFingerprintEngine 自定义指纹识别引擎
 // 支持ARL finger.json/webapp.json格式的规则语法
 // 参考ARL项目的指纹识别方式进行优化
 type CustomFingerprintEngine struct {
-	fingerprints []*model.Fingerprint
+	fingerprints       []*model.Fingerprint // 被动指纹
+	activeFingerprints []*model.Fingerprint // 主动指纹
 }
 
 // NewCustomFingerprintEngine 创建自定义指纹引擎
@@ -27,6 +29,19 @@ func NewCustomFingerprintEngine(fingerprints []*model.Fingerprint) *CustomFinger
 	return &CustomFingerprintEngine{
 		fingerprints: fingerprints,
 	}
+}
+
+// NewCustomFingerprintEngineWithActive 创建包含主动指纹的引擎
+func NewCustomFingerprintEngineWithActive(passiveFingerprints, activeFingerprints []*model.Fingerprint) *CustomFingerprintEngine {
+	return &CustomFingerprintEngine{
+		fingerprints:       passiveFingerprints,
+		activeFingerprints: activeFingerprints,
+	}
+}
+
+// SetActiveFingerprints 设置主动指纹
+func (e *CustomFingerprintEngine) SetActiveFingerprints(fingerprints []*model.Fingerprint) {
+	e.activeFingerprints = fingerprints
 }
 
 // FingerprintData 用于指纹匹配的数据
@@ -55,6 +70,119 @@ func (e *CustomFingerprintEngine) GetFingerprintCount() int {
 		return 0
 	}
 	return len(e.fingerprints)
+}
+
+// GetActiveFingerprintCount 返回已加载的主动指纹数量
+func (e *CustomFingerprintEngine) GetActiveFingerprintCount() int {
+	if e == nil {
+		return 0
+	}
+	return len(e.activeFingerprints)
+}
+
+// GetActiveFingerprints 获取主动指纹列表
+func (e *CustomFingerprintEngine) GetActiveFingerprints() []*model.Fingerprint {
+	if e == nil {
+		return nil
+	}
+	return e.activeFingerprints
+}
+
+// ActiveFingerprintTask 主动指纹扫描任务
+type ActiveFingerprintTask struct {
+	BaseURL     string             // 基础URL（不含路径）
+	Path        string             // 要探测的路径
+	Fingerprint *model.Fingerprint // 对应的指纹规则
+}
+
+// GetActiveFingerprintTasks 获取主动指纹扫描任务列表
+// 返回需要扫描的 URL+路径 组合
+func (e *CustomFingerprintEngine) GetActiveFingerprintTasks(baseURL string) []ActiveFingerprintTask {
+	var tasks []ActiveFingerprintTask
+	if e == nil || len(e.activeFingerprints) == 0 {
+		return tasks
+	}
+
+	for _, fp := range e.activeFingerprints {
+		if !fp.Enabled || len(fp.ActivePaths) == 0 {
+			continue
+		}
+		for _, path := range fp.ActivePaths {
+			tasks = append(tasks, ActiveFingerprintTask{
+				BaseURL:     baseURL,
+				Path:        path,
+				Fingerprint: fp,
+			})
+		}
+	}
+	return tasks
+}
+
+// MatchActiveFingerprint 匹配主动指纹
+// 对指定路径的响应进行指纹匹配
+func (e *CustomFingerprintEngine) MatchActiveFingerprint(fp *model.Fingerprint, data *FingerprintData) bool {
+	if fp == nil || !fp.Enabled {
+		return false
+	}
+
+	// 检查是否有匹配规则
+	hasRule := fp.Rule != "" || len(fp.HTML) > 0 || len(fp.Headers) > 0 || len(fp.Scripts) > 0
+	if !hasRule {
+		// 如果没有规则，尝试通过 title 匹配（回退策略）
+		if matchTitleFallback(fp.Name, data.Title) {
+			logx.Debugf("Active fingerprint '%s' matched by title fallback: %s", fp.Name, data.Title)
+			return true
+		}
+		logx.Debugf("Active fingerprint '%s' has no matching rule, skipping", fp.Name)
+		return false
+	}
+
+	// 优先使用Rule字段（ARL格式规则语法）
+	if fp.Rule != "" {
+		matched := e.matchRule(fp.Rule, data)
+		if matched {
+			logx.Debugf("Active fingerprint '%s' matched by Rule: %s", fp.Name, fp.Rule)
+			return true
+		}
+		// 规则不匹配时，尝试通过 title 匹配（回退策略）
+		if matchTitleFallback(fp.Name, data.Title) {
+			logx.Debugf("Active fingerprint '%s' matched by title fallback: %s", fp.Name, data.Title)
+			return true
+		}
+		return false
+	}
+
+	// 使用ARL webapp.json格式规则
+	if e.matchARLWebappRules(fp, data) {
+		logx.Debugf("Active fingerprint '%s' matched by ARL rules", fp.Name)
+		return true
+	}
+
+	// 使用Wappalyzer格式规则
+	if e.matchWappalyzerRules(fp, data) {
+		logx.Debugf("Active fingerprint '%s' matched by Wappalyzer rules", fp.Name)
+		return true
+	}
+
+	// 最后尝试通过 title 匹配（回退策略）
+	if matchTitleFallback(fp.Name, data.Title) {
+		logx.Debugf("Active fingerprint '%s' matched by title fallback: %s", fp.Name, data.Title)
+		return true
+	}
+
+	return false
+}
+
+// matchTitleFallback 通过 title 进行回退匹配
+// 支持忽略大小写、连字符和空格的差异
+func matchTitleFallback(fpName, title string) bool {
+	if title == "" || fpName == "" {
+		return false
+	}
+	// 标准化：转小写，将连字符替换为空格
+	normalizedName := strings.ToLower(strings.ReplaceAll(fpName, "-", " "))
+	normalizedTitle := strings.ToLower(strings.ReplaceAll(title, "-", " "))
+	return strings.Contains(normalizedTitle, normalizedName)
 }
 
 // Match 执行指纹匹配，返回匹配到的应用名称列表（兼容旧接口）
@@ -263,12 +391,14 @@ func (e *CustomFingerprintEngine) matchSingleCondition(condition string, data *F
 
 	if idx := strings.Index(condition, "!=\""); idx > 0 {
 		condType = strings.TrimSpace(condition[:idx])
-		rawValue := condition[idx+3:]
+		// idx+2 跳过 !=" 中的 !=，保留开头的引号给 extractQuotedValue 处理
+		rawValue := condition[idx+2:]
 		value = extractQuotedValue(rawValue)
 		negate = true
 	} else if idx := strings.Index(condition, "=\""); idx > 0 {
 		condType = strings.TrimSpace(condition[:idx])
-		rawValue := condition[idx+2:]
+		// idx+1 跳过 ="中的 =，保留开头的引号给 extractQuotedValue 处理
+		rawValue := condition[idx+1:]
 		value = extractQuotedValue(rawValue)
 		negate = false
 	} else {
@@ -312,7 +442,12 @@ func (e *CustomFingerprintEngine) matchSingleCondition(condition string, data *F
 	case "cookie":
 		// 同时检查Cookies字段和header字符串中的cookie
 		result = containsIgnoreCase(data.Cookies, value) || containsInHeaderString(data.HeaderString, value)
+	// 状态码匹配
+	case "status":
+		// 从HeaderString中提取状态码
+		result = strings.Contains(data.HeaderString, value)
 	default:
+		logx.Debugf("Unknown condition type: %s", condType)
 		return false
 	}
 
@@ -380,6 +515,7 @@ func formatHeadersToString(headers http.Header) string {
 }
 
 // extractQuotedValue 提取引号内的值
+// 支持转义引号，如 body="id=\"swagger-ui" 会提取出 id="swagger-ui
 func extractQuotedValue(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 {
@@ -396,11 +532,14 @@ func extractQuotedValue(s string) string {
 				if i > 1 && s[i-1] == '\\' {
 					continue
 				}
-				return s[1:i]
+				// 提取值并处理转义引号
+				value := s[1:i]
+				return unescapeQuotes(value, quoteChar)
 			}
 		}
-		// 没有找到结束引号，返回去掉开头引号的内容
-		return s[1:]
+		// 没有找到结束引号，返回去掉开头引号的内容，并处理转义
+		value := s[1:]
+		return unescapeQuotes(value, quoteChar)
 	}
 
 	// 不以引号开头，检查是否以引号结尾（处理格式错误的规则）
@@ -408,6 +547,17 @@ func extractQuotedValue(s string) string {
 		return s[:len(s)-1]
 	}
 
+	return s
+}
+
+// unescapeQuotes 将转义的引号还原
+// 例如：id=\"swagger-ui 还原为 id="swagger-ui
+func unescapeQuotes(s string, quoteChar byte) string {
+	if quoteChar == '"' {
+		return strings.ReplaceAll(s, `\"`, `"`)
+	} else if quoteChar == '\'' {
+		return strings.ReplaceAll(s, `\'`, `'`)
+	}
 	return s
 }
 

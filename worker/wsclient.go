@@ -394,6 +394,7 @@ func (c *WorkerWSClient) Close() {
 		c.connMu.Lock()
 		if c.conn != nil {
 			c.conn.Close()
+			c.conn = nil // 确保设为 nil，防止其他 goroutine 使用已关闭的连接
 		}
 		c.connMu.Unlock()
 
@@ -421,20 +422,29 @@ func (c *WorkerWSClient) readPump(ctx context.Context) {
 		default:
 		}
 
+		// 使用读锁保护整个读取操作，防止竞态条件
 		c.connMu.RLock()
 		conn := c.conn
-		c.connMu.RUnlock()
-
 		if conn == nil {
+			c.connMu.RUnlock()
 			// 连接断开，等待重连
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
 		// 设置读取超时
-		conn.SetReadDeadline(time.Now().Add(c.config.ReadTimeout))
+		if err := conn.SetReadDeadline(time.Now().Add(c.config.ReadTimeout)); err != nil {
+			c.connMu.RUnlock()
+			// 连接可能已关闭，触发重连
+			if !c.handleReadError(ctx, err) {
+				return
+			}
+			continue
+		}
 
 		data, _, err := wsutil.ReadServerData(conn)
+		c.connMu.RUnlock()
+
 		if err != nil {
 			if !c.handleReadError(ctx, err) {
 				return
@@ -477,16 +487,45 @@ func (c *WorkerWSClient) handleReadError(ctx context.Context, err error) bool {
 	// 尝试重连
 	if !c.reconnecting.CompareAndSwap(false, true) {
 		// 已经在重连中，等待重连完成
+		for c.reconnecting.Load() {
+			select {
+			case <-c.closeChan:
+				return false
+			case <-ctx.Done():
+				return false
+			case <-time.After(100 * time.Millisecond):
+				// 继续等待重连完成
+			}
+		}
 		return true
 	}
 
+	// 使用独立的 context 进行重连，避免继承已取消的父 context
+	reconnectCtx, reconnectCancel := context.WithCancel(context.Background())
+	
 	go func() {
-		defer c.reconnecting.Store(false)
+		defer func() {
+			reconnectCancel()
+			c.reconnecting.Store(false)
+		}()
+		
+		// 监听关闭信号
+		go func() {
+			select {
+			case <-c.closeChan:
+				reconnectCancel()
+			case <-reconnectCtx.Done():
+			}
+		}()
 		
 		// 等待一小段时间再重连，避免立即重连
-		time.Sleep(time.Second)
+		select {
+		case <-reconnectCtx.Done():
+			return
+		case <-time.After(time.Second):
+		}
 		
-		if err := c.connectWithRetry(ctx, true); err != nil {
+		if err := c.connectWithRetry(reconnectCtx, true); err != nil {
 			fmt.Printf("[WSClient] Reconnect failed: %v\n", err)
 		}
 	}()
@@ -510,16 +549,25 @@ func (c *WorkerWSClient) writePump(ctx context.Context) {
 				continue
 			}
 
+			// 使用读锁保护整个写入操作
 			c.connMu.RLock()
 			conn := c.conn
-			c.connMu.RUnlock()
-
 			if conn == nil {
+				c.connMu.RUnlock()
 				continue
 			}
 
-			conn.SetWriteDeadline(time.Now().Add(c.config.WriteTimeout))
-			if err := wsutil.WriteClientMessage(conn, ws.OpText, data); err != nil {
+			if err := conn.SetWriteDeadline(time.Now().Add(c.config.WriteTimeout)); err != nil {
+				c.connMu.RUnlock()
+				fmt.Printf("[WSClient] SetWriteDeadline error: %v\n", err)
+				c.connected.Store(false)
+				continue
+			}
+
+			err := wsutil.WriteClientMessage(conn, ws.OpText, data)
+			c.connMu.RUnlock()
+
+			if err != nil {
 				fmt.Printf("[WSClient] Write error: %v\n", err)
 				// 触发重连
 				c.connected.Store(false)
@@ -534,6 +582,9 @@ func (c *WorkerWSClient) pingPump(ctx context.Context) {
 
 	ticker := time.NewTicker(c.config.PingInterval)
 	defer ticker.Stop()
+
+	// 心跳超时阈值：2倍心跳间隔
+	heartbeatTimeout := c.config.PingInterval * 2
 
 	for {
 		select {
@@ -551,10 +602,44 @@ func (c *WorkerWSClient) pingPump(ctx context.Context) {
 			lastPong := c.lastPong
 			c.pongMu.RUnlock()
 
-			if time.Since(lastPong) > c.config.ReadTimeout {
-				fmt.Printf("[WSClient] Heartbeat timeout, reconnecting...\n")
+			if time.Since(lastPong) > heartbeatTimeout {
+				fmt.Printf("[WSClient] Heartbeat timeout (no PONG for %v), triggering reconnect...\n", time.Since(lastPong))
+				
+				// 关闭当前连接并触发重连
+				c.connMu.Lock()
+				if c.conn != nil {
+					c.conn.Close()
+					c.conn = nil
+				}
+				c.connMu.Unlock()
+				
 				c.connected.Store(false)
 				c.authenticated.Store(false)
+				
+				// 触发重连（如果没有正在进行的重连）
+				if c.reconnecting.CompareAndSwap(false, true) {
+					go func() {
+						defer c.reconnecting.Store(false)
+						
+						// 使用独立的 context 进行重连
+						reconnectCtx, reconnectCancel := context.WithCancel(context.Background())
+						defer reconnectCancel()
+						
+						// 监听关闭信号
+						go func() {
+							select {
+							case <-c.closeChan:
+								reconnectCancel()
+							case <-reconnectCtx.Done():
+							}
+						}()
+						
+						time.Sleep(time.Second)
+						if err := c.connectWithRetry(reconnectCtx, true); err != nil {
+							fmt.Printf("[WSClient] Reconnect from pingPump failed: %v\n", err)
+						}
+					}()
+				}
 				continue
 			}
 

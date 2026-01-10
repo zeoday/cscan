@@ -189,7 +189,9 @@
           </el-table-column>
           <el-table-column label="详情" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
-              {{ row.error || (row.duration ? `耗时 ${row.duration}ms` : '-') }}
+              <span v-if="row.error" style="color: #f56c6c">{{ row.error }}</span>
+              <span v-else-if="row.duration">耗时 {{ row.duration }}ms</span>
+              <span v-else style="color: #909399">-</span>
             </template>
           </el-table-column>
         </el-table>
@@ -283,9 +285,13 @@ onUnmounted(() => {
 })
 
 watch(activeTab, (tab) => {
-  if (tab === 'files' && fileList.value.length === 0) {
-    loadFiles()
-  } else if (tab === 'audit' && auditLogs.value.length === 0) {
+  if (tab === 'files') {
+    // 文件管理：首次加载
+    if (fileList.value.length === 0) {
+      loadFiles()
+    }
+  } else if (tab === 'audit') {
+    // 审计日志：每次切换都刷新
     loadAuditLogs()
   }
 })
@@ -497,10 +503,8 @@ function disconnectTerminal() {
     terminalWs.close()
     terminalWs = null
   }
-  if (terminalSessionId.value) {
-    closeTerminal(workerName.value, terminalSessionId.value).catch(() => {})
-    terminalSessionId.value = ''
-  }
+  // WebSocket 断开时服务端会自动关闭会话，无需再调用 closeTerminal API
+  terminalSessionId.value = ''
   terminalConnected.value = false
 }
 

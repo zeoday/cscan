@@ -11,7 +11,6 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/conf"
-	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/rest"
 )
 
@@ -26,14 +25,14 @@ func main() {
 	// 创建服务上下文
 	svcCtx := svc.NewServiceContext(c)
 
-	// 创建服务组
-	group := service.NewServiceGroup()
-	defer group.Stop()
+	// 启动时自动导入自定义POC和指纹（包括主动指纹路径）
+	go svcCtx.ImportCustomPocAndFingerprints()
 
 	// 创建HTTP服务器
 	server := rest.MustNewServer(c.RestConf)
+	defer server.Stop()
+
 	handler.RegisterHandlers(server, svcCtx)
-	group.Add(server)
 
 	// 创建任务调度器服务
 	rdb := redis.NewClient(&redis.Options{
@@ -41,8 +40,8 @@ func main() {
 		Password: c.Redis.Pass,
 	})
 	schedulerSvc := scheduler.NewSchedulerService(rdb, svcCtx.SyncMethods)
-	group.Add(schedulerSvc)
+	go schedulerSvc.Start()
 
 	fmt.Printf("Starting API server at %s:%d...\n", c.Host, c.Port)
-	group.Start()
+	server.Start()
 }

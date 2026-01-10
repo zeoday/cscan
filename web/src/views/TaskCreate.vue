@@ -186,11 +186,21 @@
                 <el-checkbox v-model="form.fingerprintCustomEngine">自定义指纹</el-checkbox>
                 <el-checkbox v-model="form.fingerprintScreenshot">网页截图</el-checkbox>
               </el-form-item>
+              <el-form-item label="主动扫描">
+                <el-checkbox v-model="form.fingerprintActiveScan">启用主动指纹扫描</el-checkbox>
+                <span class="form-hint">访问特定路径识别应用（如/nacos/、/actuator等），启用后自动开启自定义指纹</span>
+              </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
                   <el-form-item label="超时(秒)">
                     <el-input-number v-model="form.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
                     <span class="form-hint">并发数由Worker设置控制</span>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12" v-if="form.fingerprintActiveScan">
+                  <el-form-item label="主动超时(秒)">
+                    <el-input-number v-model="form.fingerprintActiveTimeout" :min="5" :max="60" style="width:100%" />
+                    <span class="form-hint">单个主动探测请求超时</span>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -613,6 +623,8 @@ const form = reactive({
   fingerprintIconHash: true,
   fingerprintCustomEngine: false,
   fingerprintScreenshot: false,
+  fingerprintActiveScan: false,
+  fingerprintActiveTimeout: 10,
   fingerprintTimeout: 30,
   // 漏洞扫描
   pocscanEnable: false,
@@ -660,6 +672,13 @@ onMounted(async () => {
       wsId = defaultWs ? defaultWs.id : (workspaces.value.length > 0 ? workspaces.value[0].id : '')
     }
     form.workspaceId = wsId
+  }
+})
+
+// 当启用主动指纹扫描时，自动启用自定义指纹引擎（主动扫描依赖自定义指纹引擎加载指纹）
+watch(() => form.fingerprintActiveScan, (newVal) => {
+  if (newVal && !form.fingerprintCustomEngine) {
+    form.fingerprintCustomEngine = true
   }
 })
 
@@ -733,6 +752,8 @@ function applyConfig(config) {
     fingerprintIconHash: config.fingerprint?.iconHash ?? true,
     fingerprintCustomEngine: config.fingerprint?.customEngine ?? false,
     fingerprintScreenshot: config.fingerprint?.screenshot ?? false,
+    fingerprintActiveScan: config.fingerprint?.activeScan ?? false,
+    fingerprintActiveTimeout: config.fingerprint?.activeTimeout || 10,
     fingerprintTimeout: config.fingerprint?.targetTimeout || 30,
     // 漏洞扫描
     pocscanEnable: config.pocscan?.enable ?? false,
@@ -787,6 +808,8 @@ watch(
     fingerprintIconHash: form.fingerprintIconHash,
     fingerprintCustomEngine: form.fingerprintCustomEngine,
     fingerprintScreenshot: form.fingerprintScreenshot,
+    fingerprintActiveScan: form.fingerprintActiveScan,
+    fingerprintActiveTimeout: form.fingerprintActiveTimeout,
     fingerprintTimeout: form.fingerprintTimeout,
     pocscanEnable: form.pocscanEnable,
     pocscanMode: form.pocscanMode,
@@ -840,6 +863,8 @@ function buildConfig() {
       iconHash: form.fingerprintIconHash,
       customEngine: form.fingerprintCustomEngine,
       screenshot: form.fingerprintScreenshot,
+      activeScan: form.fingerprintActiveScan,
+      activeTimeout: form.fingerprintActiveTimeout,
       targetTimeout: form.fingerprintTimeout
     },
     pocscan: {

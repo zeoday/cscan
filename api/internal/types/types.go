@@ -127,6 +127,25 @@ type OrganizationUpdateStatusReq struct {
 }
 
 // ==================== 资产管理 ====================
+
+// IPV4Info IPv4地址信息
+type IPV4Info struct {
+	IP       string `json:"ip"`
+	Location string `json:"location,omitempty"`
+}
+
+// IPV6Info IPv6地址信息
+type IPV6Info struct {
+	IP       string `json:"ip"`
+	Location string `json:"location,omitempty"`
+}
+
+// IPInfo IP地址信息
+type IPInfo struct {
+	IPV4 []IPV4Info `json:"ipv4,omitempty"`
+	IPV6 []IPV6Info `json:"ipv6,omitempty"`
+}
+
 type Asset struct {
 	Id         string   `json:"id"`
 	Authority  string   `json:"authority"`
@@ -144,6 +163,7 @@ type Asset struct {
 	IconData   string   `json:"iconData,omitempty"` // favicon 图片 base64
 	Screenshot string   `json:"screenshot"`
 	Location   string   `json:"location"`
+	IP         *IPInfo  `json:"ip,omitempty"` // IP地址信息
 	IsCDN      bool     `json:"isCdn"`
 	IsCloud    bool     `json:"isCloud"`
 	IsNew      bool     `json:"isNew"`
@@ -1100,6 +1120,8 @@ type FingerprintSaveReq struct {
 	Implies     []string          `json:"implies,optional"`
 	Excludes    []string          `json:"excludes,optional"`
 	Enabled     bool              `json:"enabled"`
+	Type        string            `json:"type,optional"`        // 类型: passive, active
+	ActivePaths []string          `json:"activePaths,optional"` // 主动指纹探测路径
 }
 
 type FingerprintDeleteReq struct {
@@ -1522,4 +1544,101 @@ type WorkerBinaryInfoResp struct {
 	OS       string `json:"os"`       // 操作系统
 	Arch     string `json:"arch"`     // 架构
 	Version  string `json:"version"`  // 版本
+}
+
+
+// ==================== 主动扫描指纹 ====================
+
+// ActiveFingerprint 主动扫描指纹
+type ActiveFingerprint struct {
+	Id                  string        `json:"id"`
+	Name                string        `json:"name"`                // 应用名称（用于关联被动指纹）
+	Paths               []string      `json:"paths"`               // 主动探测路径列表
+	Description         string        `json:"description"`         // 描述
+	Enabled             bool          `json:"enabled"`             // 是否启用
+	CreateTime          string        `json:"createTime"`
+	UpdateTime          string        `json:"updateTime"`
+	RelatedFingerprints []Fingerprint `json:"relatedFingerprints"` // 关联的被动指纹列表
+	RelatedCount        int           `json:"relatedCount"`        // 关联的被动指纹数量
+}
+
+// ActiveFingerprintListReq 主动指纹列表请求
+type ActiveFingerprintListReq struct {
+	Page     int    `json:"page,default=1"`
+	PageSize int    `json:"pageSize,default=20"`
+	Keyword  string `json:"keyword,optional"` // 搜索关键词
+	Enabled  *bool  `json:"enabled,optional"` // 状态筛选
+}
+
+// ActiveFingerprintListResp 主动指纹列表响应
+type ActiveFingerprintListResp struct {
+	Code  int                 `json:"code"`
+	Msg   string              `json:"msg"`
+	Total int                 `json:"total"`
+	List  []ActiveFingerprint `json:"list"`
+	Stats map[string]int64    `json:"stats"` // 统计信息
+}
+
+// ActiveFingerprintSaveReq 保存主动指纹请求
+type ActiveFingerprintSaveReq struct {
+	Id          string   `json:"id,optional"`
+	Name        string   `json:"name"`
+	Paths       []string `json:"paths"`
+	Description string   `json:"description,optional"`
+	Enabled     bool     `json:"enabled"`
+}
+
+// ActiveFingerprintDeleteReq 删除主动指纹请求
+type ActiveFingerprintDeleteReq struct {
+	Id string `json:"id"`
+}
+
+// ActiveFingerprintImportReq 导入主动指纹请求（YAML格式）
+type ActiveFingerprintImportReq struct {
+	Content string `json:"content"` // YAML内容（dir.yaml格式）
+}
+
+// ActiveFingerprintImportResp 导入主动指纹响应
+type ActiveFingerprintImportResp struct {
+	Code     int    `json:"code"`
+	Msg      string `json:"msg"`
+	Imported int    `json:"imported"` // 导入数量
+	Updated  int    `json:"updated"`  // 更新数量
+}
+
+// ActiveFingerprintExportResp 导出主动指纹响应
+type ActiveFingerprintExportResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Content string `json:"content"` // YAML内容
+}
+
+// ActiveFingerprintClearResp 清空主动指纹响应
+type ActiveFingerprintClearResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Deleted int    `json:"deleted"` // 删除数量
+}
+
+// ActiveFingerprintValidateReq 验证主动指纹请求
+type ActiveFingerprintValidateReq struct {
+	Id  string `json:"id"`  // 主动指纹ID
+	Url string `json:"url"` // 目标URL（基础URL，不含路径）
+}
+
+// ActiveFingerprintValidateResp 验证主动指纹响应
+type ActiveFingerprintValidateResp struct {
+	Code    int                              `json:"code"`
+	Msg     string                           `json:"msg"`
+	Matched bool                             `json:"matched"` // 是否匹配
+	Results []ActiveFingerprintValidateItem  `json:"results"` // 每个路径的验证结果
+}
+
+// ActiveFingerprintValidateItem 主动指纹验证结果项
+type ActiveFingerprintValidateItem struct {
+	Path           string `json:"path"`           // 探测路径
+	StatusCode     int    `json:"statusCode"`     // HTTP状态码
+	Matched        bool   `json:"matched"`        // 是否匹配
+	MatchedRule    string `json:"matchedRule"`    // 匹配的规则名称
+	MatchedDetails string `json:"matchedDetails"` // 匹配详情
 }

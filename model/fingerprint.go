@@ -210,6 +210,14 @@ func (m *HttpServiceMappingModel) GetNonHttpServices() []string {
 	return services
 }
 
+// FingerprintType 指纹类型
+type FingerprintType string
+
+const (
+	FingerprintTypePassive FingerprintType = "passive" // 被动指纹：通过响应内容识别
+	FingerprintTypeActive  FingerprintType = "active"  // 主动指纹：通过访问特定路径识别
+)
+
 // Fingerprint 指纹规则
 type Fingerprint struct {
 	Id          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
@@ -218,6 +226,10 @@ type Fingerprint struct {
 	Website     string             `bson:"website" json:"website"`         // 官网
 	Icon        string             `bson:"icon" json:"icon"`               // 图标URL
 	Description string             `bson:"description" json:"description"` // 描述
+	// 指纹类型
+	Type        FingerprintType    `bson:"type" json:"type"`               // 指纹类型: passive(被动), active(主动)
+	// 主动指纹专用字段
+	ActivePaths []string           `bson:"active_paths" json:"activePaths"` // 主动探测路径列表，如 ["/admin/login.php", "/wp-admin/"]
 	// 匹配规则 - Wappalyzer格式
 	Headers   map[string]string `bson:"headers" json:"headers"`     // HTTP头匹配 {"Server": "nginx"}
 	Cookies   map[string]string `bson:"cookies" json:"cookies"`     // Cookie匹配
@@ -256,6 +268,7 @@ func NewFingerprintModel(db *mongo.Database) *FingerprintModel {
 		{Keys: bson.D{{Key: "category", Value: 1}}},
 		{Keys: bson.D{{Key: "is_builtin", Value: 1}}},
 		{Keys: bson.D{{Key: "enabled", Value: 1}}},
+		{Keys: bson.D{{Key: "type", Value: 1}}}, // 指纹类型索引
 	})
 	return &FingerprintModel{coll: coll}
 }
@@ -318,6 +331,47 @@ func (m *FingerprintModel) FindEnabled(ctx context.Context) ([]Fingerprint, erro
 	return m.Find(ctx, bson.M{"enabled": true}, 0, 0)
 }
 
+// FindPassiveEnabled 查询启用的被动指纹（用于默认指纹扫描）
+func (m *FingerprintModel) FindPassiveEnabled(ctx context.Context) ([]Fingerprint, error) {
+	// 被动指纹：type为空或为passive
+	filter := bson.M{
+		"enabled": true,
+		"$or": []bson.M{
+			{"type": ""},
+			{"type": nil},
+			{"type": FingerprintTypePassive},
+		},
+	}
+	return m.Find(ctx, filter, 0, 0)
+}
+
+// FindActiveEnabled 查询启用的主动指纹（用于主动指纹扫描）
+func (m *FingerprintModel) FindActiveEnabled(ctx context.Context) ([]Fingerprint, error) {
+	filter := bson.M{
+		"enabled": true,
+		"type":    FingerprintTypeActive,
+	}
+	return m.Find(ctx, filter, 0, 0)
+}
+
+// FindByType 按类型查询指纹
+func (m *FingerprintModel) FindByType(ctx context.Context, fpType FingerprintType, page, pageSize int) ([]Fingerprint, error) {
+	var filter bson.M
+	if fpType == FingerprintTypePassive || fpType == "" {
+		// 被动指纹：type为空或为passive
+		filter = bson.M{
+			"$or": []bson.M{
+				{"type": ""},
+				{"type": nil},
+				{"type": FingerprintTypePassive},
+			},
+		}
+	} else {
+		filter = bson.M{"type": fpType}
+	}
+	return m.Find(ctx, filter, page, pageSize)
+}
+
 func (m *FingerprintModel) FindCustom(ctx context.Context) ([]Fingerprint, error) {
 	return m.Find(ctx, bson.M{"is_builtin": false}, 0, 0)
 }
@@ -340,6 +394,25 @@ func (m *FingerprintModel) FindByName(ctx context.Context, name string) (*Finger
 	var doc Fingerprint
 	err := m.coll.FindOne(ctx, bson.M{"name": name}).Decode(&doc)
 	return &doc, err
+}
+
+// FindByNames 批量按名称查询指纹（用于主动指纹关联被动指纹规则）
+func (m *FingerprintModel) FindByNames(ctx context.Context, names []string) ([]*Fingerprint, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	filter := bson.M{"name": bson.M{"$in": names}, "enabled": true}
+	cursor, err := m.coll.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var docs []*Fingerprint
+	if err = cursor.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	return docs, nil
 }
 
 func (m *FingerprintModel) Count(ctx context.Context, filter bson.M) (int64, error) {
@@ -397,6 +470,20 @@ func (m *FingerprintModel) GetStats(ctx context.Context) (map[string]int64, erro
 	// 启用数量
 	enabled, _ := m.coll.CountDocuments(ctx, bson.M{"enabled": true})
 	stats["enabled"] = enabled
+
+	// 被动指纹数量（type为空或passive）
+	passive, _ := m.coll.CountDocuments(ctx, bson.M{
+		"$or": []bson.M{
+			{"type": ""},
+			{"type": nil},
+			{"type": FingerprintTypePassive},
+		},
+	})
+	stats["passive"] = passive
+
+	// 主动指纹数量
+	active, _ := m.coll.CountDocuments(ctx, bson.M{"type": FingerprintTypeActive})
+	stats["active"] = active
 
 	return stats, nil
 }
@@ -497,4 +584,190 @@ func (m *FingerprintModel) BatchUpdateEnabled(ctx context.Context, filter bson.M
 		return 0, err
 	}
 	return result.ModifiedCount, nil
+}
+
+// ==================== 主动扫描指纹规则 ====================
+
+// ActiveFingerprint 主动扫描指纹规则
+// 独立存储主动探测路径，通过应用名称关联被动指纹
+type ActiveFingerprint struct {
+	Id          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name        string             `bson:"name" json:"name"`               // 应用名称（用于关联被动指纹）
+	Paths       []string           `bson:"paths" json:"paths"`             // 主动探测路径列表
+	Description string             `bson:"description" json:"description"` // 描述
+	Enabled     bool               `bson:"enabled" json:"enabled"`         // 是否启用
+	CreateTime  time.Time          `bson:"create_time" json:"createTime"`
+	UpdateTime  time.Time          `bson:"update_time" json:"updateTime"`
+}
+
+// ActiveFingerprintWithRelation 带关联信息的主动指纹
+type ActiveFingerprintWithRelation struct {
+	ActiveFingerprint
+	RelatedFingerprints []Fingerprint `bson:"-" json:"relatedFingerprints"` // 关联的被动指纹列表
+	RelatedCount        int           `bson:"-" json:"relatedCount"`        // 关联的被动指纹数量
+}
+
+// ActiveFingerprintModel 主动扫描指纹模型
+type ActiveFingerprintModel struct {
+	coll *mongo.Collection
+}
+
+func NewActiveFingerprintModel(db *mongo.Database) *ActiveFingerprintModel {
+	coll := db.Collection("active_fingerprint")
+	// 创建索引
+	coll.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "enabled", Value: 1}}},
+		{Keys: bson.D{{Key: "create_time", Value: -1}}},
+	})
+	return &ActiveFingerprintModel{coll: coll}
+}
+
+func (m *ActiveFingerprintModel) Insert(ctx context.Context, doc *ActiveFingerprint) error {
+	if doc.Id.IsZero() {
+		doc.Id = primitive.NewObjectID()
+	}
+	now := time.Now()
+	doc.CreateTime = now
+	doc.UpdateTime = now
+	_, err := m.coll.InsertOne(ctx, doc)
+	return err
+}
+
+func (m *ActiveFingerprintModel) Upsert(ctx context.Context, doc *ActiveFingerprint) error {
+	if doc.Id.IsZero() {
+		doc.Id = primitive.NewObjectID()
+	}
+	doc.UpdateTime = time.Now()
+	if doc.CreateTime.IsZero() {
+		doc.CreateTime = doc.UpdateTime
+	}
+
+	filter := bson.M{"name": doc.Name}
+	update := bson.M{"$set": doc}
+	opts := options.Update().SetUpsert(true)
+	_, err := m.coll.UpdateOne(ctx, filter, update, opts)
+	return err
+}
+
+func (m *ActiveFingerprintModel) Find(ctx context.Context, filter bson.M, page, pageSize int) ([]ActiveFingerprint, error) {
+	opts := options.Find()
+	if page > 0 && pageSize > 0 {
+		opts.SetSkip(int64((page - 1) * pageSize))
+		opts.SetLimit(int64(pageSize))
+	}
+	opts.SetSort(bson.D{{Key: "create_time", Value: -1}})
+
+	cursor, err := m.coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var docs []ActiveFingerprint
+	if err = cursor.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
+func (m *ActiveFingerprintModel) FindAll(ctx context.Context) ([]ActiveFingerprint, error) {
+	return m.Find(ctx, bson.M{}, 0, 0)
+}
+
+func (m *ActiveFingerprintModel) FindEnabled(ctx context.Context) ([]ActiveFingerprint, error) {
+	return m.Find(ctx, bson.M{"enabled": true}, 0, 0)
+}
+
+func (m *ActiveFingerprintModel) FindById(ctx context.Context, id string) (*ActiveFingerprint, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	var doc ActiveFingerprint
+	err = m.coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
+	return &doc, err
+}
+
+func (m *ActiveFingerprintModel) FindByName(ctx context.Context, name string) (*ActiveFingerprint, error) {
+	var doc ActiveFingerprint
+	err := m.coll.FindOne(ctx, bson.M{"name": name}).Decode(&doc)
+	return &doc, err
+}
+
+func (m *ActiveFingerprintModel) Count(ctx context.Context, filter bson.M) (int64, error) {
+	return m.coll.CountDocuments(ctx, filter)
+}
+
+func (m *ActiveFingerprintModel) Update(ctx context.Context, id string, update bson.M) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	update["update_time"] = time.Now()
+	_, err = m.coll.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": update})
+	return err
+}
+
+func (m *ActiveFingerprintModel) Delete(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	_, err = m.coll.DeleteOne(ctx, bson.M{"_id": oid})
+	return err
+}
+
+func (m *ActiveFingerprintModel) DeleteAll(ctx context.Context) error {
+	_, err := m.coll.DeleteMany(ctx, bson.M{})
+	return err
+}
+
+func (m *ActiveFingerprintModel) GetStats(ctx context.Context) (map[string]int64, error) {
+	stats := make(map[string]int64)
+	total, _ := m.coll.CountDocuments(ctx, bson.M{})
+	stats["total"] = total
+	enabled, _ := m.coll.CountDocuments(ctx, bson.M{"enabled": true})
+	stats["enabled"] = enabled
+	return stats, nil
+}
+
+// BulkUpsert 批量插入或更新
+func (m *ActiveFingerprintModel) BulkUpsert(ctx context.Context, docs []*ActiveFingerprint) (int, int, error) {
+	if len(docs) == 0 {
+		return 0, 0, nil
+	}
+
+	var models []mongo.WriteModel
+	now := time.Now()
+
+	for _, doc := range docs {
+		doc.UpdateTime = now
+		if doc.CreateTime.IsZero() {
+			doc.CreateTime = now
+		}
+
+		filter := bson.M{"name": doc.Name}
+		// 更新时不包含 _id 字段，避免 upsert 时修改已存在文档的 _id
+		update := bson.M{
+			"$set": bson.M{
+				"name":        doc.Name,
+				"paths":       doc.Paths,
+				"description": doc.Description,
+				"enabled":     doc.Enabled,
+				"update_time": doc.UpdateTime,
+			},
+			"$setOnInsert": bson.M{
+				"create_time": doc.CreateTime,
+			},
+		}
+		model := mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(update).SetUpsert(true)
+		models = append(models, model)
+	}
+
+	result, err := m.coll.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+	if err != nil {
+		return 0, 0, err
+	}
+	return int(result.UpsertedCount), int(result.MatchedCount), nil
 }

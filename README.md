@@ -6,14 +6,14 @@
 [![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<img src="images/cscan.png" alt="CSCAN" width="600"/>
+<img src="images/cscan.png" alt="CSCAN" width="250"/>
 
 ## 功能特性
 
 - **资产发现** - 端口扫描 (Naabu/Masscan)，端口服务识别 (Nmap)
-- **子域名枚举** - Subfinder 集成，支持多数据源
+- **子域名枚举** - Subfinder 集成，建议配置多数据源
 - **指纹识别** - Httpx + Wappalyzer + 自定义指纹引擎，3W+ 指纹规则
-- **漏洞检测** - Nuclei SDK 引擎，800+ 自定义 POC
+- **漏洞检测** - Nuclei SDK 引擎，支持所有默认POC，增加800+ 自定义 POC
 - **Web 截图** - Chromedp / HTTPX 引擎
 - **在线数据源** - FOFA / Hunter / Quake API 聚合搜索与导入
 - **报告管理** - 任务报告生成，支持 Excel 导出
@@ -29,6 +29,8 @@ docker-compose up -d
 ```
 
 访问 `http://ip:3000`，默认账号 `admin / 123456`
+
+> **注意！！！执行扫描之前需要手动先部署worker**
 
 ## 架构说明
 
@@ -57,7 +59,7 @@ cscan/
 ├── api/                # API 服务 (HTTP 接口)
 ├── rpc/                # RPC 服务 (内部通信)
 ├── worker/             # Worker 扫描节点
-├── scanner/            # 扫描引擎 (Naabu/Nmap/Nuclei/Httpx)
+├── scanner/            # 扫描引擎 (Naabu/Masscan/Nmap/Httpx/Nuclei/)
 ├── scheduler/          # 任务调度器
 ├── model/              # 数据模型
 ├── onlineapi/          # 在线 API 集成 (FOFA/Hunter/Quake)
@@ -67,45 +69,23 @@ cscan/
 
 ## 本地开发
 
-### 1. 启动依赖服务
-
 ```bash
+# 1. 启动依赖服务（MongoDB + Redis）
 docker-compose -f docker-compose.dev.yaml up -d
-```
 
-### 2. 启动后端服务
-
-```bash
-# RPC 服务
+# 2. 启动 RPC 服务
 go run rpc/task/task.go -f rpc/task/etc/task.yaml
 
-# API 服务
+# 3. 启动 API 服务
 go run api/cscan.go -f api/etc/cscan.yaml
-```
 
-### 3. 启动 Worker
+# 4. 启动前端
+cd web; npm install; npm run dev
 
-从 Web 界面获取安装密钥后：
-
-```bash
+# 5. 启动 Worker（需 API 地址）
+# 从Web界面获取安装命令，或使用API获取安装密钥
 go run cmd/worker/main.go -k <install_key> -s http://localhost:8888
-```
 
-Worker 参数说明：
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `-k` | 安装密钥 (必须) | - |
-| `-s` | API 服务地址 (必须) | http://localhost:8888 |
-| `-n` | Worker 名称 | 自动生成 |
-| `-c` | 并发数 | 5 |
-
-### 4. 启动前端
-
-```bash
-cd web
-npm install
-npm run dev
 ```
 
 访问 `http://localhost:3000`

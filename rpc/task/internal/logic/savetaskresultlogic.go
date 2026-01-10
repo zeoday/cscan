@@ -122,6 +122,7 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 			asset.UpdateTime = now
 			asset.IsNewAsset = true
 			asset.IsUpdated = false
+			asset.LastTaskId = in.MainTaskId // 记录发现此资产的任务ID
 
 			if err := assetModel.Insert(l.ctx, asset); err != nil {
 				l.Logger.Errorf("Insert asset failed: %v", err)
@@ -130,8 +131,11 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 			newAsset++
 		} else {
 			// 更新已存在的资产
+			// 判断是否是不同任务的更新
+			isDifferentTask := existing.TaskId != "" && existing.TaskId != in.MainTaskId
+			
 			// 只有当任务ID不同时才保存历史记录（表示是新一轮扫描，需要记录上一次的状态）
-			if existing.TaskId != "" && existing.TaskId != in.MainTaskId {
+			if isDifferentTask {
 				historyModel := l.svcCtx.GetAssetHistoryModel(workspaceId)
 				
 				// 检查是否已存在同一任务的历史记录（避免重复）
@@ -178,9 +182,16 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 				"is_http":     asset.IsHTTP,
 				"taskId":      asset.TaskId,
 				"update_time": now,
-				"update":      true,
-				"new":         false,
 			}
+			
+			// 只有不同任务更新时才设置更新标签
+			if isDifferentTask {
+				updateFields["update"] = true
+				updateFields["new"] = false
+				updateFields["last_task_id"] = existing.TaskId // 记录上一个任务ID
+				updateAsset++
+			}
+			// 同一任务内的更新不改变 new/update 标签
 
 			// 更新 IconData
 			if len(asset.IconHashBytes) > 0 {
@@ -221,7 +232,6 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 				l.Logger.Errorf("Update asset failed: %v", err)
 				continue
 			}
-			updateAsset++
 		}
 		totalAsset++
 	}

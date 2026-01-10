@@ -77,3 +77,41 @@ export function saveHttpServiceMapping(data) {
 export function deleteHttpServiceMapping(data) {
   return request.post('/fingerprint/httpservice/delete', data)
 }
+
+
+// ==================== 主动扫描指纹 API ====================
+
+// 获取主动指纹列表
+export function getActiveFingerprintList(data = {}) {
+  return request.post('/fingerprint/active/list', data)
+}
+
+// 保存主动指纹
+export function saveActiveFingerprint(data) {
+  return request.post('/fingerprint/active/save', data)
+}
+
+// 删除主动指纹
+export function deleteActiveFingerprint(data) {
+  return request.post('/fingerprint/active/delete', data)
+}
+
+// 导入主动指纹（YAML格式）
+export function importActiveFingerprints(data) {
+  return request.post('/fingerprint/active/import', data)
+}
+
+// 导出主动指纹（YAML格式）
+export function exportActiveFingerprints() {
+  return request.post('/fingerprint/active/export')
+}
+
+// 清空主动指纹
+export function clearActiveFingerprints() {
+  return request.post('/fingerprint/active/clear')
+}
+
+// 验证主动指纹
+export function validateActiveFingerprint(data) {
+  return request.post('/fingerprint/active/validate', data)
+}

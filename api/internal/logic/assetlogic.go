@@ -293,6 +293,24 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 			location = a.Ip.IpV4[0].Location
 		}
 
+		// 构建IP信息
+		var ipInfo *types.IPInfo
+		if len(a.Ip.IpV4) > 0 || len(a.Ip.IpV6) > 0 {
+			ipInfo = &types.IPInfo{}
+			for _, ipv4 := range a.Ip.IpV4 {
+				ipInfo.IPV4 = append(ipInfo.IPV4, types.IPV4Info{
+					IP:       ipv4.IPName,
+					Location: ipv4.Location,
+				})
+			}
+			for _, ipv6 := range a.Ip.IpV6 {
+				ipInfo.IPV6 = append(ipInfo.IPV6, types.IPV6Info{
+					IP:       ipv6.IPName,
+					Location: ipv6.Location,
+				})
+			}
+		}
+
 		// 获取组织名称
 		orgName := ""
 		if a.OrgId != "" {
@@ -327,6 +345,7 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 			IconData:   iconData,
 			Screenshot: a.Screenshot,
 			Location:   location,
+			IP:         ipInfo,
 			IsCDN:      a.IsCDN,
 			IsCloud:    a.IsCloud,
 			IsNew:      a.IsNewAsset,

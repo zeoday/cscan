@@ -158,6 +158,16 @@ func (m *MainTaskModel) Update(ctx context.Context, id string, update bson.M) er
 	return err
 }
 
+// UpdateWithResult 更新任务并返回结果
+func (m *MainTaskModel) UpdateWithResult(ctx context.Context, id string, update bson.M) (*mongo.UpdateResult, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	update["update_time"] = time.Now()
+	return m.coll.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": update})
+}
+
 func (m *MainTaskModel) Delete(ctx context.Context, id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

@@ -39,7 +39,7 @@ type AuditLog struct {
 	Success    bool                   `bson:"success" json:"success"`         // 是否成功
 	Error      string                 `bson:"error,omitempty" json:"error"`   // 错误信息
 	Details    map[string]interface{} `bson:"details,omitempty" json:"details"` // 额外详情
-	Duration   int64                  `bson:"duration,omitempty" json:"duration"` // 操作耗时(毫秒)
+	Duration   int64                  `bson:"duration" json:"duration"` // 操作耗时(毫秒)，始终记录
 	CreateTime time.Time              `bson:"create_time" json:"createTime"`  // 创建时间
 }
 

@@ -15,8 +15,11 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"cscan/model"
 	"cscan/pkg/utils"
 
 	"github.com/chromedp/chromedp"
@@ -68,16 +71,18 @@ func (s *FingerprintScanner) SetCustomFingerprintEngine(engine *CustomFingerprin
 
 // FingerprintOptions 指纹识别选项
 type FingerprintOptions struct {
-	Enable       bool   `json:"enable"`
-	Tool         string `json:"tool"`         // 探测工具: httpx, builtin (默认httpx)
-	Httpx        bool   `json:"httpx"`        // 已废弃，兼容旧配置
-	Screenshot   bool   `json:"screenshot"`
-	IconHash     bool   `json:"iconHash"`
-	Wappalyzer   bool   `json:"wappalyzer"`
-	CustomEngine bool   `json:"customEngine"` // 使用自定义指纹引擎
-	Timeout      int    `json:"timeout"`      // 总超时时间(秒)，默认300秒
-	TargetTimeout int   `json:"targetTimeout"` // 单个目标超时时间(秒)，默认30秒
-	Concurrency  int    `json:"concurrency"`  // 并发数，默认10
+	Enable        bool   `json:"enable"`
+	Tool          string `json:"tool"`          // 探测工具: httpx, builtin (默认httpx)
+	Httpx         bool   `json:"httpx"`         // 已废弃，兼容旧配置
+	Screenshot    bool   `json:"screenshot"`
+	IconHash      bool   `json:"iconHash"`
+	Wappalyzer    bool   `json:"wappalyzer"`
+	CustomEngine  bool   `json:"customEngine"`  // 使用自定义指纹引擎
+	ActiveScan    bool   `json:"activeScan"`    // 启用主动指纹扫描
+	ActiveTimeout int    `json:"activeTimeout"` // 主动指纹单个请求超时时间(秒)，默认10秒
+	Timeout       int    `json:"timeout"`       // 总超时时间(秒)，默认300秒
+	TargetTimeout int    `json:"targetTimeout"` // 单个目标超时时间(秒)，默认30秒
+	Concurrency   int    `json:"concurrency"`   // 并发数，默认10
 }
 
 
@@ -199,8 +204,26 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 		}
 	}
 
-	logx.Infof("Fingerprint: completed, scanned %d assets", len(httpAssets))
-	taskLog("DEBUG", "Fingerprint: completed, scanned %d assets", len(httpAssets))
+	logx.Infof("Fingerprint: completed passive scan, scanned %d assets", len(httpAssets))
+	taskLog("DEBUG", "Fingerprint: completed passive scan, scanned %d assets", len(httpAssets))
+
+	// 执行主动指纹扫描（如果启用）
+	if opts.ActiveScan {
+		if s.customFingerprintEngine != nil {
+			activeCount := s.customFingerprintEngine.GetActiveFingerprintCount()
+			taskLog("INFO", "Active fingerprint scan enabled, engine has %d active fingerprints", activeCount)
+			if activeCount > 0 {
+				s.RunActiveFingerprint(ctx, httpAssets, opts, taskLog)
+			} else {
+				taskLog("WARN", "Active fingerprint scan enabled but no active fingerprints loaded")
+			}
+		} else {
+			taskLog("WARN", "Active fingerprint scan enabled but customFingerprintEngine is nil")
+		}
+	} else {
+		taskLog("DEBUG", "Active fingerprint scan not enabled (activeScan=%v)", opts.ActiveScan)
+	}
+
 	return result, nil
 }
 
@@ -1256,4 +1279,235 @@ func containsString(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+
+// ==================== Active Fingerprint Scanning ====================
+
+// ActiveFingerprintResult 主动指纹扫描结果
+type ActiveFingerprintResult struct {
+	URL         string   // 完整URL（包含路径）
+	Path        string   // 探测路径
+	Fingerprint string   // 匹配到的指纹名称
+	FingerprintID string // 指纹ID
+	StatusCode  int      // HTTP状态码
+	Title       string   // 页面标题
+}
+
+// RunActiveFingerprint 执行主动指纹扫描
+// 参考 Slack 项目的 ActiveFingerScan 实现
+func (s *FingerprintScanner) RunActiveFingerprint(ctx context.Context, assets []*Asset, opts *FingerprintOptions, taskLog func(level, format string, args ...interface{})) {
+	if s.customFingerprintEngine == nil {
+		logx.Info("Active fingerprint: no custom engine configured, skipping")
+		return
+	}
+
+	activeCount := s.customFingerprintEngine.GetActiveFingerprintCount()
+	if activeCount == 0 {
+		logx.Info("Active fingerprint: no active fingerprints loaded, skipping")
+		return
+	}
+
+	// 过滤出存活的HTTP资产
+	aliveAssets := make([]*Asset, 0)
+	for _, asset := range assets {
+		if asset.HttpStatus != "" && asset.HttpStatus != "0" {
+			aliveAssets = append(aliveAssets, asset)
+		}
+	}
+
+	if len(aliveAssets) == 0 {
+		logx.Info("Active fingerprint: no alive HTTP assets found, skipping")
+		return
+	}
+
+	logx.Infof("Active fingerprint: scanning %d assets with %d active fingerprints", len(aliveAssets), activeCount)
+	if taskLog != nil {
+		taskLog("INFO", "Active fingerprint: scanning %d assets with %d active fingerprints", len(aliveAssets), activeCount)
+	}
+
+	// 设置主动指纹超时
+	activeTimeout := 10 * time.Second
+	if opts.ActiveTimeout > 0 {
+		activeTimeout = time.Duration(opts.ActiveTimeout) * time.Second
+	}
+
+	// 记录已访问的URL，避免重复扫描
+	visited := make(map[string]bool)
+	var visitedMu sync.Mutex
+
+	// 记录每个目标的超时次数，超过阈值则跳过
+	timeoutCounter := make(map[string]int)
+	var timeoutMu sync.Mutex
+	const maxTimeoutCount = 15
+
+	// 并发控制
+	concurrency := 10
+	if opts.Concurrency > 0 {
+		concurrency = opts.Concurrency
+	}
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+
+	// 获取主动指纹列表
+	activeFingerprints := s.customFingerprintEngine.GetActiveFingerprints()
+
+	// 调试：检查主动指纹是否有匹配规则
+	fingerprintsWithRule := 0
+	fingerprintsWithoutRule := 0
+	for _, fp := range activeFingerprints {
+		hasRule := fp.Rule != "" || len(fp.HTML) > 0 || len(fp.Headers) > 0 || len(fp.Scripts) > 0
+		if hasRule {
+			fingerprintsWithRule++
+			logx.Debugf("Active fingerprint '%s' has rule: %s, paths: %v", fp.Name, fp.Rule, fp.ActivePaths)
+		} else {
+			fingerprintsWithoutRule++
+			logx.Debugf("Active fingerprint '%s' has NO rule, paths: %v", fp.Name, fp.ActivePaths)
+		}
+	}
+	if taskLog != nil {
+		taskLog("DEBUG", "Active fingerprints: %d with rules, %d without rules", fingerprintsWithRule, fingerprintsWithoutRule)
+	}
+
+	// 请求计数器
+	var requestCount int32
+	var successCount int32
+	var failCount int32
+
+	for _, asset := range aliveAssets {
+		// 构建基础URL
+		scheme := asset.Service
+		if scheme == "" {
+			if asset.Port == 443 || asset.Port == 8443 {
+				scheme = "https"
+			} else {
+				scheme = "http"
+			}
+		}
+		baseURL := fmt.Sprintf("%s://%s:%d", scheme, asset.Host, asset.Port)
+
+		for _, fp := range activeFingerprints {
+			if !fp.Enabled || len(fp.ActivePaths) == 0 {
+				continue
+			}
+
+			for _, path := range fp.ActivePaths {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				// 检查是否超过超时阈值
+				timeoutMu.Lock()
+				if timeoutCounter[baseURL] >= maxTimeoutCount {
+					timeoutMu.Unlock()
+					continue
+				}
+				timeoutMu.Unlock()
+
+				// 构建完整URL
+				fullURL := baseURL + path
+				
+				// 去重检查
+				visitedMu.Lock()
+				if visited[fullURL] {
+					visitedMu.Unlock()
+					continue
+				}
+				visited[fullURL] = true
+				visitedMu.Unlock()
+
+				wg.Add(1)
+				sem <- struct{}{}
+
+				go func(asset *Asset, fp *model.Fingerprint, fullURL, path, baseURL string) {
+					defer wg.Done()
+					defer func() { <-sem }()
+
+					// 增加请求计数
+					atomic.AddInt32(&requestCount, 1)
+
+					// 创建带超时的请求
+					reqCtx, cancel := context.WithTimeout(ctx, activeTimeout)
+					defer cancel()
+
+					// 发起请求
+					req, err := http.NewRequestWithContext(reqCtx, "GET", fullURL, nil)
+					if err != nil {
+						atomic.AddInt32(&failCount, 1)
+						logx.Debugf("Active fingerprint request create failed: %s, error: %v", fullURL, err)
+						return
+					}
+
+					resp, err := s.client.Do(req)
+					if err != nil {
+						// 记录超时
+						timeoutMu.Lock()
+						timeoutCounter[baseURL]++
+						timeoutMu.Unlock()
+						atomic.AddInt32(&failCount, 1)
+						logx.Debugf("Active fingerprint request failed: %s, error: %v", fullURL, err)
+						return
+					}
+					defer resp.Body.Close()
+
+					atomic.AddInt32(&successCount, 1)
+
+					// 读取响应体
+					body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+
+					// 构建指纹匹配数据
+					fpData := &FingerprintData{
+						Title:        extractTitle(string(body)),
+						Body:         string(body),
+						BodyBytes:    body,
+						Headers:      resp.Header,
+						HeaderString: formatHeaders(resp.Header),
+						Server:       resp.Header.Get("Server"),
+						URL:          fullURL,
+						Cookies:      resp.Header.Get("Set-Cookie"),
+					}
+
+					// 调试：记录请求结果
+					logx.Debugf("Active fingerprint request: %s, status=%d, bodyLen=%d, title=%s", 
+						fullURL, resp.StatusCode, len(body), fpData.Title)
+
+					// 匹配指纹
+					if s.customFingerprintEngine.MatchActiveFingerprint(fp, fpData) {
+						// 404页面通常不算匹配成功（除非是特定指纹如ThinkPHP）
+						if resp.StatusCode == 404 && !strings.Contains(strings.ToLower(fp.Name), "thinkphp") {
+							logx.Debugf("Active fingerprint '%s' matched but status is 404, skipping", fp.Name)
+							return
+						}
+
+						logx.Debugf("Active fingerprint matched: %s -> %s (path: %s)", baseURL, fp.Name, path)
+						if taskLog != nil {
+							taskLog("INFO", "Active fingerprint: %s -> %s", fullURL, fp.Name)
+						}
+
+						// 添加到资产的App列表
+						appName := fmt.Sprintf("%s[active(%s)]", fp.Name, fp.Id.Hex())
+						
+						// 检查是否已存在
+						exists := false
+						for _, app := range asset.App {
+							if strings.HasPrefix(app, fp.Name) {
+								exists = true
+								break
+							}
+						}
+						if !exists {
+							asset.App = append(asset.App, appName)
+						}
+					}
+				}(asset, fp, fullURL, path, baseURL)
+			}
+		}
+	}
+
+	wg.Wait()
+	logx.Infof("Active fingerprint: scan completed, requests=%d, success=%d, fail=%d", requestCount, successCount, failCount)
+	if taskLog != nil {
+		taskLog("INFO", "Active fingerprint: scan completed, requests=%d, success=%d, fail=%d", requestCount, successCount, failCount)
+	}
 }

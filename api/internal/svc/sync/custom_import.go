@@ -16,15 +16,17 @@ import (
 
 // CustomImportService 自定义POC和指纹导入服务
 type CustomImportService struct {
-	fingerprintModel *model.FingerprintModel
-	customPocModel   *model.CustomPocModel
+	fingerprintModel       *model.FingerprintModel
+	customPocModel         *model.CustomPocModel
+	activeFingerprintModel *model.ActiveFingerprintModel
 }
 
 // NewCustomImportService 创建导入服务
-func NewCustomImportService(fpModel *model.FingerprintModel, pocModel *model.CustomPocModel) *CustomImportService {
+func NewCustomImportService(fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel) *CustomImportService {
 	return &CustomImportService{
-		fingerprintModel: fpModel,
-		customPocModel:   pocModel,
+		fingerprintModel:       fpModel,
+		customPocModel:         pocModel,
+		activeFingerprintModel: afpModel,
 	}
 }
 
@@ -42,6 +44,7 @@ func (s *CustomImportService) ImportAll(ctx context.Context) {
 	}
 
 	s.importCustomFingerprints(ctx, pocBaseDir)
+	s.importActiveFingerprints(ctx, pocBaseDir)
 	s.importCustomPocs(ctx, pocBaseDir)
 }
 
@@ -101,6 +104,83 @@ func (s *CustomImportService) importCustomFingerprints(ctx context.Context, base
 
 	duration := time.Since(startTime)
 	logx.Infof("[CustomImport] Fingerprints import completed: %d imported, %d skipped in %v", totalImported, totalSkipped, duration)
+}
+
+// importActiveFingerprints 导入主动指纹路径配置
+func (s *CustomImportService) importActiveFingerprints(ctx context.Context, baseDir string) {
+	if s.activeFingerprintModel == nil {
+		logx.Info("[CustomImport] ActiveFingerprintModel is nil, skipping active fingerprints import")
+		return
+	}
+
+	fingerDir := filepath.Join(baseDir, "custom-finger")
+	if _, err := os.Stat(fingerDir); os.IsNotExist(err) {
+		logx.Info("[CustomImport] custom-finger directory not found, skipping active fingerprints")
+		return
+	}
+
+	// 查找 active-paths.yaml 或 dir.yaml
+	activePathsFiles := []string{
+		filepath.Join(fingerDir, "active-paths.yaml"),
+		filepath.Join(fingerDir, "active-paths.yml"),
+		filepath.Join(fingerDir, "dir.yaml"),
+		filepath.Join(fingerDir, "dir.yml"),
+	}
+
+	var activePathsFile string
+	for _, f := range activePathsFiles {
+		if _, err := os.Stat(f); err == nil {
+			activePathsFile = f
+			break
+		}
+	}
+
+	if activePathsFile == "" {
+		logx.Debug("[CustomImport] No active-paths.yaml or dir.yaml found, skipping active fingerprints")
+		return
+	}
+
+	startTime := time.Now()
+	totalImported := 0
+	totalSkipped := 0
+
+	logx.Infof("[CustomImport] Starting import active fingerprints from: %s", activePathsFile)
+
+	data, err := os.ReadFile(activePathsFile)
+	if err != nil {
+		logx.Errorf("[CustomImport] Read active paths file error: %v", err)
+		return
+	}
+
+	// 解析 YAML 格式: map[应用名称][]路径
+	var activePaths map[string][]string
+	if err := yaml.Unmarshal(data, &activePaths); err != nil {
+		logx.Errorf("[CustomImport] Parse active paths YAML error: %v", err)
+		return
+	}
+
+	for name, paths := range activePaths {
+		if name == "" || len(paths) == 0 {
+			totalSkipped++
+			continue
+		}
+
+		doc := &model.ActiveFingerprint{
+			Name:    name,
+			Paths:   paths,
+			Enabled: true,
+		}
+
+		if err := s.activeFingerprintModel.Upsert(ctx, doc); err != nil {
+			logx.Debugf("[CustomImport] Upsert active fingerprint '%s' error: %v", name, err)
+			totalSkipped++
+		} else {
+			totalImported++
+		}
+	}
+
+	duration := time.Since(startTime)
+	logx.Infof("[CustomImport] Active fingerprints import completed: %d imported, %d skipped in %v", totalImported, totalSkipped, duration)
 }
 
 // importCustomPocs 导入自定义POC
@@ -273,11 +353,11 @@ type SyncMethods struct {
 	customImport    *CustomImportService
 }
 
-func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel) *SyncMethods {
+func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel) *SyncMethods {
 	return &SyncMethods{
 		nucleiSync:      NewNucleiSyncService(nucleiModel),
 		fingerprintSync: NewFingerprintSyncService(fpModel),
-		customImport:    NewCustomImportService(fpModel, pocModel),
+		customImport:    NewCustomImportService(fpModel, pocModel, afpModel),
 	}
 }
 

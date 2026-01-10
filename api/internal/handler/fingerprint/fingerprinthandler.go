@@ -310,3 +310,124 @@ func FingerprintMatchAssetsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc 
 		httpx.OkJson(w, resp)
 	}
 }
+
+
+// ==================== 主动扫描指纹 Handler ====================
+
+// ActiveFingerprintListHandler 主动指纹列表
+func ActiveFingerprintListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ActiveFingerprintListReq
+		httpx.Parse(r, &req)
+
+		l := logic.NewActiveFingerprintListLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintList(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ActiveFingerprintSaveHandler 保存主动指纹
+func ActiveFingerprintSaveHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ActiveFingerprintSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewActiveFingerprintSaveLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintSave(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ActiveFingerprintDeleteHandler 删除主动指纹
+func ActiveFingerprintDeleteHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ActiveFingerprintDeleteReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewActiveFingerprintDeleteLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintDelete(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ActiveFingerprintImportHandler 导入主动指纹（YAML格式）
+func ActiveFingerprintImportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ActiveFingerprintImportReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewActiveFingerprintImportLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintImport(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ActiveFingerprintExportHandler 导出主动指纹（YAML格式）
+func ActiveFingerprintExportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logic.NewActiveFingerprintExportLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintExport()
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ActiveFingerprintClearHandler 清空主动指纹
+func ActiveFingerprintClearHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logic.NewActiveFingerprintClearLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintClear()
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ActiveFingerprintValidateHandler 验证主动指纹
+func ActiveFingerprintValidateHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ActiveFingerprintValidateReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewActiveFingerprintValidateLogic(r.Context(), svcCtx)
+		resp, err := l.ActiveFingerprintValidate(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}

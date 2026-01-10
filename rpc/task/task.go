@@ -25,6 +25,7 @@ func main() {
 	conf.MustLoad(*configFile, &c)
 	ctx := svc.NewServiceContext(c)
 
+	// 增加gRPC消息大小限制到50MB，支持大量指纹数据传输
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		pb.RegisterTaskServiceServer(grpcServer, server.NewTaskServiceServer(ctx))
 
@@ -32,6 +33,10 @@ func main() {
 			reflection.Register(grpcServer)
 		}
 	})
+	s.AddOptions(
+		grpc.MaxRecvMsgSize(50*1024*1024), // 50MB
+		grpc.MaxSendMsgSize(50*1024*1024), // 50MB
+	)
 	defer s.Stop()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)

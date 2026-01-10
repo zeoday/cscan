@@ -112,6 +112,9 @@ func (l *MainTaskListLogic) MainTaskList(req *types.MainTaskListReq, workspaceId
 		subTaskDone := t.SubTaskDone
 		status := t.Status
 		
+		// DEBUG: 打印从数据库读取的原始状态
+		fmt.Printf("[TaskList] task=%s, dbStatus='%s', progress=%d, subTaskDone=%d\n", t.TaskId, t.Status, t.Progress, t.SubTaskDone)
+		
 		// 如果状态为空，根据进度推断状态（兼容旧数据）
 		if status == "" {
 			if progress >= 100 || (t.SubTaskCount > 0 && subTaskDone >= t.SubTaskCount) {
@@ -610,11 +613,13 @@ func (l *MainTaskRetryLogic) MainTaskRetry(req *types.MainTaskRetryReq, workspac
 	l.Logger.Infof("Retry task %s target split into %d batches (batchSize=%d), enabledModules=%d, subTaskCount=%d", 
 		newTaskId, len(batches), batchSize, enabledModules, subTaskCount)
 
-	// 更新新任务状态为PENDING，记录子任务数量
+	// 更新新任务状态为STARTED，记录子任务数量
+	now := time.Now()
 	taskModel.Update(l.ctx, newTask.Id.Hex(), bson.M{
-		"status":         model.TaskStatusPending,
+		"status":         model.TaskStatusStarted,
 		"sub_task_count": subTaskCount,
 		"sub_task_done":  0,
+		"start_time":     now,
 	})
 
 	// 保存主任务信息到 Redis
@@ -705,6 +710,9 @@ func NewMainTaskStartLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Mai
 }
 
 func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, workspaceId string) (resp *types.BaseResp, err error) {
+	fmt.Printf("[MainTaskStart] ========== START ==========\n")
+	fmt.Printf("[MainTaskStart] id=%s, reqWorkspaceId='%s', headerWorkspaceId='%s'\n", 
+		req.Id, req.WorkspaceId, workspaceId)
 	l.Logger.Infof("MainTaskStart: received request, id=%s, reqWorkspaceId='%s', headerWorkspaceId='%s'", 
 		req.Id, req.WorkspaceId, workspaceId)
 	
@@ -718,6 +726,7 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 		return &types.BaseResp{Code: 400, Msg: "workspaceId不能为空"}, nil
 	}
 	
+	fmt.Printf("[MainTaskStart] using workspaceId='%s'\n", wsId)
 	l.Logger.Infof("MainTaskStart: using workspaceId='%s'", wsId)
 	taskModel := l.svcCtx.GetMainTaskModel(wsId)
 
@@ -794,18 +803,24 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 	l.Logger.Infof("Task %s target split into %d batches (batchSize=%d), enabledModules=%d, subTaskCount=%d", 
 		task.TaskId, len(batches), batchSize, enabledModules, subTaskCount)
 
-	// 更新主任务状态为PENDING，记录子任务数量
+	// 更新主任务状态为STARTED（直接设置为执行中，因为任务即将被推送到队列）
+	now := time.Now()
 	update := bson.M{
-		"status":         model.TaskStatusPending,
+		"status":         model.TaskStatusStarted,
 		"sub_task_count": subTaskCount,
 		"sub_task_done":  0,
+		"start_time":     now,
 	}
-	l.Logger.Infof("MainTaskStart: updating task %s status to PENDING", req.Id)
-	if err := taskModel.Update(l.ctx, req.Id, update); err != nil {
+	l.Logger.Infof("MainTaskStart: updating task %s status to STARTED", req.Id)
+	fmt.Printf("[MainTaskStart] updating task %s status to STARTED, update=%+v\n", req.Id, update)
+	result, err := taskModel.UpdateWithResult(l.ctx, req.Id, update)
+	if err != nil {
+		fmt.Printf("[MainTaskStart] ERROR: failed to update task status: %v\n", err)
 		l.Logger.Errorf("MainTaskStart: failed to update task status: %v", err)
 		return &types.BaseResp{Code: 500, Msg: "更新任务状态失败"}, nil
 	}
-	l.Logger.Infof("MainTaskStart: task %s status updated to PENDING", req.Id)
+	fmt.Printf("[MainTaskStart] SUCCESS: task %s updated, matchedCount=%d, modifiedCount=%d\n", req.Id, result.MatchedCount, result.ModifiedCount)
+	l.Logger.Infof("MainTaskStart: task %s status updated, matchedCount=%d, modifiedCount=%d", req.Id, result.MatchedCount, result.ModifiedCount)
 
 	// 保存主任务信息到 Redis
 	taskInfoKey := "cscan:task:info:" + task.TaskId
@@ -921,22 +936,33 @@ func (l *MainTaskPauseLogic) MainTaskPause(req *types.MainTaskControlReq, worksp
 	l.Logger.Infof("MainTaskPause: found task, id=%s, taskId=%s, status='%s', progress=%d, subTaskCount=%d, subTaskDone=%d", 
 		req.Id, task.TaskId, task.Status, task.Progress, task.SubTaskCount, task.SubTaskDone)
 
-	// 检查状态：STARTED 或 PENDING 状态可以暂停
-	// 注意：空状态视为 CREATED，不允许暂停
-	if task.Status != model.TaskStatusStarted && task.Status != model.TaskStatusPending {
-		statusMsg := task.Status
-		if statusMsg == "" {
-			statusMsg = "CREATED (未启动)"
-		}
-		l.Logger.Infof("MainTaskPause: invalid status for pause, taskId=%s, status='%s'", task.TaskId, task.Status)
-		return &types.BaseResp{Code: 400, Msg: "只有执行中或等待执行的任务可以暂停，当前状态: " + statusMsg}, nil
+	// 只有已完成（SUCCESS）或已失败（FAILURE）的任务不能暂停
+	// 其他状态（CREATED、PENDING、STARTED、PAUSED 或空）都允许暂停
+	if task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusFailure {
+		return &types.BaseResp{Code: 400, Msg: "已完成或已失败的任务不能暂停，当前状态: " + task.Status}, nil
+	}
+
+	// 如果已经是暂停状态，提示用户
+	if task.Status == model.TaskStatusPaused {
+		return &types.BaseResp{Code: 400, Msg: "任务已经处于暂停状态"}, nil
 	}
 
 	// 发送暂停信号到Redis（Set用于HTTP轮询，Publish用于WebSocket推送）
+	// 1. 发送给主任务
 	ctrlKey := "cscan:task:ctrl:" + task.TaskId
 	l.svcCtx.RedisClient.Set(l.ctx, ctrlKey, "PAUSE", 24*time.Hour)
-	// 同时发布到频道，触发WebSocket推送
 	l.svcCtx.RedisClient.Publish(l.ctx, ctrlKey, "PAUSE")
+	
+	// 2. 如果有子任务，也发送给所有子任务
+	if task.SubTaskCount > 1 {
+		for i := 0; i < task.SubTaskCount; i++ {
+			subTaskId := fmt.Sprintf("%s-%d", task.TaskId, i)
+			subCtrlKey := "cscan:task:ctrl:" + subTaskId
+			l.svcCtx.RedisClient.Set(l.ctx, subCtrlKey, "PAUSE", 24*time.Hour)
+			l.svcCtx.RedisClient.Publish(l.ctx, subCtrlKey, "PAUSE")
+		}
+		l.Logger.Infof("Task pause signal sent to %d sub-tasks", task.SubTaskCount)
+	}
 
 	// 更新状态为PAUSED
 	update := bson.M{"status": model.TaskStatusPaused}
@@ -944,7 +970,7 @@ func (l *MainTaskPauseLogic) MainTaskPause(req *types.MainTaskControlReq, worksp
 		return &types.BaseResp{Code: 500, Msg: "更新任务状态失败"}, nil
 	}
 
-	l.Logger.Infof("Task paused: taskId=%s", task.TaskId)
+	l.Logger.Infof("Task paused: taskId=%s, subTaskCount=%d", task.TaskId, task.SubTaskCount)
 	return &types.BaseResp{Code: 0, Msg: "任务已暂停"}, nil
 }
 
@@ -973,13 +999,19 @@ func (l *MainTaskResumeLogic) MainTaskResume(req *types.MainTaskControlReq, work
 		return &types.BaseResp{Code: 400, Msg: "workspaceId不能为空"}, nil
 	}
 	
+	l.Logger.Infof("MainTaskResume: id=%s, workspaceId=%s", req.Id, wsId)
+	
 	taskModel := l.svcCtx.GetMainTaskModel(wsId)
 
 	// 获取任务
 	task, err := taskModel.FindById(l.ctx, req.Id)
 	if err != nil {
+		l.Logger.Errorf("MainTaskResume: task not found, id=%s, error=%v", req.Id, err)
 		return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
 	}
+
+	l.Logger.Infof("MainTaskResume: found task, taskId=%s, status=%s, subTaskCount=%d, subTaskDone=%d", 
+		task.TaskId, task.Status, task.SubTaskCount, task.SubTaskDone)
 
 	// 检查状态：只有PAUSED状态可以继续
 	if task.Status != model.TaskStatusPaused {
@@ -989,54 +1021,116 @@ func (l *MainTaskResumeLogic) MainTaskResume(req *types.MainTaskControlReq, work
 	// 清除暂停信号
 	ctrlKey := "cscan:task:ctrl:" + task.TaskId
 	l.svcCtx.RedisClient.Del(l.ctx, ctrlKey)
-
-	// 更新状态为PENDING
-	update := bson.M{"status": model.TaskStatusPending}
-	if err := taskModel.Update(l.ctx, req.Id, update); err != nil {
-		return &types.BaseResp{Code: 500, Msg: "更新任务状态失败"}, nil
+	
+	// 如果有子任务，也清除所有子任务的暂停信号
+	if task.SubTaskCount > 1 {
+		for i := 0; i < task.SubTaskCount; i++ {
+			subTaskId := fmt.Sprintf("%s-%d", task.TaskId, i)
+			subCtrlKey := "cscan:task:ctrl:" + subTaskId
+			l.svcCtx.RedisClient.Del(l.ctx, subCtrlKey)
+		}
+		l.Logger.Infof("MainTaskResume: cleared pause signals for %d sub-tasks", task.SubTaskCount)
 	}
 
-	// 重新发送任务到队列（带上已保存的状态）
-	config := task.Config
-	if task.TaskState != "" {
-		// 将已保存的状态注入到配置中
-		var configMap map[string]interface{}
-		if json.Unmarshal([]byte(config), &configMap) == nil {
-			configMap["resumeState"] = task.TaskState
-			if newConfig, err := json.Marshal(configMap); err == nil {
-				config = string(newConfig)
-			}
-		}
+	// 更新状态为STARTED
+	update := bson.M{"status": model.TaskStatusStarted}
+	if err := taskModel.Update(l.ctx, req.Id, update); err != nil {
+		l.Logger.Errorf("MainTaskResume: failed to update status, error=%v", err)
+		return &types.BaseResp{Code: 500, Msg: "更新任务状态失败"}, nil
+	}
+	l.Logger.Infof("MainTaskResume: status updated to STARTED")
+
+	// 解析任务配置
+	var taskConfig map[string]interface{}
+	if err := json.Unmarshal([]byte(task.Config), &taskConfig); err != nil {
+		l.Logger.Errorf("MainTaskResume: failed to parse config, error=%v", err)
+		return &types.BaseResp{Code: 500, Msg: "解析任务配置失败"}, nil
 	}
 
 	// 从配置中获取指定的 Worker 列表
 	var workers []string
-	var configMap map[string]interface{}
-	if json.Unmarshal([]byte(task.Config), &configMap) == nil {
-		if w, ok := configMap["workers"].([]interface{}); ok {
-			for _, v := range w {
-				if s, ok := v.(string); ok {
-					workers = append(workers, s)
-				}
+	if w, ok := taskConfig["workers"].([]interface{}); ok {
+		for _, v := range w {
+			if s, ok := v.(string); ok {
+				workers = append(workers, s)
 			}
 		}
 	}
 
-	schedTask := &scheduler.TaskInfo{
-		TaskId:      task.TaskId,
-		MainTaskId:  task.Id.Hex(),
-		WorkspaceId: wsId,
-		TaskName:    task.Name,
-		Config:      config,
-		Priority:    1,
-		Workers:     workers,
+	// 获取目标
+	target, _ := taskConfig["target"].(string)
+
+	// 从配置中获取批次大小，默认50
+	batchSize := 50
+	if bs, ok := taskConfig["batchSize"].(float64); ok {
+		if bs == 0 {
+			batchSize = 1000000
+		} else if bs > 0 {
+			batchSize = int(bs)
+		}
 	}
-	l.Logger.Infof("Resuming task: taskId=%s, workspaceId=%s, hasState=%v", task.TaskId, wsId, task.TaskState != "")
-	if err := l.svcCtx.Scheduler.PushTask(l.ctx, schedTask); err != nil {
-		l.Logger.Errorf("push task to queue failed: %v", err)
+
+	// 使用目标拆分器判断是否需要拆分
+	splitter := scheduler.NewTargetSplitter(batchSize)
+	batches := splitter.SplitTargets(target)
+
+	// 如果任务有保存的状态，注入到配置中
+	if task.TaskState != "" {
+		taskConfig["resumeState"] = task.TaskState
+	}
+
+	// 重新推送所有子任务到队列（从已完成的位置继续）
+	// 注意：这里简化处理，重新推送所有批次，Worker 会根据 resumeState 跳过已完成的阶段
+	var schedTasks []*scheduler.TaskInfo
+	for i, batch := range batches {
+		// 复制配置并替换目标
+		subConfig := make(map[string]interface{})
+		for k, v := range taskConfig {
+			subConfig[k] = v
+		}
+		subConfig["target"] = batch
+		subConfig["subTaskIndex"] = i
+		subConfig["subTaskTotal"] = len(batches)
+		subConfigBytes, _ := json.Marshal(subConfig)
+
+		// 生成子任务ID
+		subTaskId := task.TaskId
+		if len(batches) > 1 {
+			subTaskId = task.TaskId + "-" + strconv.Itoa(i)
+		}
+
+		schedTask := &scheduler.TaskInfo{
+			TaskId:      subTaskId,
+			MainTaskId:  task.Id.Hex(),
+			WorkspaceId: wsId,
+			TaskName:    task.Name,
+			Config:      string(subConfigBytes),
+			Priority:    1,
+			Workers:     workers,
+		}
+		schedTasks = append(schedTasks, schedTask)
+
+		// 保存子任务信息到 Redis（多批次时）
+		if len(batches) > 1 {
+			subTaskInfoKey := "cscan:task:info:" + subTaskId
+			subTaskInfoData, _ := json.Marshal(map[string]interface{}{
+				"workspaceId":  wsId,
+				"mainTaskId":   task.Id.Hex(),
+				"parentTaskId": task.TaskId,
+				"subTaskCount": task.SubTaskCount,
+			})
+			l.svcCtx.RedisClient.Set(l.ctx, subTaskInfoKey, subTaskInfoData, 24*time.Hour)
+		}
+	}
+
+	// 批量推送任务
+	l.Logger.Infof("MainTaskResume: pushing %d sub-tasks to queue", len(schedTasks))
+	if err := l.svcCtx.Scheduler.PushTaskBatch(l.ctx, schedTasks); err != nil {
+		l.Logger.Errorf("MainTaskResume: push tasks to queue failed: %v", err)
 		return &types.BaseResp{Code: 500, Msg: "任务入队失败"}, nil
 	}
 
+	l.Logger.Infof("MainTaskResume: task resumed successfully, taskId=%s, subTasks=%d", task.TaskId, len(schedTasks))
 	return &types.BaseResp{Code: 0, Msg: "任务已继续"}, nil
 }
 
@@ -1084,10 +1178,21 @@ func (l *MainTaskStopLogic) MainTaskStop(req *types.MainTaskControlReq, workspac
 	}
 
 	// 发送停止信号到Redis（Set用于HTTP轮询，Publish用于WebSocket推送）
+	// 1. 发送给主任务
 	ctrlKey := "cscan:task:ctrl:" + task.TaskId
 	l.svcCtx.RedisClient.Set(l.ctx, ctrlKey, "STOP", 24*time.Hour)
-	// 同时发布到频道，触发WebSocket推送
 	l.svcCtx.RedisClient.Publish(l.ctx, ctrlKey, "STOP")
+	
+	// 2. 如果有子任务，也发送给所有子任务
+	if task.SubTaskCount > 1 {
+		for i := 0; i < task.SubTaskCount; i++ {
+			subTaskId := fmt.Sprintf("%s-%d", task.TaskId, i)
+			subCtrlKey := "cscan:task:ctrl:" + subTaskId
+			l.svcCtx.RedisClient.Set(l.ctx, subCtrlKey, "STOP", 24*time.Hour)
+			l.svcCtx.RedisClient.Publish(l.ctx, subCtrlKey, "STOP")
+		}
+		l.Logger.Infof("Task stop signal sent to %d sub-tasks", task.SubTaskCount)
+	}
 
 	// 更新状态为STOPPED，设置结束时间
 	now := time.Now()

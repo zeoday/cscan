@@ -250,11 +250,13 @@ func (w *Worker) handleControlSignal(taskId, action string) {
 
 	// 存储控制信号
 	w.taskControlSignals.Store(taskId, action)
+	w.logger.Info("Stored control signal for task %s: %s", taskId, action)
 
-	// 如果是STOP信号，也存储到主任务ID
+	// 如果是STOP或PAUSE信号，也存储到主任务ID
 	mainTaskId := getMainTaskId(taskId)
 	if mainTaskId != taskId {
 		w.taskControlSignals.Store(mainTaskId, action)
+		w.logger.Info("Also stored control signal for main task %s: %s", mainTaskId, action)
 	}
 }
 
@@ -364,6 +366,11 @@ func (w *Worker) Start() {
 
 	// 启动 WebSocket 客户端（用于日志推送和控制信号）
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				w.logger.Error("WebSocket client goroutine panic recovered: %v", r)
+			}
+		}()
 		if err := w.wsClient.Start(w.ctx); err != nil {
 			w.logger.Warn("WebSocket client failed to start: %v, falling back to HTTP polling", err)
 		} else {
@@ -382,35 +389,111 @@ func (w *Worker) Start() {
 	// 启动任务处理协程
 	for i := 0; i < w.config.Concurrency; i++ {
 		w.wg.Add(1)
-		go w.processTask()
+		go w.processTaskWithRecovery(i)
 	}
 
 	// 启动任务拉取协程
 	w.wg.Add(1)
-	go w.fetchTasks()
+	go w.fetchTasksWithRecovery()
 
 	// 启动结果上报协程
 	w.wg.Add(1)
-	go w.reportResult()
+	go w.reportResultWithRecovery()
 
 	// 启动心跳协程
 	w.wg.Add(1)
-	go w.keepAlive()
+	go w.keepAliveWithRecovery()
 
 	// 启动 HTTP 轮询回退（当 WebSocket 不可用时）
 	w.wg.Add(1)
-	go w.controlPolling()
+	go w.controlPollingWithRecovery()
 
 	w.logger.Info("Worker %s started with %d workers", w.config.Name, w.config.Concurrency)
 }
 
-// fetchTasks 从服务端拉取任务
-func (w *Worker) fetchTasks() {
+// processTaskWithRecovery 带 panic 恢复的任务处理
+func (w *Worker) processTaskWithRecovery(workerId int) {
 	defer w.wg.Done()
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		default:
+		}
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					w.logger.Error("Task processor %d panic recovered: %v, stack: %s", workerId, r, string(getStackTrace()))
+				}
+			}()
+			w.processTaskLoop()
+		}()
+		
+		// 如果 processTaskLoop 正常返回（stopChan 关闭），退出
+		select {
+		case <-w.stopChan:
+			return
+		default:
+			// panic 恢复后短暂等待再重启
+			time.Sleep(time.Second)
+			w.logger.Info("Task processor %d restarting after recovery", workerId)
+		}
+	}
+}
 
+// processTaskLoop 任务处理循环（内部方法）
+func (w *Worker) processTaskLoop() {
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		case task := <-w.taskChan:
+			// 在执行前检查任务是否已被停止
+			ctx := context.Background()
+			if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
+				w.taskLog(task.TaskId, LevelInfo, "Task %s skipped because it was stopped while waiting in queue", task.TaskId)
+				continue
+			}
+			w.executeTask(task)
+		}
+	}
+}
+
+// fetchTasksWithRecovery 带 panic 恢复的任务拉取
+func (w *Worker) fetchTasksWithRecovery() {
+	defer w.wg.Done()
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		default:
+		}
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					w.logger.Error("Task fetcher panic recovered: %v", r)
+				}
+			}()
+			w.fetchTasksLoop()
+		}()
+		
+		select {
+		case <-w.stopChan:
+			return
+		default:
+			time.Sleep(time.Second)
+			w.logger.Info("Task fetcher restarting after recovery")
+		}
+	}
+}
+
+// fetchTasksLoop 任务拉取循环（内部方法）
+func (w *Worker) fetchTasksLoop() {
 	emptyCount := 0
-	baseInterval := 500 * time.Millisecond // 基础间隔改为500ms
-	maxInterval := 2 * time.Second         // 最大间隔改为2秒，确保任务能快速被拉取
+	baseInterval := 500 * time.Millisecond
+	maxInterval := 2 * time.Second
 
 	for {
 		select {
@@ -420,10 +503,9 @@ func (w *Worker) fetchTasks() {
 			hasTask := w.pullTask()
 			if hasTask {
 				emptyCount = 0
-				time.Sleep(50 * time.Millisecond) // 有任务时快速拉取
+				time.Sleep(50 * time.Millisecond)
 			} else {
 				emptyCount++
-				// 没有任务时逐渐增加等待时间，最多2秒
 				interval := baseInterval * time.Duration(emptyCount)
 				if interval > maxInterval {
 					interval = maxInterval
@@ -432,6 +514,100 @@ func (w *Worker) fetchTasks() {
 			}
 		}
 	}
+}
+
+// reportResultWithRecovery 带 panic 恢复的结果上报
+func (w *Worker) reportResultWithRecovery() {
+	defer w.wg.Done()
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		default:
+		}
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					w.logger.Error("Result reporter panic recovered: %v", r)
+				}
+			}()
+			w.reportResultLoop()
+		}()
+		
+		select {
+		case <-w.stopChan:
+			return
+		default:
+			time.Sleep(time.Second)
+			w.logger.Info("Result reporter restarting after recovery")
+		}
+	}
+}
+
+// keepAliveWithRecovery 带 panic 恢复的心跳
+func (w *Worker) keepAliveWithRecovery() {
+	defer w.wg.Done()
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		default:
+		}
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					w.logger.Error("Keepalive panic recovered: %v", r)
+				}
+			}()
+			w.keepAliveLoop()
+		}()
+		
+		select {
+		case <-w.stopChan:
+			return
+		default:
+			time.Sleep(time.Second)
+			w.logger.Info("Keepalive restarting after recovery")
+		}
+	}
+}
+
+// controlPollingWithRecovery 带 panic 恢复的控制轮询
+func (w *Worker) controlPollingWithRecovery() {
+	defer w.wg.Done()
+	for {
+		select {
+		case <-w.stopChan:
+			return
+		default:
+		}
+		
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					w.logger.Error("Control polling panic recovered: %v", r)
+				}
+			}()
+			w.controlPollingLoop()
+		}()
+		
+		select {
+		case <-w.stopChan:
+			return
+		default:
+			time.Sleep(time.Second)
+			w.logger.Info("Control polling restarting after recovery")
+		}
+	}
+}
+
+// getStackTrace 获取堆栈跟踪
+func getStackTrace() []byte {
+	buf := make([]byte, 4096)
+	n := runtime.Stack(buf, false)
+	return buf[:n]
 }
 
 // pullTask 拉取单个任务，返回是否获取到任务
@@ -451,11 +627,13 @@ func (w *Worker) pullTask() bool {
 	// 通过 HTTP 接口获取任务
 	resp, err := w.httpClient.CheckTask(ctx)
 	if err != nil {
+		w.logger.Debug("pullTask: CheckTask failed: %v", err)
 		return false
 	}
 
 	if resp.IsExist && !resp.IsFinished {
 		// 有待执行的任务
+		w.logger.Info("pullTask: got task %s (main: %s)", resp.TaskId, resp.MainTaskId)
 		task := &scheduler.TaskInfo{
 			TaskId:      resp.TaskId,
 			MainTaskId:  resp.MainTaskId,
@@ -530,26 +708,6 @@ func (w *Worker) SubmitTask(task *scheduler.TaskInfo) {
 	w.taskChan <- task
 }
 
-// processTask 处理任务
-func (w *Worker) processTask() {
-	defer w.wg.Done()
-
-	for {
-		select {
-		case <-w.stopChan:
-			return
-		case task := <-w.taskChan:
-			// 在执行前检查任务是否已被停止
-			ctx := context.Background()
-			if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
-				w.taskLog(task.TaskId, LevelInfo, "Task %s skipped because it was stopped while waiting in queue", task.TaskId)
-				continue
-			}
-			w.executeTask(task)
-		}
-	}
-}
-
 // checkTaskControl 检查任务控制信号
 // 返回: "PAUSE" - 暂停, "STOP" - 停止, "" - 继续执行
 func (w *Worker) checkTaskControl(ctx context.Context, taskId string) string {
@@ -571,6 +729,12 @@ func (w *Worker) checkTaskControl(ctx context.Context, taskId string) string {
 	}
 
 	return ""
+}
+
+// shouldStopTask 检查任务是否应该停止（包括 STOP 和 PAUSE）
+func (w *Worker) shouldStopTask(ctx context.Context, taskId string) bool {
+	ctrl := w.checkTaskControl(ctx, taskId)
+	return ctrl == "STOP" || ctrl == "PAUSE" || ctx.Err() != nil
 }
 
 // saveTaskProgress 保存任务进度（用于暂停后继续扫描)
@@ -600,13 +764,13 @@ func (w *Worker) saveTaskProgress(ctx context.Context, task *scheduler.TaskInfo,
 }
 
 // createTaskContext 创建带有任务控制信号检查的上下文
-// 当任务被停止时，上下文会被取消
+// 当任务被停止或暂停时，上下文会被取消
 func (w *Worker) createTaskContext(parentCtx context.Context, taskId string) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parentCtx)
 
 	// 启动一个goroutine定期检查任务控制信号
 	go func() {
-		ticker := time.NewTicker(200 * time.Millisecond) // 检查间隔到200ms
+		ticker := time.NewTicker(200 * time.Millisecond) // 检查间隔200ms
 		defer ticker.Stop()
 
 		for {
@@ -614,8 +778,9 @@ func (w *Worker) createTaskContext(parentCtx context.Context, taskId string) (co
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if ctrl := w.checkTaskControl(ctx, taskId); ctrl == "STOP" {
-					w.taskLog(taskId, LevelInfo, "Task %s received stop signal, cancelling context", taskId)
+				ctrl := w.checkTaskControl(ctx, taskId)
+				if ctrl == "STOP" || ctrl == "PAUSE" {
+					w.taskLog(taskId, LevelInfo, "Task %s received %s signal, cancelling context", taskId, ctrl)
 					cancel()
 					return
 				}
@@ -1091,14 +1256,14 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			}
 			// 使用Worker并发数覆盖配置中的并发数
 			config.Fingerprint.Concurrency = w.config.Concurrency
-			w.taskLog(task.TaskId, LevelInfo, "Fingerprint: %d assets, timeout %ds/target, concurrency=%d", len(allAssets), targetTimeout, w.config.Concurrency)
+			w.taskLog(task.TaskId, LevelInfo, "Fingerprint: %d assets, timeout %ds/target, concurrency=%d, activeScan=%v", len(allAssets), targetTimeout, w.config.Concurrency, config.Fingerprint.ActiveScan)
 
 			// 每次扫描前实时加载HTTP服务映射配置
 			w.loadHttpServiceMappings()
 
-			// 如果启用自定义指纹引擎，加载自定义指纹
+			// 如果启用自定义指纹引擎，加载自定义指纹（包括主动指纹）
 			if config.Fingerprint.CustomEngine {
-				w.loadCustomFingerprints(ctx, s.(*scanner.FingerprintScanner))
+				w.loadCustomFingerprints(ctx, s.(*scanner.FingerprintScanner), config.Fingerprint.ActiveScan)
 			}
 
 			// 创建带超时的上下文，防止指纹识别卡死
@@ -1608,10 +1773,8 @@ func (w *Worker) saveVulResult(ctx context.Context, workspaceId, mainTaskId stri
 	}
 }
 
-// reportResult 上报结果
-func (w *Worker) reportResult() {
-	defer w.wg.Done()
-
+// reportResultLoop 上报结果循环（内部方法）
+func (w *Worker) reportResultLoop() {
 	for {
 		select {
 		case <-w.stopChan:
@@ -1629,30 +1792,136 @@ func (w *Worker) handleResult(result *scanner.ScanResult) {
 	w.saveVulResult(ctx, result.WorkspaceId, result.MainTaskId, result.Vulnerabilities)
 }
 
-// keepAlive 心跳
-func (w *Worker) keepAlive() {
-	defer w.wg.Done()
-
+// keepAliveLoop 心跳循环（内部方法）
+// 心跳使用独立协程，不受扫描任务阻塞影响
+func (w *Worker) keepAliveLoop() {
 	// 启动时立即发送一次心跳
 	w.sendHeartbeat()
 
+	// 心跳间隔 30 秒，但允许 3 次失败（服务端应设置 90-120 秒超时判定离线）
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
+
+	consecutiveFailures := 0
+	maxFailures := 3
 
 	for {
 		select {
 		case <-w.stopChan:
 			return
 		case <-ticker.C:
-			w.sendHeartbeat()
+			// 心跳发送使用独立 context，不受主 context 影响
+			if err := w.sendHeartbeatWithRetry(); err != nil {
+				consecutiveFailures++
+				w.logger.Warn("Heartbeat failed (%d/%d): %v", consecutiveFailures, maxFailures, err)
+				
+				if consecutiveFailures >= maxFailures {
+					w.logger.Error("Heartbeat failed %d times consecutively, worker may be marked offline", maxFailures)
+					// 不主动退出，继续尝试，让服务端决定是否标记离线
+				}
+			} else {
+				if consecutiveFailures > 0 {
+					w.logger.Info("Heartbeat recovered after %d failures", consecutiveFailures)
+				}
+				consecutiveFailures = 0
+			}
 		}
 	}
 }
 
-// controlPolling HTTP轮询控制信号（WebSocket不可用时的回退方案）
-func (w *Worker) controlPolling() {
-	defer w.wg.Done()
+// sendHeartbeatWithRetry 带重试的心跳发送
+func (w *Worker) sendHeartbeatWithRetry() error {
+	var lastErr error
+	for i := 0; i < 2; i++ { // 最多重试 1 次
+		if i > 0 {
+			time.Sleep(2 * time.Second)
+		}
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := w.doSendHeartbeat(ctx)
+		cancel()
+		
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+	}
+	return lastErr
+}
 
+// doSendHeartbeat 执行心跳发送
+func (w *Worker) doSendHeartbeat(ctx context.Context) error {
+	// 获取系统资源使用情况（快速采样，避免阻塞）
+	cpuPercent, _ := cpu.Percent(0, false) // 使用 0 表示不等待，返回上次采样值
+	memInfo, _ := mem.VirtualMemory()
+
+	cpuLoad := 0.0
+	if len(cpuPercent) > 0 {
+		cpuLoad = cpuPercent[0]
+	}
+	memUsed := 0.0
+	if memInfo != nil {
+		memUsed = memInfo.UsedPercent
+	}
+
+	// 确保数值有效
+	if cpuLoad < 0 || cpuLoad > 100 {
+		cpuLoad = 0.0
+	}
+	if memUsed < 0 || memUsed > 100 {
+		memUsed = 0.0
+	}
+
+	// 计算正在执行的任务数
+	w.mu.Lock()
+	runningTasks := w.taskStarted - w.taskExecuted
+	if runningTasks < 0 {
+		runningTasks = 0
+	}
+	w.mu.Unlock()
+
+	// 通过 HTTP 接口发送心跳
+	resp, err := w.httpClient.Heartbeat(ctx, &HeartbeatReq{
+		WorkerName:         w.config.Name,
+		IP:                 w.config.IP,
+		CpuLoad:            cpuLoad,
+		MemUsed:            memUsed,
+		TaskStartedNumber:  int32(w.taskStarted),
+		TaskExecutedNumber: int32(w.taskExecuted),
+		IsDaemon:           false,
+		Concurrency:        w.config.Concurrency,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// 处理控制指令
+	if resp.ManualStopFlag {
+		w.logger.Info("received stop signal, stopping worker...")
+		go func() {
+			w.Stop()
+			os.Exit(0)
+		}()
+	}
+	if resp.ManualReloadFlag {
+		w.logger.Info("received reload/restart signal, restarting worker...")
+		go func() {
+			w.Stop()
+			os.Exit(0)
+		}()
+	}
+	
+	return nil
+}
+
+// sendHeartbeat 发送心跳（简单包装，用于外部调用）
+func (w *Worker) sendHeartbeat() {
+	_ = w.sendHeartbeatWithRetry()
+}
+
+// controlPollingLoop HTTP轮询控制信号循环（内部方法，作为WebSocket的备份方案）
+func (w *Worker) controlPollingLoop() {
 	ticker := time.NewTicker(2 * time.Second) // 每2秒轮询一次
 	defer ticker.Stop()
 
@@ -1661,19 +1930,14 @@ func (w *Worker) controlPolling() {
 		case <-w.stopChan:
 			return
 		case <-ticker.C:
-			// 如果WebSocket已连接，跳过HTTP轮询
-			if w.wsClient != nil && w.wsClient.IsConnected() {
-				continue
-			}
-
 			// 获取当前正在执行的任务ID列表
 			taskIds := w.getRunningTaskIds()
 			if len(taskIds) == 0 {
 				continue
 			}
 
-			// 通过HTTP轮询获取控制信号
-			ctx, cancel := context.WithTimeout(w.ctx, 5*time.Second)
+			// 通过HTTP轮询获取控制信号（始终执行，作为WebSocket的备份）
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			resp, err := w.httpClient.GetTaskControlSignals(ctx, taskIds)
 			cancel()
 
@@ -1765,74 +2029,6 @@ func (w *Worker) isCPUOverloaded() bool {
 	}
 
 	return false
-}
-
-// sendHeartbeat 发送心跳
-func (w *Worker) sendHeartbeat() {
-	ctx, cancel := context.WithTimeout(w.ctx, 10*time.Second) // 继承父Context
-	defer cancel()
-
-	// 获取系统资源使用情况
-	cpuPercent, _ := cpu.Percent(time.Second, false)
-	memInfo, _ := mem.VirtualMemory()
-
-	cpuLoad := 0.0
-	if len(cpuPercent) > 0 {
-		cpuLoad = cpuPercent[0]
-	}
-	memUsed := 0.0
-	if memInfo != nil {
-		memUsed = memInfo.UsedPercent
-	}
-
-	// 确保数值有效
-	if cpuLoad < 0 || cpuLoad > 100 {
-		cpuLoad = 0.0
-	}
-	if memUsed < 0 || memUsed > 100 {
-		memUsed = 0.0
-	}
-
-	// 计算正在执行的任务数（已开始但未完成的任务）
-	w.mu.Lock()
-	runningTasks := w.taskStarted - w.taskExecuted
-	if runningTasks < 0 {
-		runningTasks = 0
-	}
-	w.mu.Unlock()
-
-	// 通过 HTTP 接口发送心跳
-	resp, err := w.httpClient.Heartbeat(ctx, &HeartbeatReq{
-		WorkerName:         w.config.Name,
-		IP:                 w.config.IP,
-		CpuLoad:            cpuLoad,
-		MemUsed:            memUsed,
-		TaskStartedNumber:  int32(w.taskStarted),
-		TaskExecutedNumber: int32(w.taskExecuted),
-		IsDaemon:           false,
-		Concurrency:        w.config.Concurrency,
-	})
-
-	// 调试：打印心跳发送的 IP
-	if w.config.IP == "" {
-		fmt.Printf("[Heartbeat] WARNING: IP is empty! config=%+v\n", w.config)
-	}
-	if err != nil {
-		w.logger.Error("keepalive failed: %v", err)
-		return
-	}
-
-	// 处理控制指令
-	if resp.ManualStopFlag {
-		w.logger.Info("received stop signal, stopping worker...")
-		w.Stop()
-		os.Exit(0)
-	}
-	if resp.ManualReloadFlag {
-		w.logger.Info("received reload/restart signal, restarting worker...")
-		w.Stop()
-		os.Exit(0) // 退出后由守护进程或用户重新启动
-	}
 }
 
 // NOTE: subscribeStatusQuery 已移除，将在 Task 6 中通过 WebSocket 实现
@@ -2005,58 +2201,125 @@ func parseAppName(app string) string {
 }
 
 // loadCustomFingerprints 加载自定义指纹到指纹扫描器
-func (w *Worker) loadCustomFingerprints(ctx context.Context, fpScanner *scanner.FingerprintScanner) {
-	// 通过 HTTP 接口获取指纹配置
+// activeScan: 是否启用主动扫描，如果启用则同时加载主动指纹
+func (w *Worker) loadCustomFingerprints(ctx context.Context, fpScanner *scanner.FingerprintScanner, activeScan bool) {
+	// 通过 HTTP 接口获取被动指纹配置
+	var passiveFingerprints []*model.Fingerprint
+	passiveFpMap := make(map[string]*model.Fingerprint)
+	
 	resp, err := w.httpClient.GetFingerprints(ctx, &FingerprintsReq{
 		EnabledOnly: true,
 	})
 	if err != nil {
 		w.logger.Error("GetFingerprints HTTP failed: %v", err)
-		return
-	}
-
-	if !resp.Success {
+		// 不直接返回，继续尝试加载主动指纹
+	} else if !resp.Success {
 		w.logger.Error("GetFingerprints failed: %s", resp.Msg)
-		return
-	}
-
-	if len(resp.Fingerprints) == 0 {
-		w.logger.Info("No custom fingerprints found")
-		return
-	}
-
-	// 转换为model.Fingerprint
-	var fingerprints []*model.Fingerprint
-	for _, fp := range resp.Fingerprints {
-		mfp := &model.Fingerprint{
-			Name:      fp.Name,
-			Category:  fp.Category,
-			Rule:      fp.Rule,
-			Source:    fp.Source,
-			Headers:   fp.Headers,
-			Cookies:   fp.Cookies,
-			HTML:      fp.Html,
-			Scripts:   fp.Scripts,
-			ScriptSrc: fp.ScriptSrc,
-			Meta:      fp.Meta,
-			CSS:       fp.Css,
-			URL:       fp.Url,
-			IsBuiltin: fp.IsBuiltin,
-			Enabled:   fp.Enabled,
-		}
-		// 解析ID
-		if fp.Id != "" {
-			if oid, err := primitive.ObjectIDFromHex(fp.Id); err == nil {
-				mfp.Id = oid
+		// 不直接返回，继续尝试加载主动指纹
+	} else {
+		// 转换为model.Fingerprint（被动指纹）
+		for _, fp := range resp.Fingerprints {
+			mfp := &model.Fingerprint{
+				Name:      fp.Name,
+				Category:  fp.Category,
+				Rule:      fp.Rule,
+				Source:    fp.Source,
+				Headers:   fp.Headers,
+				Cookies:   fp.Cookies,
+				HTML:      fp.Html,
+				Scripts:   fp.Scripts,
+				ScriptSrc: fp.ScriptSrc,
+				Meta:      fp.Meta,
+				CSS:       fp.Css,
+				URL:       fp.Url,
+				IsBuiltin: fp.IsBuiltin,
+				Enabled:   fp.Enabled,
 			}
+			// 解析ID
+			if fp.Id != "" {
+				if oid, err := primitive.ObjectIDFromHex(fp.Id); err == nil {
+					mfp.Id = oid
+				}
+			}
+			passiveFingerprints = append(passiveFingerprints, mfp)
+			// 存入映射（小写名称作为key，支持不区分大小写匹配）
+			passiveFpMap[strings.ToLower(fp.Name)] = mfp
 		}
-		fingerprints = append(fingerprints, mfp)
+	}
+
+	// 如果启用主动扫描，加载主动指纹
+	var activeFingerprints []*model.Fingerprint
+	if activeScan {
+		activeResp, err := w.httpClient.GetActiveFingerprints(ctx, true)
+		if err != nil {
+			w.logger.Warn("GetActiveFingerprints HTTP failed: %v", err)
+		} else if activeResp.Success && len(activeResp.Fingerprints) > 0 {
+			for _, afp := range activeResp.Fingerprints {
+				// 创建主动指纹对象，直接使用API返回的规则（已包含关联的被动指纹规则）
+				mfp := &model.Fingerprint{
+					Name:        afp.Name,
+					ActivePaths: afp.Paths,
+					Enabled:     afp.Enabled,
+					Type:        model.FingerprintTypeActive,
+					// 使用API返回的匹配规则（服务端已关联被动指纹）
+					Rule:      afp.Rule,
+					Headers:   afp.Headers,
+					Cookies:   afp.Cookies,
+					HTML:      afp.Html,
+					Scripts:   afp.Scripts,
+					ScriptSrc: afp.ScriptSrc,
+					Meta:      afp.Meta,
+					CSS:       afp.Css,
+					URL:       afp.Url,
+				}
+				
+				// 如果API没有返回规则，尝试从本地被动指纹映射获取
+				if mfp.Rule == "" && len(mfp.HTML) == 0 && len(mfp.Headers) == 0 {
+					if passiveFp := passiveFpMap[strings.ToLower(afp.Name)]; passiveFp != nil {
+						mfp.Rule = passiveFp.Rule
+						mfp.Headers = passiveFp.Headers
+						mfp.Cookies = passiveFp.Cookies
+						mfp.HTML = passiveFp.HTML
+						mfp.Scripts = passiveFp.Scripts
+						mfp.ScriptSrc = passiveFp.ScriptSrc
+						mfp.Meta = passiveFp.Meta
+						mfp.CSS = passiveFp.CSS
+						mfp.URL = passiveFp.URL
+						mfp.Category = passiveFp.Category
+						w.logger.Debug("Active fingerprint '%s' linked to local passive fingerprint with rule: %s", afp.Name, passiveFp.Rule)
+					} else {
+						w.logger.Warn("Active fingerprint '%s' has no matching rule", afp.Name)
+					}
+				} else if mfp.Rule != "" {
+					w.logger.Debug("Active fingerprint '%s' loaded with rule from API: %s", afp.Name, mfp.Rule)
+				}
+				
+				// 解析ID
+				if afp.Id != "" {
+					if oid, err := primitive.ObjectIDFromHex(afp.Id); err == nil {
+						mfp.Id = oid
+					}
+				}
+				activeFingerprints = append(activeFingerprints, mfp)
+			}
+			w.logger.Info("Loaded %d active fingerprints", len(activeFingerprints))
+		}
 	}
 
 	// 创建自定义指纹引擎并设置到扫描器
-	customEngine := scanner.NewCustomFingerprintEngine(fingerprints)
-	fpScanner.SetCustomFingerprintEngine(customEngine)
-	w.logger.Info("Loaded %d fingerprints (builtin + custom) into fingerprint scanner", len(fingerprints))
+	// 即使被动指纹为空，只要有主动指纹也要创建引擎
+	if len(passiveFingerprints) > 0 || len(activeFingerprints) > 0 {
+		var customEngine *scanner.CustomFingerprintEngine
+		if len(activeFingerprints) > 0 {
+			customEngine = scanner.NewCustomFingerprintEngineWithActive(passiveFingerprints, activeFingerprints)
+		} else {
+			customEngine = scanner.NewCustomFingerprintEngine(passiveFingerprints)
+		}
+		fpScanner.SetCustomFingerprintEngine(customEngine)
+		w.logger.Info("Loaded %d passive fingerprints, %d active fingerprints into scanner", len(passiveFingerprints), len(activeFingerprints))
+	} else {
+		w.logger.Info("No fingerprints found")
+	}
 }
 
 // filterByPortThreshold 根据端口阈值过滤资产

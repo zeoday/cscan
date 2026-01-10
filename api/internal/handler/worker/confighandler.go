@@ -3,8 +3,10 @@ package worker
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"cscan/api/internal/svc"
+	"cscan/model"
 	"cscan/pkg/response"
 	"cscan/rpc/task/pb"
 
@@ -116,6 +118,41 @@ type WorkerHttpServiceResp struct {
 	Success  bool                       `json:"success"`
 	Mappings []WorkerHttpServiceMapping `json:"mappings"`
 	Count    int32                      `json:"count"`
+}
+
+// ==================== Active Fingerprints Config Types ====================
+
+// WorkerActiveFingerprintsReq 主动指纹获取请求
+type WorkerActiveFingerprintsReq struct {
+	EnabledOnly bool `json:"enabledOnly"`
+}
+
+// WorkerActiveFingerprintDocument 主动指纹文档
+type WorkerActiveFingerprintDocument struct {
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`        // 应用名称（用于关联被动指纹）
+	Paths       []string `json:"paths"`       // 主动探测路径列表
+	Description string   `json:"description"`
+	Enabled     bool     `json:"enabled"`
+	// 关联的被动指纹规则（用于匹配响应）
+	Rule      string            `json:"rule,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Cookies   map[string]string `json:"cookies,omitempty"`
+	Html      []string          `json:"html,omitempty"`
+	Scripts   []string          `json:"scripts,omitempty"`
+	ScriptSrc []string          `json:"scriptSrc,omitempty"`
+	Meta      map[string]string `json:"meta,omitempty"`
+	Css       []string          `json:"css,omitempty"`
+	Url       []string          `json:"url,omitempty"`
+}
+
+// WorkerActiveFingerprintsResp 主动指纹获取响应
+type WorkerActiveFingerprintsResp struct {
+	Code         int                               `json:"code"`
+	Msg          string                            `json:"msg"`
+	Success      bool                              `json:"success"`
+	Fingerprints []WorkerActiveFingerprintDocument `json:"fingerprints"`
+	Count        int32                             `json:"count"`
 }
 
 // ==================== Templates Handler ====================
@@ -314,6 +351,93 @@ func WorkerConfigHttpServiceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc
 			Success:  true,
 			Mappings: mappings,
 			Count:    rpcResp.Count,
+		})
+	}
+}
+
+// ==================== Active Fingerprints Handler ====================
+
+// WorkerConfigActiveFingerprintsHandler 主动指纹配置获取接口
+// POST /api/v1/worker/config/activefingerprints
+func WorkerConfigActiveFingerprintsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req WorkerActiveFingerprintsReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpx.OkJson(w, &WorkerActiveFingerprintsResp{Code: 400, Msg: "参数解析失败"})
+			return
+		}
+
+		ctx := r.Context()
+		var docs []WorkerActiveFingerprintDocument
+
+		// 获取主动指纹
+		var activeFingerprints []model.ActiveFingerprint
+		var err error
+		if req.EnabledOnly {
+			activeFingerprints, err = svcCtx.ActiveFingerprintModel.FindEnabled(ctx)
+		} else {
+			activeFingerprints, err = svcCtx.ActiveFingerprintModel.FindAll(ctx)
+		}
+		if err != nil {
+			logx.Errorf("[WorkerConfigActiveFingerprints] Find error: %v", err)
+			response.Error(w, err)
+			return
+		}
+
+		// 收集所有主动指纹的名称，用于批量查询关联的被动指纹
+		names := make([]string, 0, len(activeFingerprints))
+		for _, fp := range activeFingerprints {
+			names = append(names, fp.Name)
+		}
+
+		// 批量获取关联的被动指纹规则
+		passiveFpMap := make(map[string]*model.Fingerprint)
+		if len(names) > 0 && svcCtx.FingerprintModel != nil {
+			passiveFingerprints, err := svcCtx.FingerprintModel.FindByNames(ctx, names)
+			if err != nil {
+				logx.Infof("[WorkerConfigActiveFingerprints] FindByNames error: %v", err)
+				// 不返回错误，继续处理（主动指纹仍然可以返回，只是没有匹配规则）
+			} else {
+				for _, pf := range passiveFingerprints {
+					// 使用小写名称作为key，支持不区分大小写匹配
+					passiveFpMap[strings.ToLower(pf.Name)] = pf
+				}
+				logx.Debugf("[WorkerConfigActiveFingerprints] Found %d passive fingerprints for %d active fingerprints", len(passiveFingerprints), len(names))
+			}
+		}
+
+		// 构建返回数据，包含关联的被动指纹规则
+		for _, fp := range activeFingerprints {
+			doc := WorkerActiveFingerprintDocument{
+				Id:          fp.Id.Hex(),
+				Name:        fp.Name,
+				Paths:       fp.Paths,
+				Description: fp.Description,
+				Enabled:     fp.Enabled,
+			}
+
+			// 查找关联的被动指纹，复制其匹配规则（使用小写名称匹配）
+			if passiveFp, ok := passiveFpMap[strings.ToLower(fp.Name)]; ok {
+				doc.Rule = passiveFp.Rule
+				doc.Headers = passiveFp.Headers
+				doc.Cookies = passiveFp.Cookies
+				doc.Html = passiveFp.HTML
+				doc.Scripts = passiveFp.Scripts
+				doc.ScriptSrc = passiveFp.ScriptSrc
+				doc.Meta = passiveFp.Meta
+				doc.Css = passiveFp.CSS
+				doc.Url = passiveFp.URL
+			}
+
+			docs = append(docs, doc)
+		}
+
+		httpx.OkJson(w, &WorkerActiveFingerprintsResp{
+			Code:         0,
+			Msg:          "success",
+			Success:      true,
+			Fingerprints: docs,
+			Count:        int32(len(docs)),
 		})
 	}
 }

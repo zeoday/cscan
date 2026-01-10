@@ -70,6 +70,12 @@ func (l *UpdateTaskLogic) UpdateTask(in *pb.UpdateTaskReq) (*pb.UpdateTaskResp, 
 
 // updateTaskInDB 更新数据库中的任务状态
 func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
+	// 如果状态为空，只是进度更新，不更新数据库状态
+	if state == "" {
+		l.Logger.Infof("UpdateTask: state is empty for taskId=%s, skipping DB update (progress only)", taskId)
+		return
+	}
+
 	// 从Redis获取任务信息（workspaceId）
 	taskInfoKey := "cscan:task:info:" + taskId
 	taskInfoData, err := l.svcCtx.RedisClient.Get(l.ctx, taskInfoKey).Result()
@@ -104,7 +110,7 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 		"status": state,
 	}
 
-	l.Logger.Infof("UpdateTask: taskId=%s, mainTaskId=%s, subTaskCount=%d", taskId, mainTaskId, subTaskCount)
+	l.Logger.Infof("UpdateTask: taskId=%s, mainTaskId=%s, subTaskCount=%d, state=%s", taskId, mainTaskId, subTaskCount, state)
 
 	// 根据状态设置不同字段
 	switch state {
@@ -117,11 +123,12 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 			// 查询失败时仍然尝试更新状态和开始时间
 			update["start_time"] = now
 		} else if task.Status == "STARTED" {
-			// 主任务已经是STARTED状态，不需要再更新状态
-			delete(update, "status")
-			// 但仍然更新 update_time（在 taskModel.Update 中自动添加）
+			// 主任务已经是STARTED状态，不需要再更新
+			l.Logger.Infof("UpdateTask: main task %s already STARTED, skipping update", mainTaskId)
+			return
 		} else {
-			// 主任务不是STARTED状态（如PENDING），更新状态和开始时间
+			// 主任务不是STARTED状态（如PENDING/CREATED），更新状态和开始时间
+			l.Logger.Infof("UpdateTask: updating main task %s from %s to STARTED", mainTaskId, task.Status)
 			update["start_time"] = now
 		}
 	case "SUCCESS", "COMPLETED":

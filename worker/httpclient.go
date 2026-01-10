@@ -673,6 +673,60 @@ func (c *WorkerHTTPClient) GetPocById(ctx context.Context, pocId, pocType string
 	return &resp, nil
 }
 
+// ==================== Active Fingerprints ====================
+
+// ActiveFingerprintsReq 主动指纹获取请求
+type ActiveFingerprintsReq struct {
+	EnabledOnly bool `json:"enabledOnly"`
+}
+
+// ActiveFingerprintDocument 主动指纹文档
+type ActiveFingerprintDocument struct {
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`        // 应用名称（用于关联被动指纹）
+	Paths       []string `json:"paths"`       // 主动探测路径列表
+	Description string   `json:"description"`
+	Enabled     bool     `json:"enabled"`
+	// 关联的被动指纹规则（用于匹配响应）
+	Rule      string            `json:"rule,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Cookies   map[string]string `json:"cookies,omitempty"`
+	Html      []string          `json:"html,omitempty"`
+	Scripts   []string          `json:"scripts,omitempty"`
+	ScriptSrc []string          `json:"scriptSrc,omitempty"`
+	Meta      map[string]string `json:"meta,omitempty"`
+	Css       []string          `json:"css,omitempty"`
+	Url       []string          `json:"url,omitempty"`
+}
+
+// ActiveFingerprintsResp 主动指纹获取响应
+type ActiveFingerprintsResp struct {
+	Code         int                         `json:"code"`
+	Msg          string                      `json:"msg"`
+	Success      bool                        `json:"success"`
+	Fingerprints []ActiveFingerprintDocument `json:"fingerprints"`
+	Count        int32                       `json:"count"`
+}
+
+// GetActiveFingerprints 获取主动指纹配置
+func (c *WorkerHTTPClient) GetActiveFingerprints(ctx context.Context, enabledOnly bool) (*ActiveFingerprintsResp, error) {
+	req := &ActiveFingerprintsReq{
+		EnabledOnly: enabledOnly,
+	}
+
+	respBody, err := c.doRequest(ctx, http.MethodPost, "/api/v1/worker/config/activefingerprints", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ActiveFingerprintsResp
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response failed: %w", err)
+	}
+
+	return &resp, nil
+}
+
 // ==================== Worker Offline Notification ====================
 
 // WorkerOfflineReq Worker离线通知请求

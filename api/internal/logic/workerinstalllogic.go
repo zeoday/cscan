@@ -52,7 +52,8 @@ func (l *WorkerInstallLogic) GetInstallCommand(req *types.WorkerInstallCommandRe
 		l.Logger.Infof("[WorkerInstall] Generated new install key: %s", installKey)
 	}
 
-	// 构建API服务地址（优先使用请求参数，其次使用默认值）
+	// 构建API服务地址
+	// 优先使用请求参数中的主机名，端口始终使用配置中的 API 端口
 	serverAddr := req.ServerAddr
 	// 移除 serverAddr 中的协议前缀，统一处理
 	serverAddrClean := serverAddr
@@ -60,6 +61,32 @@ func (l *WorkerInstallLogic) GetInstallCommand(req *types.WorkerInstallCommandRe
 		serverAddrClean = serverAddrClean[8:]
 	} else if len(serverAddrClean) > 7 && serverAddrClean[:7] == "http://" {
 		serverAddrClean = serverAddrClean[7:]
+	}
+
+	// 从配置中获取 API 服务端口
+	apiPort := l.svcCtx.Config.Port
+	if apiPort == 0 {
+		apiPort = 8888 // 默认端口
+	}
+
+	// 如果前端没有传地址，或者只传了主机名，则使用配置中的端口
+	if serverAddrClean == "" {
+		serverAddrClean = fmt.Sprintf("localhost:%d", apiPort)
+	} else {
+		// 提取主机名部分（去掉可能的端口），然后使用配置中的端口
+		host := serverAddrClean
+		if idx := len(host) - 1; idx > 0 {
+			for i := len(host) - 1; i >= 0; i-- {
+				if host[i] == ':' {
+					host = host[:i]
+					break
+				}
+				if host[i] == ']' || host[i] < '0' || host[i] > '9' {
+					break
+				}
+			}
+		}
+		serverAddrClean = fmt.Sprintf("%s:%d", host, apiPort)
 	}
 
 	// 生成各平台的安装命令（单端口通信，只需 -k 和 -s 参数）

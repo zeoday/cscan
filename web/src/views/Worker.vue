@@ -171,8 +171,8 @@
           </el-form-item>
 
           <el-form-item label="服务地址">
-            <code style="background: #f5f7fa; padding: 8px 12px; border-radius: 4px;">{{ installInfo.serverAddr }}</code>
-            <span style="margin-left: 10px; color: #909399; font-size: 12px;">（Worker 连接地址）</span>
+            <code class="server-addr-code">{{ installInfo.serverAddr }}</code>
+            <span style="margin-left: 10px; color: var(--el-text-color-secondary); font-size: 12px;">（Worker 连接地址）</span>
           </el-form-item>
         </el-form>
 
@@ -717,15 +717,16 @@ async function openInstallDialog() {
 
 async function loadInstallCommand() {
   try {
-    // 当前浏览器访问地址（用于下载配置文件）
-    const currentUrl = window.location.origin
+    // 只传主机名，让后端决定端口
+    const hostname = window.location.hostname
     
-    const res = await request.post('/worker/install/command', {})
+    const res = await request.post('/worker/install/command', { serverAddr: hostname })
     if (res.code === 0) {
       installInfo.installKey = res.installKey
-      // 下载地址用浏览器当前地址，API地址用后端返回的地址
-      installInfo.downloadUrl = currentUrl
-      installInfo.serverAddr = res.serverAddr ? `http://${res.serverAddr}` : currentUrl
+      // 使用后端返回的完整地址
+      const apiUrl = `http://${res.serverAddr}`
+      installInfo.downloadUrl = apiUrl
+      installInfo.serverAddr = apiUrl
       installInfo.commands = res.commands || {}
     } else {
       ElMessage.error(res.msg || '获取安装命令失败')
@@ -876,7 +877,7 @@ function openConsole(workerName) {
     gap: 10px;
     
     code {
-      background: #f5f7fa;
+      background: var(--el-fill-color-light, #f5f7fa);
       padding: 8px 12px;
       border-radius: 4px;
       font-family: 'Consolas', 'Monaco', monospace;
@@ -886,11 +887,20 @@ function openConsole(workerName) {
     }
   }
 
+  // 服务地址样式
+  .server-addr-code {
+    background: var(--el-fill-color-light, #f5f7fa);
+    color: var(--el-text-color-regular, #606266);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+  }
+
   .command-section {
     .command-title {
       margin: 0 0 8px 0;
       font-size: 13px;
-      color: #606266;
+      color: var(--el-text-color-secondary, #606266);
     }
 
     .command-box {

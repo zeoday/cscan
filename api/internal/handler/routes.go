@@ -65,6 +65,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/fingerprints", Handler: worker.WorkerConfigFingerprintsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/subfinder", Handler: worker.WorkerConfigSubfinderHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/httpservice", Handler: worker.WorkerConfigHttpServiceHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/worker/config/activefingerprints", Handler: worker.WorkerConfigActiveFingerprintsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/poc", Handler: worker.WorkerConfigPocHandler(svcCtx)},
 	}
 
@@ -222,6 +223,15 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/httpservice/list", Handler: fingerprint.HttpServiceMappingListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/httpservice/save", Handler: fingerprint.HttpServiceMappingSaveHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/httpservice/delete", Handler: fingerprint.HttpServiceMappingDeleteHandler(svcCtx)},
+
+		// 主动扫描指纹
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/list", Handler: fingerprint.ActiveFingerprintListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/save", Handler: fingerprint.ActiveFingerprintSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/delete", Handler: fingerprint.ActiveFingerprintDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/import", Handler: fingerprint.ActiveFingerprintImportHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/export", Handler: fingerprint.ActiveFingerprintExportHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/clear", Handler: fingerprint.ActiveFingerprintClearHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/validate", Handler: fingerprint.ActiveFingerprintValidateHandler(svcCtx)},
 
 		// 报告管理
 		{Method: http.MethodPost, Path: "/api/v1/report/detail", Handler: report.ReportDetailHandler(svcCtx)},

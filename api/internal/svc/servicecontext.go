@@ -2,6 +2,7 @@ package svc
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cscan/api/internal/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/zeromicro/go-zero/zrpc"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"google.golang.org/grpc"
 )
 
 type ServiceContext struct {
@@ -31,9 +33,10 @@ type ServiceContext struct {
 	CustomPocModel          *model.CustomPocModel
 	NucleiTemplateModel     *model.NucleiTemplateModel
 	FingerprintModel        *model.FingerprintModel
-	HttpServiceMappingModel *model.HttpServiceMappingModel
-	CommandHistoryModel     *model.CommandHistoryModel
-	AuditLogModel           *model.AuditLogModel
+	HttpServiceMappingModel  *model.HttpServiceMappingModel
+	ActiveFingerprintModel   *model.ActiveFingerprintModel
+	CommandHistoryModel      *model.CommandHistoryModel
+	AuditLogModel            *model.AuditLogModel
 
 	// 调度器
 	Scheduler *scheduler.Scheduler
@@ -49,25 +52,46 @@ type ServiceContext struct {
 
 func NewServiceContext(c config.Config) *ServiceContext {
 	// MongoDB连接
+	fmt.Println("Connecting to MongoDB:", c.Mongo.Uri)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(c.Mongo.Uri))
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to connect MongoDB: %v", err))
 	}
+
+	// 测试 MongoDB 连接
+	if err := mongoClient.Ping(ctx, nil); err != nil {
+		panic(fmt.Sprintf("MongoDB ping failed: %v\nPlease ensure MongoDB is running: docker-compose -f docker-compose.dev.yaml up -d", err))
+	}
+	fmt.Println("MongoDB connected successfully")
 
 	mongoDB := mongoClient.Database(c.Mongo.DbName)
 
 	// Redis连接 - 使用go-zero配置
+	fmt.Println("Connecting to Redis:", c.Redis.Host)
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     c.Redis.Host,
 		Password: c.Redis.Pass,
 		DB:       0,
 	})
 
-	// 创建RPC客户端
-	taskRpcClient := pb.NewTaskServiceClient(zrpc.MustNewClient(c.TaskRpc).Conn())
+	// 测试 Redis 连接
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		panic(fmt.Sprintf("Redis ping failed: %v\nPlease ensure Redis is running: docker-compose -f docker-compose.dev.yaml up -d", err))
+	}
+	fmt.Println("Redis connected successfully")
+
+	// 创建RPC客户端（增加消息大小限制到50MB，支持大量指纹数据传输）
+	fmt.Println("Connecting to RPC:", c.TaskRpc.Endpoints)
+	rpcClient := zrpc.MustNewClient(c.TaskRpc, zrpc.WithDialOption(
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
+			grpc.MaxCallSendMsgSize(50*1024*1024), // 50MB
+		),
+	))
+	taskRpcClient := pb.NewTaskServiceClient(rpcClient.Conn())
 
 	svcCtx := &ServiceContext{
 		Config:                  c,
@@ -83,9 +107,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		CustomPocModel:          model.NewCustomPocModel(mongoDB),
 		NucleiTemplateModel:     model.NewNucleiTemplateModel(mongoDB),
 		FingerprintModel:        model.NewFingerprintModel(mongoDB),
-		HttpServiceMappingModel: model.NewHttpServiceMappingModel(mongoDB),
-		CommandHistoryModel:     model.NewCommandHistoryModel(mongoDB),
-		AuditLogModel:           model.NewAuditLogModel(mongoDB),
+		HttpServiceMappingModel:  model.NewHttpServiceMappingModel(mongoDB),
+		ActiveFingerprintModel:   model.NewActiveFingerprintModel(mongoDB),
+		CommandHistoryModel:      model.NewCommandHistoryModel(mongoDB),
+		AuditLogModel:            model.NewAuditLogModel(mongoDB),
 		Scheduler:               scheduler.NewScheduler(rdb),
 		TemplateCategories:      []string{},
 		TemplateTags:            []string{},
@@ -97,6 +122,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		svcCtx.NucleiTemplateModel,
 		svcCtx.FingerprintModel,
 		svcCtx.CustomPocModel,
+		svcCtx.ActiveFingerprintModel,
 	)
 
 	return svcCtx
