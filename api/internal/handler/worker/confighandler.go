@@ -508,3 +508,88 @@ func WorkerConfigPocHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		})
 	}
 }
+
+// ==================== DirScan Dict Config Types ====================
+
+// WorkerDirScanDictReq 目录扫描字典获取请求
+type WorkerDirScanDictReq struct {
+	DictIds []string `json:"dictIds"` // 字典ID列表
+}
+
+// WorkerDirScanDictItem 目录扫描字典项
+type WorkerDirScanDictItem struct {
+	Id      string   `json:"id"`
+	Name    string   `json:"name"`
+	Paths   []string `json:"paths"` // 解析后的路径列表
+}
+
+// WorkerDirScanDictResp 目录扫描字典获取响应
+type WorkerDirScanDictResp struct {
+	Code  int                     `json:"code"`
+	Msg   string                  `json:"msg"`
+	Dicts []WorkerDirScanDictItem `json:"dicts"`
+	Count int                     `json:"count"`
+}
+
+// ==================== DirScan Dict Handler ====================
+
+// WorkerConfigDirScanDictHandler 目录扫描字典配置获取接口
+// POST /api/v1/worker/config/dirscandict
+func WorkerConfigDirScanDictHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req WorkerDirScanDictReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpx.OkJson(w, &WorkerDirScanDictResp{Code: 400, Msg: "参数解析失败"})
+			return
+		}
+
+		if len(req.DictIds) == 0 {
+			httpx.OkJson(w, &WorkerDirScanDictResp{Code: 400, Msg: "dictIds不能为空"})
+			return
+		}
+
+		ctx := r.Context()
+		dictModel := model.NewDirScanDictModel(svcCtx.MongoDB)
+
+		// 获取字典
+		dicts, err := dictModel.FindByIds(ctx, req.DictIds)
+		if err != nil {
+			logx.Errorf("[WorkerConfigDirScanDict] FindByIds error: %v", err)
+			httpx.OkJson(w, &WorkerDirScanDictResp{Code: 500, Msg: "获取字典失败"})
+			return
+		}
+
+		// 转换数据，解析路径
+		items := make([]WorkerDirScanDictItem, 0, len(dicts))
+		for _, d := range dicts {
+			paths := parseDictPaths(d.Content)
+			items = append(items, WorkerDirScanDictItem{
+				Id:    d.Id.Hex(),
+				Name:  d.Name,
+				Paths: paths,
+			})
+		}
+
+		httpx.OkJson(w, &WorkerDirScanDictResp{
+			Code:  0,
+			Msg:   "success",
+			Dicts: items,
+			Count: len(items),
+		})
+	}
+}
+
+// parseDictPaths 解析字典内容，返回路径列表
+func parseDictPaths(content string) []string {
+	var paths []string
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// 跳过空行和注释
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		paths = append(paths, line)
+	}
+	return paths
+}

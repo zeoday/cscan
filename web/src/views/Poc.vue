@@ -271,7 +271,102 @@
           />
         </el-card>
       </el-tab-pane>
+
+      <!-- 目录扫描字典 -->
+      <el-tab-pane label="目录扫描字典" name="dirscanDict">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>目录扫描字典管理</span>
+              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+                共 {{ dirscanDictPagination.total || 0 }} 个字典
+              </span>
+              <div style="margin-left: auto">
+                <el-button type="danger" size="small" @click="handleClearDirscanDict" :loading="clearDictLoading" style="margin-right: 10px">
+                  <el-icon><Delete /></el-icon>清空自定义
+                </el-button>
+                <el-button type="primary" size="small" @click="showDirscanDictForm()">
+                  <el-icon><Plus /></el-icon>新增字典
+                </el-button>
+              </div>
+            </div>
+          </template>
+          <p class="tip-text">
+            管理目录扫描使用的字典文件，支持自定义路径列表。创建任务时可选择要使用的字典进行目录扫描。
+          </p>
+          <el-table :data="dirscanDicts" stripe v-loading="dirscanDictLoading" max-height="500">
+            <el-table-column prop="name" label="字典名称" width="200" />
+            <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="pathCount" label="路径数量" width="100" />
+            <el-table-column prop="isBuiltin" label="类型" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">
+                  {{ row.isBuiltin ? '内置' : '自定义' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="enabled" label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
+                  {{ row.enabled ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <el-button type="primary" link size="small" @click="showDirscanDictForm(row)">编辑</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteDirscanDict(row)" :disabled="row.isBuiltin">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            v-model:current-page="dirscanDictPagination.page"
+            v-model:page-size="dirscanDictPagination.pageSize"
+            :total="dirscanDictPagination.total"
+            :page-sizes="[20, 50, 100]"
+            layout="total, sizes, prev, pager, next"
+            class="pagination"
+            @size-change="loadDirscanDicts"
+            @current-change="loadDirscanDicts"
+          />
+        </el-card>
+      </el-tab-pane>
     </el-tabs>
+
+    <!-- 目录扫描字典编辑对话框 -->
+    <el-dialog v-model="dirscanDictDialogVisible" :title="dirscanDictForm.id ? '编辑字典' : '新增字典'" width="700px">
+      <el-form ref="dirscanDictFormRef" :model="dirscanDictForm" :rules="dirscanDictRules" label-width="100px">
+        <el-form-item label="字典名称" prop="name">
+          <el-input v-model="dirscanDictForm.name" placeholder="输入字典名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="dirscanDictForm.description" placeholder="可选描述" />
+        </el-form-item>
+        <el-form-item label="路径列表" prop="content">
+          <div style="width: 100%">
+            <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
+              每行一个路径，以 / 开头，支持 # 开头的注释行
+            </div>
+            <el-input
+              v-model="dirscanDictForm.content"
+              type="textarea"
+              :rows="15"
+              placeholder="/admin&#10;/login&#10;/api&#10;/backup&#10;/.git&#10;/config"
+            />
+            <div style="margin-top: 8px; color: #909399; font-size: 12px">
+              当前路径数量: {{ countDictPaths(dirscanDictForm.content) }}
+            </div>
+          </div>
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="dirscanDictForm.enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dirscanDictDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveDirscanDict">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 标签映射编辑对话框 -->
     <el-dialog v-model="tagMappingDialogVisible" :title="tagMappingForm.id ? '编辑映射' : '新增映射'" width="500px">
@@ -871,6 +966,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete, MagicStick, FolderOpened } from '@element-plus/icons-vue'
 import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, clearNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc, getAIConfig, saveAIConfig, validatePocSyntax } from '@/api/poc'
+import { getDirScanDictList, saveDirScanDict, deleteDirScanDict, clearDirScanDict } from '@/api/dirscan'
 import jsYaml from 'js-yaml'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
@@ -924,6 +1020,29 @@ const customPocs = ref([])
 const customPocLoading = ref(false)
 const customPocDialogVisible = ref(false)
 const syntaxValidating = ref(false) // 语法验证中
+
+// 目录扫描字典
+const dirscanDicts = ref([])
+const dirscanDictLoading = ref(false)
+const dirscanDictDialogVisible = ref(false)
+const dirscanDictFormRef = ref()
+const clearDictLoading = ref(false)
+const dirscanDictForm = reactive({
+  id: '',
+  name: '',
+  description: '',
+  content: '',
+  enabled: true
+})
+const dirscanDictRules = {
+  name: [{ required: true, message: '请输入字典名称', trigger: 'blur' }],
+  content: [{ required: true, message: '请输入路径列表', trigger: 'blur' }]
+}
+const dirscanDictPagination = reactive({
+  page: 1,
+  pageSize: 20,
+  total: 0
+})
 
 // AI辅助编写POC
 const aiAssistDialogVisible = ref(false)
@@ -1185,6 +1304,8 @@ function handleTabChange(tab) {
     loadTagMappings()
   } else if (tab === 'customPoc' && customPocs.value.length === 0) {
     loadCustomPocs()
+  } else if (tab === 'dirscanDict' && dirscanDicts.value.length === 0) {
+    loadDirscanDicts()
   }
 }
 
@@ -3666,6 +3787,135 @@ function buildPocPrompt() {
 请生成Nuclei POC模板：`
 
   return prompt
+}
+
+// ==================== 目录扫描字典相关方法 ====================
+
+// 加载目录扫描字典列表
+async function loadDirscanDicts() {
+  dirscanDictLoading.value = true
+  try {
+    const res = await getDirScanDictList({
+      page: dirscanDictPagination.page,
+      pageSize: dirscanDictPagination.pageSize
+    })
+    if (res.code === 0) {
+      dirscanDicts.value = res.list || []
+      dirscanDictPagination.total = res.total || 0
+    }
+  } catch (e) {
+    console.error('加载目录扫描字典失败:', e)
+  } finally {
+    dirscanDictLoading.value = false
+  }
+}
+
+// 显示字典编辑表单
+function showDirscanDictForm(row = null) {
+  if (row) {
+    Object.assign(dirscanDictForm, {
+      id: row.id,
+      name: row.name,
+      description: row.description || '',
+      content: row.content || '',
+      enabled: row.enabled
+    })
+  } else {
+    Object.assign(dirscanDictForm, {
+      id: '',
+      name: '',
+      description: '',
+      content: '',
+      enabled: true
+    })
+  }
+  dirscanDictDialogVisible.value = true
+}
+
+// 保存目录扫描字典
+async function handleSaveDirscanDict() {
+  try {
+    await dirscanDictFormRef.value.validate()
+  } catch (e) {
+    return
+  }
+
+  try {
+    const res = await saveDirScanDict({
+      id: dirscanDictForm.id || undefined,
+      name: dirscanDictForm.name,
+      description: dirscanDictForm.description,
+      content: dirscanDictForm.content,
+      enabled: dirscanDictForm.enabled
+    })
+    if (res.code === 0) {
+      ElMessage.success(dirscanDictForm.id ? '更新成功' : '创建成功')
+      dirscanDictDialogVisible.value = false
+      loadDirscanDicts()
+    } else {
+      ElMessage.error(res.msg || '保存失败')
+    }
+  } catch (e) {
+    console.error('保存字典失败:', e)
+    ElMessage.error('保存失败')
+  }
+}
+
+// 删除目录扫描字典
+async function handleDeleteDirscanDict(row) {
+  try {
+    await ElMessageBox.confirm(`确定要删除字典 "${row.name}" 吗？`, '确认删除', {
+      type: 'warning'
+    })
+    const res = await deleteDirScanDict({ id: row.id })
+    if (res.code === 0) {
+      ElMessage.success('删除成功')
+      loadDirscanDicts()
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('删除字典失败:', e)
+    }
+  }
+}
+
+// 清空自定义目录扫描字典
+async function handleClearDirscanDict() {
+  try {
+    await ElMessageBox.confirm('确定要清空所有自定义字典吗？内置字典不会被删除。', '确认清空', {
+      type: 'warning'
+    })
+    clearDictLoading.value = true
+    const res = await clearDirScanDict()
+    if (res.code === 0) {
+      ElMessage.success(`已清空 ${res.deleted} 个自定义字典`)
+      loadDirscanDicts()
+    } else {
+      ElMessage.error(res.msg || '清空失败')
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('清空字典失败:', e)
+    }
+  } finally {
+    clearDictLoading.value = false
+  }
+}
+
+// 计算字典路径数量
+function countDictPaths(content) {
+  if (!content) return 0
+  const lines = content.split('\n')
+  let count = 0
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith('#')) {
+      count++
+    }
+  }
+  return count
 }
 </script>
 

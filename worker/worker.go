@@ -358,6 +358,7 @@ func (w *Worker) registerScanners() {
 	w.scanners["subfinder"] = scanner.NewSubfinderScanner()
 	w.scanners["fingerprint"] = scanner.NewFingerprintScanner()
 	w.scanners["nuclei"] = scanner.NewNucleiScanner()
+	w.scanners["urlfinder"] = scanner.NewURLFinderScanner()
 }
 
 // Start 启动Worker
@@ -891,6 +892,9 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 	if config.Fingerprint != nil && config.Fingerprint.Enable {
 		enabledPhases = append(enabledPhases, "Fingerprint")
 	}
+	if config.DirScan != nil && config.DirScan.Enable {
+		enabledPhases = append(enabledPhases, "Dir Scan")
+	}
 	if config.PocScan != nil && config.PocScan.Enable {
 		enabledPhases = append(enabledPhases, "POC Scan")
 	}
@@ -1047,8 +1051,8 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		w.incrSubTaskDone(ctx, task, "子域名扫描")
 	}
 
-	// 执行端口扫描
-	if (config.PortScan == nil || config.PortScan.Enable) && !completedPhases["portscan"] {
+	// 执行端口扫描（只有明确启用时才执行）
+	if config.PortScan != nil && config.PortScan.Enable && !completedPhases["portscan"] {
 		// 检查控制信号
 		if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
 			w.taskLog(task.TaskId, LevelInfo, "Task stopped")
@@ -1328,6 +1332,60 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		// 指纹识别模块完成，递增子任务进度
 		w.incrSubTaskDone(ctx, task, "指纹识别")
 		} // 结束 len(allAssets) > 0 的 else 分支
+	}
+
+	// 检查控制信号
+	if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
+		w.taskLog(task.TaskId, LevelInfo, "Task stopped")
+		return
+	} else if ctrl == "PAUSE" {
+		w.taskLog(task.TaskId, LevelInfo, "Task paused, saving progress...")
+		w.saveTaskProgress(ctx, task, completedPhases, allAssets)
+		return
+	}
+
+	// 执行目录扫描（在指纹识别之后、POC扫描之前）
+	if config.DirScan != nil && config.DirScan.Enable && !completedPhases["dirscan"] {
+		// 如果没有资产，尝试从目标生成 HTTP 资产（用于只启用目录扫描的场景）
+		if len(allAssets) == 0 {
+			generatedAssets := w.generateHTTPAssetsFromTarget(target)
+			if len(generatedAssets) > 0 {
+				allAssets = generatedAssets
+				w.taskLog(task.TaskId, LevelInfo, "Dir scan: generated %d HTTP assets from target", len(allAssets))
+			}
+		}
+
+		// 仍然没有资产时跳过
+		if len(allAssets) == 0 {
+			w.taskLog(task.TaskId, LevelInfo, "Dir scan: skipped (no assets)")
+			completedPhases["dirscan"] = true
+			w.incrSubTaskDone(ctx, task, "目录扫描")
+		} else {
+			// 检查控制信号
+			if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
+				w.taskLog(task.TaskId, LevelInfo, "Task stopped")
+				return
+			} else if ctrl == "PAUSE" {
+				w.taskLog(task.TaskId, LevelInfo, "Task paused, saving progress...")
+				w.saveTaskProgress(ctx, task, completedPhases, allAssets)
+				return
+			}
+
+			// 更新当前阶段
+			w.updateTaskProgressWithPhase(ctx, task.TaskId, 70, "目录扫描中", "目录扫描")
+
+			// 执行目录扫描
+			dirScanAssets := w.executeDirScan(ctx, task, allAssets, config.DirScan, orgId)
+			if len(dirScanAssets) > 0 {
+				// 将目录扫描发现的资产添加到总资产列表
+				allAssets = append(allAssets, dirScanAssets...)
+				w.taskLog(task.TaskId, LevelInfo, "Dir scan completed: found %d paths", len(dirScanAssets))
+				// 保存目录扫描结果
+				w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, dirScanAssets)
+			}
+			completedPhases["dirscan"] = true
+			w.incrSubTaskDone(ctx, task, "目录扫描")
+		}
 	}
 
 	// 检查控制信号
@@ -2880,6 +2938,284 @@ func (w *Worker) executePortIdentify(ctx context.Context, task *scheduler.TaskIn
 
 	w.taskLog(task.TaskId, LevelInfo, "Port identify completed: %d assets", len(identifiedAssets))
 	return identifiedAssets
+}
+
+// executeDirScan 执行目录扫描阶段
+func (w *Worker) executeDirScan(ctx context.Context, task *scheduler.TaskInfo, assets []*scanner.Asset, config *scheduler.DirScanConfig, orgId string) []*scanner.Asset {
+	// 过滤出HTTP资产
+	var httpAssets []*scanner.Asset
+	for _, asset := range assets {
+		if asset.IsHTTP {
+			httpAssets = append(httpAssets, asset)
+		}
+	}
+
+	if len(httpAssets) == 0 {
+		w.taskLog(task.TaskId, LevelInfo, "Dir scan: skipped (no HTTP assets)")
+		return nil
+	}
+
+	w.taskLog(task.TaskId, LevelInfo, "Dir scan: %d HTTP assets, %d dicts", len(httpAssets), len(config.DictIds))
+
+	// 获取字典内容
+	if len(config.DictIds) == 0 {
+		w.taskLog(task.TaskId, LevelWarn, "Dir scan: no dicts configured")
+		return nil
+	}
+
+	dictResp, err := w.httpClient.GetDirScanDicts(ctx, config.DictIds)
+	if err != nil {
+		w.taskLog(task.TaskId, LevelError, "Dir scan: get dicts failed: %v", err)
+		return nil
+	}
+
+	if len(dictResp.Dicts) == 0 {
+		w.taskLog(task.TaskId, LevelWarn, "Dir scan: no dicts found")
+		return nil
+	}
+
+	// 合并所有字典的路径
+	var allPaths []string
+	pathSet := make(map[string]bool)
+	for _, dict := range dictResp.Dicts {
+		for _, path := range dict.Paths {
+			if !pathSet[path] {
+				pathSet[path] = true
+				allPaths = append(allPaths, path)
+			}
+		}
+		w.taskLog(task.TaskId, LevelInfo, "Dir scan: loaded dict '%s' with %d paths", dict.Name, len(dict.Paths))
+	}
+
+	if len(allPaths) == 0 {
+		w.taskLog(task.TaskId, LevelWarn, "Dir scan: no paths in dicts")
+		return nil
+	}
+
+	w.taskLog(task.TaskId, LevelInfo, "Dir scan: total %d unique paths", len(allPaths))
+
+	// 获取扫描器
+	urlfinderScanner, ok := w.scanners["urlfinder"]
+	if !ok {
+		w.taskLog(task.TaskId, LevelError, "Dir scan: urlfinder scanner not found")
+		return nil
+	}
+
+	// 构建扫描选项
+	threads := config.Threads
+	if threads <= 0 {
+		threads = 50
+	}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 10
+	}
+	statusCodes := config.StatusCodes
+	if len(statusCodes) == 0 {
+		statusCodes = []int{200, 201, 204, 301, 302, 307, 308, 401, 403, 405, 500}
+	}
+
+	opts := &scanner.URLFinderOptions{
+		Paths:          allPaths,
+		Threads:        threads,
+		Timeout:        timeout,
+		StatusCodes:    statusCodes,
+		Extensions:     config.Extensions,
+		FollowRedirect: config.FollowRedirect,
+	}
+
+	// 计算总超时时间
+	totalTimeout := timeout * len(httpAssets) * len(allPaths) / threads
+	if totalTimeout < 60 {
+		totalTimeout = 60
+	}
+	if totalTimeout > 3600 {
+		totalTimeout = 3600 // 最大1小时
+	}
+	dirCtx, dirCancel := context.WithTimeout(ctx, time.Duration(totalTimeout)*time.Second)
+	defer dirCancel()
+
+	// 创建任务日志回调
+	taskLogger := func(level, format string, args ...interface{}) {
+		w.taskLog(task.TaskId, level, format, args...)
+	}
+
+	// 创建进度回调
+	onProgress := func(progress int, message string) {
+		w.updateTaskProgress(ctx, task.TaskId, 70+progress/5, message) // 70-90%
+	}
+
+	// 执行扫描
+	result, err := urlfinderScanner.Scan(dirCtx, &scanner.ScanConfig{
+		Assets:      httpAssets,
+		Options:     opts,
+		WorkspaceId: task.WorkspaceId,
+		MainTaskId:  task.MainTaskId,
+		TaskLogger:  taskLogger,
+		OnProgress:  onProgress,
+	})
+
+	// 检查是否超时
+	if dirCtx.Err() == context.DeadlineExceeded {
+		w.taskLog(task.TaskId, LevelWarn, "Dir scan timeout after %ds, using partial results", totalTimeout)
+	}
+
+	// 检查是否被停止
+	if ctx.Err() != nil || w.checkTaskControl(ctx, task.TaskId) == "STOP" {
+		w.taskLog(task.TaskId, LevelInfo, "Task stopped")
+		return nil
+	}
+
+	if err != nil {
+		w.taskLog(task.TaskId, LevelError, "Dir scan error: %v", err)
+		return nil
+	}
+
+	if result != nil && len(result.Assets) > 0 {
+		w.taskLog(task.TaskId, LevelInfo, "Dir scan completed: found %d paths", len(result.Assets))
+
+		// 保存目录扫描结果到数据库
+		w.saveDirScanResults(ctx, task, result.Assets)
+
+		return result.Assets
+	}
+
+	return nil
+}
+
+// saveDirScanResults 保存目录扫描结果到数据库
+func (w *Worker) saveDirScanResults(ctx context.Context, task *scheduler.TaskInfo, assets []*scanner.Asset) {
+	if len(assets) == 0 {
+		w.taskLog(task.TaskId, LevelDebug, "Dir scan: no assets to save")
+		return
+	}
+
+	w.taskLog(task.TaskId, LevelInfo, "Dir scan: saving %d results to database", len(assets))
+
+	// 转换为目录扫描结果文档
+	var results []DirScanResultDocument
+	for _, asset := range assets {
+		// 构建完整URL
+		scheme := "http"
+		if asset.Port == 443 || strings.HasPrefix(asset.Service, "https") {
+			scheme = "https"
+		}
+		var fullURL string
+		if (scheme == "http" && asset.Port == 80) || (scheme == "https" && asset.Port == 443) {
+			fullURL = fmt.Sprintf("%s://%s%s", scheme, asset.Host, asset.Path)
+		} else {
+			fullURL = fmt.Sprintf("%s://%s:%d%s", scheme, asset.Host, asset.Port, asset.Path)
+		}
+
+		results = append(results, DirScanResultDocument{
+			Authority:     asset.Authority,
+			Host:          asset.Host,
+			Port:          asset.Port,
+			URL:           fullURL,
+			Path:          asset.Path,
+			StatusCode:    parseStatusCode(asset.HttpStatus),
+			ContentLength: asset.ContentLength,
+			ContentType:   asset.ContentType,
+			Title:         asset.Title,
+		})
+	}
+
+	// 调用 HTTP 接口保存结果
+	req := &DirScanResultReq{
+		WorkspaceId: task.WorkspaceId,
+		MainTaskId:  task.MainTaskId,
+		Results:     results,
+	}
+
+	w.taskLog(task.TaskId, LevelDebug, "Dir scan: calling SaveDirScanResult API with %d results", len(results))
+
+	resp, err := w.httpClient.SaveDirScanResult(ctx, req)
+	if err != nil {
+		w.taskLog(task.TaskId, LevelError, "Dir scan: save results failed: %v", err)
+		return
+	}
+
+	if resp.Success {
+		w.taskLog(task.TaskId, LevelInfo, "Dir scan: saved %d results to database", resp.Total)
+	} else {
+		w.taskLog(task.TaskId, LevelWarn, "Dir scan: save results response: %s", resp.Msg)
+	}
+}
+
+// parseStatusCode 解析状态码字符串为整数
+func parseStatusCode(status string) int {
+	if status == "" {
+		return 0
+	}
+	var code int
+	fmt.Sscanf(status, "%d", &code)
+	return code
+}
+
+// generateHTTPAssetsFromTarget 从目标生成 HTTP 资产（用于只启用目录扫描的场景）
+// 支持的目标格式：
+// - 域名: example.com (默认生成 80 和 443 端口)
+// - 带端口: example.com:8080
+// - URL: http://example.com:8080 或 https://example.com
+func (w *Worker) generateHTTPAssetsFromTarget(target string) []*scanner.Asset {
+	var assets []*scanner.Asset
+
+	targets := strings.Split(target, "\n")
+	for _, t := range targets {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+
+		// 处理 URL 格式
+		if strings.HasPrefix(t, "http://") || strings.HasPrefix(t, "https://") {
+			asset := w.parseURLToAsset(t)
+			if asset != nil {
+				asset.IsHTTP = true
+				assets = append(assets, asset)
+			}
+			continue
+		}
+
+		// 处理带端口的格式 host:port
+		if strings.Contains(t, ":") && !strings.Contains(t, "/") {
+			parts := strings.Split(t, ":")
+			if len(parts) == 2 {
+				host := parts[0]
+				port := 80
+				if p, err := strconv.Atoi(parts[1]); err == nil {
+					port = p
+				}
+				asset := &scanner.Asset{
+					Host:      host,
+					Port:      port,
+					Authority: fmt.Sprintf("%s:%d", host, port),
+					IsHTTP:    true,
+				}
+				assets = append(assets, asset)
+				continue
+			}
+		}
+
+		// 跳过 CIDR 和 IP 范围格式（目录扫描不适用）
+		if strings.Contains(t, "/") || (strings.Contains(t, "-") && !strings.Contains(t, ".")) {
+			continue
+		}
+
+		// 单个主机（域名或IP），生成 80 和 443 端口
+		for _, port := range []int{80, 443} {
+			asset := &scanner.Asset{
+				Host:      t,
+				Port:      port,
+				Authority: fmt.Sprintf("%s:%d", t, port),
+				Service:   map[int]string{80: "http", 443: "https"}[port],
+				IsHTTP:    true,
+			}
+			assets = append(assets, asset)
+		}
+	}
+
+	return assets
 }
 
 // generateAssetsFromTarget 从目标生成初始资产列表（用于端口扫描禁用时）

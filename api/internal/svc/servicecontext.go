@@ -123,6 +123,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		svcCtx.FingerprintModel,
 		svcCtx.CustomPocModel,
 		svcCtx.ActiveFingerprintModel,
+		model.NewDirScanDictModel(svcCtx.MongoDB),
 	)
 
 	return svcCtx

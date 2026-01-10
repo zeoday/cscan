@@ -26,6 +26,11 @@
       <el-tab-pane label="漏洞管理" name="vul">
         <VulView ref="vulViewRef" @data-changed="handleDataChanged" />
       </el-tab-pane>
+
+      <!-- 目录管理 Tab -->
+      <el-tab-pane label="目录管理" name="dirscan">
+        <DirScanView ref="dirscanViewRef" @data-changed="handleDataChanged" />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -40,12 +45,13 @@ const SiteView = defineAsyncComponent(() => import('@/components/asset/SiteView.
 const DomainView = defineAsyncComponent(() => import('@/components/asset/DomainView.vue'))
 const IPView = defineAsyncComponent(() => import('@/components/asset/IPView.vue'))
 const VulView = defineAsyncComponent(() => import('@/components/asset/VulView.vue'))
+const DirScanView = defineAsyncComponent(() => import('@/components/asset/DirScanView.vue'))
 
 const route = useRoute()
 const router = useRouter()
 
 // 有效的tab名称
-const validTabs = ['all', 'site', 'domain', 'ip', 'vul']
+const validTabs = ['all', 'site', 'domain', 'ip', 'vul', 'dirscan']
 
 // 从URL获取初始tab，默认为'all'
 const getInitialTab = () => {
@@ -59,6 +65,7 @@ const siteViewRef = ref(null)
 const domainViewRef = ref(null)
 const ipViewRef = ref(null)
 const vulViewRef = ref(null)
+const dirscanViewRef = ref(null)
 
 // 监听路由变化，更新activeTab
 watch(() => route.query.tab, (newTab) => {
@@ -85,6 +92,7 @@ function handleDataChanged() {
   domainViewRef.value?.refresh?.()
   ipViewRef.value?.refresh?.()
   vulViewRef.value?.refresh?.()
+  dirscanViewRef.value?.refresh?.()
 }
 
 function refreshCurrentTab() {
@@ -103,6 +111,9 @@ function refreshCurrentTab() {
       break
     case 'vul':
       vulViewRef.value?.refresh?.()
+      break
+    case 'dirscan':
+      dirscanViewRef.value?.refresh?.()
       break
   }
 }

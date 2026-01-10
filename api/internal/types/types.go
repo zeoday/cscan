@@ -1642,3 +1642,70 @@ type ActiveFingerprintValidateItem struct {
 	MatchedRule    string `json:"matchedRule"`    // 匹配的规则名称
 	MatchedDetails string `json:"matchedDetails"` // 匹配详情
 }
+
+
+// ==================== 目录扫描字典 ====================
+
+// DirScanDict 目录扫描字典
+type DirScanDict struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`        // 字典名称
+	Description string `json:"description"` // 描述
+	Content     string `json:"content"`     // 字典内容（每行一个路径）
+	PathCount   int    `json:"pathCount"`   // 路径数量
+	Enabled     bool   `json:"enabled"`     // 是否启用
+	IsBuiltin   bool   `json:"isBuiltin"`   // 是否内置字典
+	CreateTime  string `json:"createTime"`
+	UpdateTime  string `json:"updateTime"`
+}
+
+// DirScanDictListReq 目录扫描字典列表请求
+type DirScanDictListReq struct {
+	Page     int  `json:"page,default=1"`
+	PageSize int  `json:"pageSize,default=20"`
+	Enabled  *bool `json:"enabled,optional"` // 状态筛选
+}
+
+// DirScanDictListResp 目录扫描字典列表响应
+type DirScanDictListResp struct {
+	Code  int           `json:"code"`
+	Msg   string        `json:"msg"`
+	Total int           `json:"total"`
+	List  []DirScanDict `json:"list"`
+}
+
+// DirScanDictSaveReq 保存目录扫描字典请求
+type DirScanDictSaveReq struct {
+	Id          string `json:"id,optional"`
+	Name        string `json:"name"`
+	Description string `json:"description,optional"`
+	Content     string `json:"content"`
+	Enabled     bool   `json:"enabled"`
+}
+
+// DirScanDictDeleteReq 删除目录扫描字典请求
+type DirScanDictDeleteReq struct {
+	Id string `json:"id"`
+}
+
+// DirScanDictClearResp 清空目录扫描字典响应
+type DirScanDictClearResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Deleted int    `json:"deleted"` // 删除数量
+}
+
+// DirScanDictEnabledListResp 启用的目录扫描字典列表响应（用于任务创建时选择）
+type DirScanDictEnabledListResp struct {
+	Code int                    `json:"code"`
+	Msg  string                 `json:"msg"`
+	List []DirScanDictSimple    `json:"list"`
+}
+
+// DirScanDictSimple 简化的目录扫描字典信息（用于选择列表）
+type DirScanDictSimple struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	PathCount int    `json:"pathCount"`
+	IsBuiltin bool   `json:"isBuiltin"`
+}

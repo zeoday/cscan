@@ -5,6 +5,7 @@ import (
 
 	"cscan/api/internal/handler/ai"
 	"cscan/api/internal/handler/asset"
+	"cscan/api/internal/handler/dirscan"
 	"cscan/api/internal/handler/fingerprint"
 	"cscan/api/internal/handler/onlineapi"
 	"cscan/api/internal/handler/organization"
@@ -54,6 +55,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/worker/task/update", Handler: worker.WorkerTaskUpdateHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/task/result", Handler: worker.WorkerTaskResultHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/task/vul", Handler: worker.WorkerVulResultHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/worker/task/dirscan", Handler: worker.WorkerDirScanResultHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/task/subtask/done", Handler: worker.WorkerSubTaskDoneHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/task/control", Handler: worker.WorkerTaskControlHandler(svcCtx)},
 		// 心跳
@@ -67,6 +69,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/httpservice", Handler: worker.WorkerConfigHttpServiceHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/activefingerprints", Handler: worker.WorkerConfigActiveFingerprintsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/poc", Handler: worker.WorkerConfigPocHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/worker/config/dirscandict", Handler: worker.WorkerConfigDirScanDictHandler(svcCtx)},
 	}
 
 	// 为Worker路由包装认证中间件
@@ -246,6 +249,20 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/ai/generatePoc", Handler: ai.GeneratePocHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/ai/config/get", Handler: ai.AIConfigGetHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/ai/config/save", Handler: ai.AIConfigSaveHandler(svcCtx)},
+
+		// 目录扫描字典
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/list", Handler: dirscan.DirScanDictListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/save", Handler: dirscan.DirScanDictSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/delete", Handler: dirscan.DirScanDictDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/clear", Handler: dirscan.DirScanDictClearHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/enabled", Handler: dirscan.DirScanDictEnabledListHandler(svcCtx)},
+
+		// 目录扫描结果
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/list", Handler: dirscan.DirScanResultListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/stat", Handler: dirscan.DirScanResultStatHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/delete", Handler: dirscan.DirScanResultDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/batchDelete", Handler: dirscan.DirScanResultBatchDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/clear", Handler: dirscan.DirScanResultClearHandler(svcCtx)},
 	}
 
 	// 为每个路由包装认证中间件

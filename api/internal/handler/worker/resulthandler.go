@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"cscan/api/internal/svc"
+	"cscan/model"
 	"cscan/pkg/response"
 	"cscan/rpc/task/pb"
 
@@ -288,6 +289,99 @@ func WorkerVulResultHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			Msg:     rpcResp.Message,
 			Success: rpcResp.Success,
 			Total:   rpcResp.Total,
+		})
+	}
+}
+
+// ==================== Dir Scan Result Types ====================
+
+// WorkerDirScanResultDocument 目录扫描结果文档
+type WorkerDirScanResultDocument struct {
+	Authority     string `json:"authority"`
+	Host          string `json:"host"`
+	Port          int    `json:"port"`
+	URL           string `json:"url"`
+	Path          string `json:"path"`
+	StatusCode    int    `json:"statusCode"`
+	ContentLength int64  `json:"contentLength"`
+	ContentType   string `json:"contentType"`
+	Title         string `json:"title"`
+	RedirectURL   string `json:"redirectUrl"`
+}
+
+// WorkerDirScanResultReq 目录扫描结果上报请求
+type WorkerDirScanResultReq struct {
+	WorkspaceId string                        `json:"workspaceId"`
+	MainTaskId  string                        `json:"mainTaskId"`
+	Results     []WorkerDirScanResultDocument `json:"results"`
+}
+
+// WorkerDirScanResultResp 目录扫描结果上报响应
+type WorkerDirScanResultResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Success bool   `json:"success"`
+	Total   int64  `json:"total"`
+}
+
+// ==================== Dir Scan Result Handler ====================
+
+// WorkerDirScanResultHandler 目录扫描结果上报接口
+// POST /api/v1/worker/task/dirscan
+func WorkerDirScanResultHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req WorkerDirScanResultReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpx.OkJson(w, &WorkerDirScanResultResp{Code: 400, Msg: "参数解析失败"})
+			return
+		}
+
+		if req.WorkspaceId == "" || req.MainTaskId == "" {
+			httpx.OkJson(w, &WorkerDirScanResultResp{Code: 400, Msg: "workspaceId和mainTaskId不能为空"})
+			return
+		}
+
+		if len(req.Results) == 0 {
+			httpx.OkJson(w, &WorkerDirScanResultResp{Code: 0, Msg: "success", Success: true, Total: 0})
+			return
+		}
+
+		// 直接保存到 MongoDB
+		ctx := r.Context()
+		resultModel := model.NewDirScanResultModel(svcCtx.MongoDB)
+
+		var savedCount int64
+		for _, result := range req.Results {
+			doc := &model.DirScanResult{
+				WorkspaceId:   req.WorkspaceId,
+				MainTaskId:    req.MainTaskId,
+				Authority:     result.Authority,
+				Host:          result.Host,
+				Port:          result.Port,
+				URL:           result.URL,
+				Path:          result.Path,
+				StatusCode:    result.StatusCode,
+				ContentLength: result.ContentLength,
+				ContentType:   result.ContentType,
+				Title:         result.Title,
+				RedirectURL:   result.RedirectURL,
+			}
+
+			// 使用 Upsert 避免重复
+			if err := resultModel.Upsert(ctx, doc); err != nil {
+				logx.Errorf("[WorkerDirScanResult] Upsert error: %v", err)
+				continue
+			}
+			savedCount++
+		}
+
+		logx.Infof("[WorkerDirScanResult] Saved %d dir scan results for task %s", savedCount, req.MainTaskId)
+
+		httpx.OkJson(w, &WorkerDirScanResultResp{
+			Code:    0,
+			Msg:     "success",
+			Success: true,
+			Total:   savedCount,
 		})
 	}
 }

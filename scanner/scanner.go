@@ -39,7 +39,7 @@ type Asset struct {
 	Authority  string   `json:"authority"`
 	Host       string   `json:"host"`
 	Port       int      `json:"port"`
-	Category   string   `json:"category"` // ipv4/ipv6/domain
+	Category   string   `json:"category"` // ipv4/ipv6/domain/url
 	Service    string   `json:"service"`
 	Server     string   `json:"server"`
 	Banner     string   `json:"banner"`
@@ -58,7 +58,11 @@ type Asset struct {
 	IsHTTP     bool     `json:"isHttp"`   // 是否为HTTP服务
 	IPV4       []IPInfo `json:"ipv4"`
 	IPV6       []IPInfo `json:"ipv6"`
-	Source     string   `json:"source"`   // 资产来源: subfinder, portscan, etc.
+	Source     string   `json:"source"`   // 资产来源: subfinder, portscan, urlfinder, etc.
+	// 目录扫描相关字段
+	Path          string `json:"path,omitempty"`          // 发现的路径
+	ContentLength int64  `json:"contentLength,omitempty"` // 响应内容长度
+	ContentType   string `json:"contentType,omitempty"`   // 响应内容类型
 }
 
 // IPInfo IP信息

@@ -75,6 +75,9 @@ services:
       - TZ=Asia/Shanghai
     ports:
       - "3000:80"
+      - "3443:443"
+    volumes:
+      - cscan_ssl_certs:/etc/nginx/ssl
     depends_on:
       - cscan-api
     restart: unless-stopped
@@ -85,6 +88,8 @@ volumes:
   cscan_redis_data:
     driver: local
   cscan_mongodb_data:
+    driver: local
+  cscan_ssl_certs:
     driver: local
 
 networks:

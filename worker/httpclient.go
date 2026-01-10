@@ -673,6 +673,47 @@ func (c *WorkerHTTPClient) GetPocById(ctx context.Context, pocId, pocType string
 	return &resp, nil
 }
 
+// ==================== DirScan Dict ====================
+
+// DirScanDictReq 目录扫描字典获取请求
+type DirScanDictReq struct {
+	DictIds []string `json:"dictIds"`
+}
+
+// DirScanDictItem 目录扫描字典项
+type DirScanDictItem struct {
+	Id    string   `json:"id"`
+	Name  string   `json:"name"`
+	Paths []string `json:"paths"`
+}
+
+// DirScanDictResp 目录扫描字典获取响应
+type DirScanDictResp struct {
+	Code  int               `json:"code"`
+	Msg   string            `json:"msg"`
+	Dicts []DirScanDictItem `json:"dicts"`
+	Count int               `json:"count"`
+}
+
+// GetDirScanDicts 获取目录扫描字典
+func (c *WorkerHTTPClient) GetDirScanDicts(ctx context.Context, dictIds []string) (*DirScanDictResp, error) {
+	req := &DirScanDictReq{
+		DictIds: dictIds,
+	}
+
+	respBody, err := c.doRequest(ctx, http.MethodPost, "/api/v1/worker/config/dirscandict", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp DirScanDictResp
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response failed: %w", err)
+	}
+
+	return &resp, nil
+}
+
 // ==================== Active Fingerprints ====================
 
 // ActiveFingerprintsReq 主动指纹获取请求
@@ -799,6 +840,52 @@ func (c *WorkerHTTPClient) GetTaskControlSignals(ctx context.Context, taskIds []
 	}
 
 	var resp TaskControlResp
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response failed: %w", err)
+	}
+
+	return &resp, nil
+}
+
+// ==================== Dir Scan Result ====================
+
+// DirScanResultDocument 目录扫描结果文档
+type DirScanResultDocument struct {
+	Authority     string `json:"authority"`
+	Host          string `json:"host"`
+	Port          int    `json:"port"`
+	URL           string `json:"url"`
+	Path          string `json:"path"`
+	StatusCode    int    `json:"statusCode"`
+	ContentLength int64  `json:"contentLength"`
+	ContentType   string `json:"contentType"`
+	Title         string `json:"title"`
+	RedirectURL   string `json:"redirectUrl"`
+}
+
+// DirScanResultReq 目录扫描结果上报请求
+type DirScanResultReq struct {
+	WorkspaceId string                  `json:"workspaceId"`
+	MainTaskId  string                  `json:"mainTaskId"`
+	Results     []DirScanResultDocument `json:"results"`
+}
+
+// DirScanResultResp 目录扫描结果上报响应
+type DirScanResultResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Success bool   `json:"success"`
+	Total   int64  `json:"total"`
+}
+
+// SaveDirScanResult 保存目录扫描结果
+func (c *WorkerHTTPClient) SaveDirScanResult(ctx context.Context, req *DirScanResultReq) (*DirScanResultResp, error) {
+	respBody, err := c.doRequest(ctx, http.MethodPost, "/api/v1/worker/task/dirscan", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp DirScanResultResp
 	if err := json.Unmarshal(respBody, &resp); err != nil {
 		return nil, fmt.Errorf("unmarshal response failed: %w", err)
 	}

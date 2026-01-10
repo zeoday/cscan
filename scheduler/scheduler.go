@@ -221,6 +221,18 @@ type TaskConfig struct {
 	DomainScan   *DomainScanConfig   `json:"domainscan,omitempty"`
 	Fingerprint  *FingerprintConfig  `json:"fingerprint,omitempty"`
 	PocScan      *PocScanConfig      `json:"pocscan,omitempty"`
+	DirScan      *DirScanConfig      `json:"dirscan,omitempty"` // 目录扫描
+}
+
+// DirScanConfig 目录扫描配置
+type DirScanConfig struct {
+	Enable         bool     `json:"enable"`
+	DictIds        []string `json:"dictIds"`        // 字典ID列表
+	Threads        int      `json:"threads"`        // 并发线程数
+	Timeout        int      `json:"timeout"`        // 单个请求超时(秒)
+	StatusCodes    []int    `json:"statusCodes"`    // 有效状态码列表
+	Extensions     []string `json:"extensions"`     // 文件扩展名
+	FollowRedirect bool     `json:"followRedirect"` // 是否跟随重定向
 }
 
 type PortScanConfig struct {

@@ -1,7 +1,7 @@
 # CSCAN Web 前端 Dockerfile
 # 支持多架构: linux/amd64, linux/arm64
 
-FROM docker.1ms.run/node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -11,11 +11,16 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM docker.1ms.run/nginx:alpine
+FROM nginx:alpine
+
+# 安装 openssl 用于生成自签证书
+RUN apk add --no-cache openssl
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-EXPOSE 80
+EXPOSE 80 443
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

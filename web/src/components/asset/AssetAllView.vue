@@ -183,6 +183,30 @@
                   </el-tag>
                 </div>
               </el-tab-pane>
+              <el-tab-pane name="dirscan" v-if="rowDirScanMap[row.id] && rowDirScanMap[row.id].length > 0">
+                <template #label>
+                  <span>目录</span>
+                  <el-badge :value="rowDirScanMap[row.id].length" type="primary" :max="99" style="margin-left: 2px" />
+                </template>
+                <div class="tab-content tab-content-dirscan">
+                  <el-collapse v-model="row._dirScanCollapse" accordion size="small">
+                    <el-collapse-item v-for="(item, idx) in rowDirScanMap[row.id].slice(0, 10)" :key="item.id || idx" :name="idx">
+                      <template #title>
+                        <el-tag :type="getDirScanStatusType(item.statusCode)" size="small" style="margin-right: 8px">{{ item.statusCode }}</el-tag>
+                        <span class="dirscan-path">{{ item.path }}</span>
+                      </template>
+                      <div class="dirscan-detail">
+                        <div><a :href="item.url" target="_blank" class="url-link">{{ item.url }}</a></div>
+                        <div v-if="item.title" class="dirscan-title">标题: {{ item.title }}</div>
+                        <div class="dirscan-meta">大小: {{ formatDirScanSize(item.contentLength) }}</div>
+                      </div>
+                    </el-collapse-item>
+                  </el-collapse>
+                  <div v-if="rowDirScanMap[row.id].length > 10" class="dirscan-more">
+                    共 {{ rowDirScanMap[row.id].length }} 条，<el-button type="primary" link size="small" @click="showDirScanDetail(row)">查看全部</el-button>
+                  </div>
+                </div>
+              </el-tab-pane>
             </el-tabs>
             <span v-else class="no-data">-</span>
           </template>
@@ -393,6 +417,35 @@
       </template>
     </el-dialog>
 
+    <!-- 目录扫描详情对话框 -->
+    <el-dialog v-model="dirScanDetailVisible" title="目录扫描结果" width="900px">
+      <div v-if="dirScanDetailRow" style="margin-bottom: 15px">
+        <el-tag type="info">{{ dirScanDetailRow.authority }}</el-tag>
+        <span style="margin-left: 10px; color: var(--el-text-color-secondary)">共 {{ dirScanDetailData.length }} 条记录</span>
+      </div>
+      <el-table :data="dirScanDetailData" stripe size="small" max-height="500">
+        <el-table-column prop="url" label="URL" min-width="300" show-overflow-tooltip>
+          <template #default="{ row }">
+            <a :href="row.url" target="_blank" rel="noopener" class="url-link">{{ row.url }}</a>
+          </template>
+        </el-table-column>
+        <el-table-column prop="path" label="路径" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="statusCode" label="状态码" width="90">
+          <template #default="{ row }">
+            <el-tag :type="getDirScanStatusType(row.statusCode)" size="small">{{ row.statusCode }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="contentLength" label="大小" width="90">
+          <template #default="{ row }">{{ formatDirScanSize(row.contentLength) }}</template>
+        </el-table-column>
+        <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="发现时间" width="150" />
+      </el-table>
+      <template #footer>
+        <el-button @click="dirScanDetailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 导入资产对话框 -->
     <el-dialog v-model="importDialogVisible" title="导入资产" width="600px">
       <el-form label-width="80px">
@@ -456,6 +509,12 @@ const historyDetailVisible = ref(false)
 const currentHistoryDetail = ref(null)
 const historyDetailTab = ref('header')
 
+// 目录扫描相关
+const rowDirScanMap = ref({}) // 存储每行资产的目录扫描数据
+const dirScanDetailVisible = ref(false)
+const dirScanDetailData = ref([])
+const dirScanDetailRow = ref(null)
+
 // 导入相关
 const importDialogVisible = ref(false)
 const importTargets = ref('')
@@ -487,6 +546,7 @@ watch(tableData, (newData) => {
       }
     })
     loadAllRowVuls(newData)
+    loadAllRowDirScans(newData)
   }
 }, { immediate: true })
 
@@ -496,7 +556,8 @@ function hasAnyTabContent(row) {
          row.httpHeader || 
          row.httpBody || 
          row.iconHash || 
-         (rowVulMap.value[row.id] && rowVulMap.value[row.id].length > 0)
+         (rowVulMap.value[row.id] && rowVulMap.value[row.id].length > 0) ||
+         (rowDirScanMap.value[row.id] && rowDirScanMap.value[row.id].length > 0)
 }
 
 // 获取默认显示的Tab
@@ -561,6 +622,41 @@ async function loadFingerprints() {
     const res = await request.post('/fingerprint/list', { page: 1, pageSize: 500, enabled: true })
     if (res.code === 0) fingerprintList.value = res.list || []
   } catch (e) { console.error(e) }
+}
+
+// 批量加载所有行的目录扫描数据
+async function loadAllRowDirScans(rows) {
+  rowDirScanMap.value = {}
+  for (const row of rows) {
+    try {
+      const res = await request.post('/dirscan/result/list', { authority: row.authority, page: 1, pageSize: 50 })
+      if (res.code === 0 && res.list && res.list.length > 0) {
+        rowDirScanMap.value[row.id] = res.list
+      }
+    } catch (e) { /* ignore */ }
+  }
+}
+
+// 显示目录扫描详情对话框
+function showDirScanDetail(row) {
+  dirScanDetailRow.value = row
+  dirScanDetailData.value = rowDirScanMap.value[row.id] || []
+  dirScanDetailVisible.value = true
+}
+
+function getDirScanStatusType(code) {
+  if (code >= 200 && code < 300) return 'success'
+  if (code >= 300 && code < 400) return 'warning'
+  if (code >= 400 && code < 500) return 'danger'
+  if (code >= 500) return 'danger'
+  return 'info'
+}
+
+function formatDirScanSize(bytes) {
+  if (!bytes || bytes < 0) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
 }
 
 function quickFilter(field, value) {
@@ -999,6 +1095,11 @@ defineExpose({ refresh })
       max-height: 80px;
       overflow: hidden;
       font-size: 12px;
+      &.tab-content-dirscan {
+        max-height: 250px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
     }
     .tab-content-app {
       // 指纹Tab：最大高度约三行标签（每行约26px）
@@ -1023,6 +1124,12 @@ defineExpose({ refresh })
       // Vuln Tab：增加高度以显示更多漏洞
       max-height: 150px;
       overflow: auto;
+    }
+    .tab-content-dirscan {
+      // 目录扫描Tab：增加高度以显示更多内容
+      max-height: 250px;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     .tab-content-iconhash {
       .iconhash-display {
@@ -1089,6 +1196,55 @@ defineExpose({ refresh })
   .import-tips {
     color: var(--el-text-color-secondary);
     font-size: 13px;
+  }
+  
+  // 目录扫描 Tab 样式
+  .tab-content-dirscan {
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    .dirscan-path {
+      font-size: 12px;
+      color: var(--el-text-color-regular);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 250px;
+    }
+    .dirscan-detail {
+      font-size: 12px;
+      padding: 5px 0;
+      .dirscan-title, .dirscan-meta {
+        color: var(--el-text-color-secondary);
+        margin-top: 4px;
+      }
+    }
+    .dirscan-more {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+    :deep(.el-collapse) {
+      border: none;
+    }
+    :deep(.el-collapse-item__header) {
+      height: 32px;
+      line-height: 32px;
+      font-size: 12px;
+      background: transparent;
+    }
+    :deep(.el-collapse-item__wrap) {
+      background: transparent;
+    }
+    :deep(.el-collapse-item__content) {
+      padding-bottom: 8px;
+    }
+  }
+  
+  .url-link {
+    color: var(--el-color-primary);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
   }
 }
 </style>

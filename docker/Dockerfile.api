@@ -1,4 +1,4 @@
-FROM docker.1ms.run/golang:1.24-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /cscan-api ./api/cscan.go
 
 # 运行镜像
-FROM docker.1ms.run/alpine:3.19
+FROM alpine:3.19
 
 WORKDIR /app
 

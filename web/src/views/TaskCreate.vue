@@ -207,6 +207,57 @@
             </template>
           </el-collapse-item>
 
+          <!-- 目录扫描 -->
+          <el-collapse-item name="dirscan">
+            <template #title>
+              <span class="collapse-title">目录扫描 <el-tag v-if="form.dirscanEnable" type="success" size="small">开</el-tag></span>
+            </template>
+            <el-form-item label="启用">
+              <el-switch v-model="form.dirscanEnable" />
+              <span class="form-hint">基于字典的目录/路径发现</span>
+            </el-form-item>
+            <template v-if="form.dirscanEnable">
+              <el-form-item label="扫描字典">
+                <div class="selected-dict-summary">
+                  <el-tag type="primary" size="small" v-if="form.dirscanDictIds.length">
+                    已选择: {{ form.dirscanDictIds.length }} 个字典
+                  </el-tag>
+                  <span v-if="!form.dirscanDictIds.length" style="color: #909399">
+                    未选择任何字典
+                  </span>
+                  <el-button type="primary" link @click="showDictSelectDialog">选择字典</el-button>
+                </div>
+              </el-form-item>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="并发线程">
+                    <el-input-number v-model="form.dirscanThreads" :min="1" :max="200" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="请求超时(秒)">
+                    <el-input-number v-model="form.dirscanTimeout" :min="1" :max="60" style="width:100%" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-form-item label="有效状态码">
+                <el-checkbox-group v-model="form.dirscanStatusCodes">
+                  <el-checkbox :label="200">200</el-checkbox>
+                  <el-checkbox :label="201">201</el-checkbox>
+                  <el-checkbox :label="204">204</el-checkbox>
+                  <el-checkbox :label="301">301</el-checkbox>
+                  <el-checkbox :label="302">302</el-checkbox>
+                  <el-checkbox :label="401">401</el-checkbox>
+                  <el-checkbox :label="403">403</el-checkbox>
+                  <el-checkbox :label="500">500</el-checkbox>
+                </el-checkbox-group>
+              </el-form-item>
+              <el-form-item label="跟随重定向">
+                <el-switch v-model="form.dirscanFollowRedirect" />
+              </el-form-item>
+            </template>
+          </el-collapse-item>
+
           <!-- 漏洞扫描 -->
           <el-collapse-item name="pocscan">
             <template #title>
@@ -290,6 +341,31 @@
         </div>
       </el-form>
     </el-card>
+
+    <!-- 目录扫描字典选择对话框 -->
+    <el-dialog v-model="dictSelectDialogVisible" title="选择目录扫描字典" width="800px" @open="handleDictDialogOpen">
+      <el-table 
+        ref="dictTableRef"
+        :data="dictList" 
+        v-loading="dictLoading" 
+        max-height="400"
+        @selection-change="handleDictSelectionChange"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="45" :reserve-selection="true" />
+        <el-table-column prop="name" label="字典名称" min-width="150" />
+        <el-table-column prop="pathCount" label="路径数量" width="100" />
+        <el-table-column prop="isBuiltin" label="类型" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? '内置' : '自定义' }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="dictSelectDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmDictSelection">确定</el-button>
+      </template>
+    </el-dialog>
 
     <!-- POC选择对话框 -->
     <el-dialog v-model="pocSelectDialogVisible" title="选择POC" width="1200px" @open="handlePocDialogOpen">
@@ -513,6 +589,7 @@ import { ElMessage } from 'element-plus'
 import { Close, Search } from '@element-plus/icons-vue'
 import { createTask, updateTask, getTaskDetail, startTask, getWorkerList, getScanConfig, saveScanConfig } from '@/api/task'
 import { getNucleiTemplateList, getCustomPocList, getNucleiTemplateDetail } from '@/api/poc'
+import { getDirScanDictEnabledList } from '@/api/dirscan'
 import { useWorkspaceStore } from '@/stores/workspace'
 import request from '@/api/request'
 
@@ -531,6 +608,13 @@ const isEdit = ref(false)
 const pocSelectDialogVisible = ref(false)
 const pocSelectTab = ref('nuclei')
 const nucleiTemplateList = ref([])
+
+// 目录扫描字典选择相关
+const dictSelectDialogVisible = ref(false)
+const dictList = ref([])
+const dictLoading = ref(false)
+const dictTableRef = ref()
+const selectedDictIds = ref([])
 const customPocList = ref([])
 const nucleiTemplateLoading = ref(false)
 const customPocLoading = ref(false)
@@ -638,7 +722,15 @@ const form = reactive({
   pocscanCustomPocIds: [],
   // 保存已选择的对象信息（用于显示名称）
   pocscanNucleiTemplates: [],
-  pocscanCustomPocs: []
+  pocscanCustomPocs: [],
+  // 目录扫描
+  dirscanEnable: false,
+  dirscanDictIds: [],
+  dirscanDicts: [], // 保存已选择的字典信息
+  dirscanThreads: 50,
+  dirscanTimeout: 10,
+  dirscanStatusCodes: [200, 301, 302, 401, 403],
+  dirscanFollowRedirect: false
 })
 
 const rules = {
@@ -764,7 +856,14 @@ function applyConfig(config) {
     pocscanSeverity: config.pocscan?.severity ? config.pocscan.severity.split(',') : ['critical', 'high', 'medium'],
     pocscanTargetTimeout: config.pocscan?.targetTimeout || 600,
     pocscanNucleiTemplateIds: config.pocscan?.nucleiTemplateIds || [],
-    pocscanCustomPocIds: config.pocscan?.customPocIds || []
+    pocscanCustomPocIds: config.pocscan?.customPocIds || [],
+    // 目录扫描
+    dirscanEnable: config.dirscan?.enable ?? false,
+    dirscanDictIds: config.dirscan?.dictIds || [],
+    dirscanThreads: config.dirscan?.threads || 50,
+    dirscanTimeout: config.dirscan?.timeout || 10,
+    dirscanStatusCodes: config.dirscan?.statusCodes || [200, 301, 302, 401, 403],
+    dirscanFollowRedirect: config.dirscan?.followRedirect ?? false
   })
 }
 
@@ -819,7 +918,14 @@ watch(
     pocscanSeverity: form.pocscanSeverity,
     pocscanTargetTimeout: form.pocscanTargetTimeout,
     pocscanNucleiTemplateIds: form.pocscanNucleiTemplateIds,
-    pocscanCustomPocIds: form.pocscanCustomPocIds
+    pocscanCustomPocIds: form.pocscanCustomPocIds,
+    // 目录扫描
+    dirscanEnable: form.dirscanEnable,
+    dirscanDictIds: form.dirscanDictIds,
+    dirscanThreads: form.dirscanThreads,
+    dirscanTimeout: form.dirscanTimeout,
+    dirscanStatusCodes: form.dirscanStatusCodes,
+    dirscanFollowRedirect: form.dirscanFollowRedirect
   }),
   () => {
     if (!isEdit.value) {
@@ -872,6 +978,14 @@ function buildConfig() {
       useNuclei: true,
       severity: form.pocscanSeverity.join(','),
       targetTimeout: form.pocscanTargetTimeout
+    },
+    dirscan: {
+      enable: form.dirscanEnable,
+      dictIds: form.dirscanDictIds,
+      threads: form.dirscanThreads,
+      timeout: form.dirscanTimeout,
+      statusCodes: form.dirscanStatusCodes,
+      followRedirect: form.dirscanFollowRedirect
     }
   }
 
@@ -1383,6 +1497,60 @@ function copyPocContent() {
       ElMessage.error('复制失败')
     })
   }
+}
+
+// ==================== 目录扫描字典选择相关方法 ====================
+
+// 显示字典选择对话框
+function showDictSelectDialog() {
+  selectedDictIds.value = [...form.dirscanDictIds]
+  dictSelectDialogVisible.value = true
+}
+
+// 字典对话框打开时加载数据
+async function handleDictDialogOpen() {
+  await loadDictList()
+  // 恢复选中状态
+  await nextTick()
+  restoreDictTableSelection()
+}
+
+// 加载字典列表
+async function loadDictList() {
+  dictLoading.value = true
+  try {
+    const res = await getDirScanDictEnabledList()
+    if (res.code === 0) {
+      dictList.value = res.list || []
+    }
+  } catch (e) {
+    console.error('加载字典列表失败:', e)
+  } finally {
+    dictLoading.value = false
+  }
+}
+
+// 恢复字典表格选中状态
+function restoreDictTableSelection() {
+  if (!dictTableRef.value) return
+  const selectedIds = new Set(selectedDictIds.value)
+  dictList.value.forEach(row => {
+    if (selectedIds.has(row.id)) {
+      dictTableRef.value.toggleRowSelection(row, true)
+    }
+  })
+}
+
+// 字典选择变化
+function handleDictSelectionChange(selection) {
+  selectedDictIds.value = selection.map(d => d.id)
+}
+
+// 确认字典选择
+function confirmDictSelection() {
+  form.dirscanDictIds = [...selectedDictIds.value]
+  form.dirscanDicts = dictList.value.filter(d => selectedDictIds.value.includes(d.id))
+  dictSelectDialogVisible.value = false
 }
 </script>
 

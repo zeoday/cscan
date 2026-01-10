@@ -351,13 +351,15 @@ type SyncMethods struct {
 	nucleiSync      *NucleiSyncService
 	fingerprintSync *FingerprintSyncService
 	customImport    *CustomImportService
+	dirscanDictModel *model.DirScanDictModel
 }
 
-func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel) *SyncMethods {
+func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel, dirscanDictModel *model.DirScanDictModel) *SyncMethods {
 	return &SyncMethods{
-		nucleiSync:      NewNucleiSyncService(nucleiModel),
-		fingerprintSync: NewFingerprintSyncService(fpModel),
-		customImport:    NewCustomImportService(fpModel, pocModel, afpModel),
+		nucleiSync:       NewNucleiSyncService(nucleiModel),
+		fingerprintSync:  NewFingerprintSyncService(fpModel),
+		customImport:     NewCustomImportService(fpModel, pocModel, afpModel),
+		dirscanDictModel: dirscanDictModel,
 	}
 }
 
@@ -371,6 +373,8 @@ func (s *SyncMethods) SyncWappalyzerFingerprints() {
 
 func (s *SyncMethods) ImportCustomPocAndFingerprints() {
 	s.customImport.ImportAll(context.Background())
+	// 初始化内置目录扫描字典
+	s.initBuiltinDirScanDicts(context.Background())
 }
 
 func (s *SyncMethods) RefreshTemplateCache() {
@@ -383,4 +387,93 @@ func (s *SyncMethods) GetCategories() []string {
 
 func (s *SyncMethods) GetStats() map[string]int {
 	return s.nucleiSync.GetStats()
+}
+
+// initBuiltinDirScanDicts 初始化内置目录扫描字典
+func (s *SyncMethods) initBuiltinDirScanDicts(ctx context.Context) {
+	if s.dirscanDictModel == nil {
+		return
+	}
+
+	// 检查是否已有内置字典，避免重复导入
+	builtinDicts, _ := s.dirscanDictModel.FindBuiltin(ctx)
+	if len(builtinDicts) > 0 {
+		logx.Info("[SyncMethods] Builtin dirscan dicts already exist, skipping")
+		return
+	}
+
+	// 确定字典目录路径
+	dictDir := "/app/poc/custom-url"
+	if _, err := os.Stat(dictDir); os.IsNotExist(err) {
+		dictDir = "poc/custom-url"
+	}
+	if _, err := os.Stat(dictDir); os.IsNotExist(err) {
+		logx.Info("[SyncMethods] custom-url directory not found, skipping builtin dicts")
+		return
+	}
+
+	logx.Infof("[SyncMethods] Initializing builtin dirscan dicts from: %s", dictDir)
+
+	totalImported := 0
+	totalSkipped := 0
+
+	err := filepath.Walk(dictDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+
+		// 读取文件内容
+		data, err := os.ReadFile(path)
+		if err != nil {
+			logx.Errorf("[SyncMethods] Failed to read dict file %s: %v", path, err)
+			totalSkipped++
+			return nil
+		}
+
+		content := string(data)
+		if strings.TrimSpace(content) == "" {
+			totalSkipped++
+			return nil
+		}
+
+		// 使用文件名（不含扩展名）作为字典名称
+		fileName := filepath.Base(path)
+		dictName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+
+		dict := &model.DirScanDict{
+			Name:        dictName,
+			Description: "系统内置字典",
+			Content:     content,
+			PathCount:   countLines(content),
+			Enabled:     true,
+			IsBuiltin:   true,
+		}
+
+		if err := s.dirscanDictModel.Insert(ctx, dict); err != nil {
+			logx.Errorf("[SyncMethods] Failed to insert builtin dict %s: %v", dictName, err)
+			totalSkipped++
+		} else {
+			totalImported++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		logx.Errorf("[SyncMethods] Walk dict directory error: %v", err)
+	}
+
+	logx.Infof("[SyncMethods] Builtin dirscan dicts initialized: %d imported, %d skipped", totalImported, totalSkipped)
+}
+
+// countLines 计算非空非注释行数
+func countLines(content string) int {
+	count := 0
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			count++
+		}
+	}
+	return count
 }

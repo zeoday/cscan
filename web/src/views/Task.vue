@@ -139,6 +139,11 @@
               {{ parsedConfig.pocscan?.enable ? '开启' : '关闭' }}
             </el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="目录扫描">
+            <el-tag :type="parsedConfig.dirscan?.enable ? 'success' : 'info'" size="small">
+              {{ parsedConfig.dirscan?.enable ? '开启' : '关闭' }}
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="任务拆分">
             {{ parsedConfig.batchSize === 0 ? '不拆分' : ((parsedConfig.batchSize || 50) + ' 个/批') }}
           </el-descriptions-item>
@@ -207,6 +212,17 @@
             </el-descriptions-item>
             <el-descriptions-item v-if="parsedConfig.pocscan?.customPocIds?.length" label="指定自定义POC" :span="3">
               {{ parsedConfig.pocscan.customPocIds.length }} 个
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+        
+        <!-- 目录扫描配置 -->
+        <div v-if="parsedConfig.dirscan?.enable" class="config-detail">
+          <el-descriptions :column="3" border size="small" title="目录扫描配置">
+            <el-descriptions-item label="并发数">{{ parsedConfig.dirscan?.concurrency || 10 }}</el-descriptions-item>
+            <el-descriptions-item label="超时时间">{{ parsedConfig.dirscan?.timeout || 10 }}秒</el-descriptions-item>
+            <el-descriptions-item label="使用字典">
+              {{ parsedConfig.dirscan?.dictIds?.length ? (parsedConfig.dirscan.dictIds.length + ' 个') : '默认字典' }}
             </el-descriptions-item>
           </el-descriptions>
         </div>
