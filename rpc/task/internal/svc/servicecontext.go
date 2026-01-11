@@ -24,6 +24,7 @@ type ServiceContext struct {
 	HttpServiceMappingModel *model.HttpServiceMappingModel
 	WorkspaceModel          *model.WorkspaceModel
 	SubfinderProviderModel  *model.SubfinderProviderModel
+	NotifyConfigModel       *model.NotifyConfigModel
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -69,6 +70,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		HttpServiceMappingModel: model.NewHttpServiceMappingModel(mongoDB),
 		WorkspaceModel:          model.NewWorkspaceModel(mongoDB),
 		SubfinderProviderModel:  model.NewSubfinderProviderModel(mongoDB),
+		NotifyConfigModel:       model.NewNotifyConfigModel(mongoDB),
 	}
 }
 

@@ -2110,3 +2110,153 @@ func (l *HttpServiceMappingDeleteLogic) HttpServiceMappingDelete(req *types.Http
 	
 	return &types.BaseResp{Code: 0, Msg: "删除成功"}, nil
 }
+
+// ==================== HTTP服务设置 ====================
+
+// HttpServiceConfigGetLogic 获取HTTP服务配置
+type HttpServiceConfigGetLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewHttpServiceConfigGetLogic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceConfigGetLogic {
+	return &HttpServiceConfigGetLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *HttpServiceConfigGetLogic) HttpServiceConfigGet() (*types.HttpServiceConfigGetResp, error) {
+	config, err := l.svcCtx.HttpServiceModel.GetConfig(l.ctx)
+	if err != nil {
+		return &types.HttpServiceConfigGetResp{Code: 500, Msg: "获取配置失败: " + err.Error()}, nil
+	}
+
+	return &types.HttpServiceConfigGetResp{
+		Code: 0,
+		Msg:  "success",
+		Data: types.HttpServiceConfig{
+			HttpPorts:   config.HttpPorts,
+			HttpsPorts:  config.HttpsPorts,
+			Description: config.Description,
+		},
+	}, nil
+}
+
+// HttpServiceConfigSaveLogic 保存HTTP服务配置
+type HttpServiceConfigSaveLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewHttpServiceConfigSaveLogic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceConfigSaveLogic {
+	return &HttpServiceConfigSaveLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *HttpServiceConfigSaveLogic) HttpServiceConfigSave(req *types.HttpServiceConfigSaveReq) (*types.BaseResp, error) {
+	config := &model.HttpServiceConfig{
+		HttpPorts:   req.HttpPorts,
+		HttpsPorts:  req.HttpsPorts,
+		Description: req.Description,
+	}
+
+	err := l.svcCtx.HttpServiceModel.SaveConfig(l.ctx, config)
+	if err != nil {
+		return &types.BaseResp{Code: 500, Msg: "保存配置失败: " + err.Error()}, nil
+	}
+
+	return &types.BaseResp{Code: 0, Msg: "保存成功"}, nil
+}
+
+// HttpServiceMappingListV2Logic 获取HTTP服务映射列表（使用新模型）
+type HttpServiceMappingListV2Logic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewHttpServiceMappingListV2Logic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceMappingListV2Logic {
+	return &HttpServiceMappingListV2Logic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *HttpServiceMappingListV2Logic) HttpServiceMappingListV2(req *types.HttpServiceMappingListReq) (*types.HttpServiceMappingListResp, error) {
+	docs, err := l.svcCtx.HttpServiceModel.GetMappings(l.ctx)
+	if err != nil {
+		return &types.HttpServiceMappingListResp{Code: 500, Msg: "查询失败"}, nil
+	}
+
+	list := make([]types.HttpServiceMapping, 0, len(docs))
+	for _, doc := range docs {
+		// 筛选
+		if req.IsHttp != nil && doc.IsHttp != *req.IsHttp {
+			continue
+		}
+		if req.Keyword != "" && !strings.Contains(strings.ToLower(doc.ServiceName), strings.ToLower(req.Keyword)) {
+			continue
+		}
+
+		list = append(list, types.HttpServiceMapping{
+			Id:          doc.Id.Hex(),
+			ServiceName: doc.ServiceName,
+			IsHttp:      doc.IsHttp,
+			Description: doc.Description,
+			Enabled:     doc.Enabled,
+			CreateTime:  doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	return &types.HttpServiceMappingListResp{
+		Code: 0,
+		Msg:  "success",
+		List: list,
+	}, nil
+}
+
+// HttpServiceMappingSaveV2Logic 保存HTTP服务映射（使用新模型）
+type HttpServiceMappingSaveV2Logic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewHttpServiceMappingSaveV2Logic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceMappingSaveV2Logic {
+	return &HttpServiceMappingSaveV2Logic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *HttpServiceMappingSaveV2Logic) HttpServiceMappingSaveV2(req *types.HttpServiceMappingSaveReq) (*types.BaseResp, error) {
+	doc := &model.HttpServiceMapping{
+		ServiceName: strings.ToLower(strings.TrimSpace(req.ServiceName)),
+		IsHttp:      req.IsHttp,
+		Description: req.Description,
+		Enabled:     req.Enabled,
+	}
+
+	if req.Id != "" {
+		oid, err := primitive.ObjectIDFromHex(req.Id)
+		if err != nil {
+			return &types.BaseResp{Code: 400, Msg: "无效的ID"}, nil
+		}
+		doc.Id = oid
+	}
+
+	err := l.svcCtx.HttpServiceModel.SaveMapping(l.ctx, doc)
+	if err != nil {
+		return &types.BaseResp{Code: 500, Msg: "保存失败: " + err.Error()}, nil
+	}
+
+	return &types.BaseResp{Code: 0, Msg: "保存成功"}, nil
+}
+
+// HttpServiceMappingDeleteV2Logic 删除HTTP服务映射（使用新模型）
+type HttpServiceMappingDeleteV2Logic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewHttpServiceMappingDeleteV2Logic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceMappingDeleteV2Logic {
+	return &HttpServiceMappingDeleteV2Logic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *HttpServiceMappingDeleteV2Logic) HttpServiceMappingDeleteV2(req *types.HttpServiceMappingDeleteReq) (*types.BaseResp, error) {
+	err := l.svcCtx.HttpServiceModel.DeleteMapping(l.ctx, req.Id)
+	if err != nil {
+		return &types.BaseResp{Code: 500, Msg: "删除失败"}, nil
+	}
+
+	return &types.BaseResp{Code: 0, Msg: "删除成功"}, nil
+}

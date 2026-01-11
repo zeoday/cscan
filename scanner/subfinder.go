@@ -3,6 +3,7 @@ package scanner
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"cscan/pkg/utils"
 
+	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/subfinder/v2/pkg/runner"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -42,6 +44,27 @@ type SubfinderOptions struct {
 	ProviderConfig     map[string][]string `json:"providerConfig"`     // API配置 (从数据库加载)
 	ResolveDNS         bool                `json:"resolveDNS"`         // 是否解析DNS
 	Concurrent         int                 `json:"concurrent"`         // DNS解析并发数
+}
+
+// Validate 验证 SubfinderOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *SubfinderOptions) Validate() error {
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.MaxEnumerationTime < 0 {
+		return fmt.Errorf("maxEnumerationTime must be non-negative, got %d", o.MaxEnumerationTime)
+	}
+	if o.Threads < 0 {
+		return fmt.Errorf("threads must be non-negative, got %d", o.Threads)
+	}
+	if o.RateLimit < 0 {
+		return fmt.Errorf("rateLimit must be non-negative, got %d", o.RateLimit)
+	}
+	if o.Concurrent < 0 {
+		return fmt.Errorf("concurrent must be non-negative, got %d", o.Concurrent)
+	}
+	return nil
 }
 
 // Scan 执行Subfinder子域名扫描
@@ -279,8 +302,96 @@ func (s *SubfinderScanner) enumerateDomain(ctx context.Context, domain string, o
 	return subdomains, nil
 }
 
-// resolveDomains DNS解析子域名
+// resolveDomains 使用dnsx进行DNS解析子域名
 func (s *SubfinderScanner) resolveDomains(ctx context.Context, domains []string, concurrent int, taskLog func(level, format string, args ...interface{})) []*Asset {
+	var assets []*Asset
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	if concurrent <= 0 {
+		concurrent = 50
+	}
+
+	// 创建dnsx客户端
+	dnsxOpts := dnsx.DefaultOptions
+	dnsxOpts.MaxRetries = 3
+	dnsClient, err := dnsx.New(dnsxOpts)
+	if err != nil {
+		logx.Errorf("Failed to create dnsx client for resolution: %v", err)
+		// 降级使用标准库
+		return s.resolveDomainsFallback(ctx, domains, concurrent, taskLog)
+	}
+
+	taskChan := make(chan string, concurrent)
+
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for domain := range taskChan {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// 使用dnsx进行DNS解析
+					result, err := dnsClient.Lookup(domain)
+					if err != nil || len(result) == 0 {
+						continue
+					}
+
+					asset := &Asset{
+						Authority: domain,
+						Host:      domain,
+						Category:  "domain",
+					}
+
+					for _, ip := range result {
+						parsedIP := net.ParseIP(ip)
+						if parsedIP == nil {
+							continue
+						}
+						if ip4 := parsedIP.To4(); ip4 != nil {
+							asset.IPV4 = append(asset.IPV4, IPInfo{IP: ip4.String()})
+						} else {
+							asset.IPV6 = append(asset.IPV6, IPInfo{IP: parsedIP.String()})
+						}
+					}
+
+					cname, err := net.LookupCNAME(domain)
+					if err == nil && cname != domain+"." {
+						asset.CName = strings.TrimSuffix(cname, ".")
+					}
+
+					mu.Lock()
+					assets = append(assets, asset)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	resolved := 0
+	for _, domain := range domains {
+		select {
+		case <-ctx.Done():
+			close(taskChan)
+			wg.Wait()
+			return assets
+		case taskChan <- domain:
+			resolved++
+			if resolved%100 == 0 && taskLog != nil {
+				taskLog("INFO", "DNS resolved: %d/%d", resolved, len(domains))
+			}
+		}
+	}
+
+	close(taskChan)
+	wg.Wait()
+	return assets
+}
+
+// resolveDomainsFallback 使用标准库进行DNS解析（降级方案）
+func (s *SubfinderScanner) resolveDomainsFallback(ctx context.Context, domains []string, concurrent int, taskLog func(level, format string, args ...interface{})) []*Asset {
 	var assets []*Asset
 	var mu sync.Mutex
 	var wg sync.WaitGroup

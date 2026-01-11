@@ -13,22 +13,42 @@ import (
 	"time"
 )
 
+// FofaVersion Fofa API版本
+type FofaVersion string
+
+const (
+	FofaVersionDefault FofaVersion = "v1" // fofa.info (默认版本)
+	FofaVersionV5      FofaVersion = "v5" // v5.fofa.info
+)
+
 // FofaClient Fofa API客户端
 type FofaClient struct {
-	email  string
-	key    string
-	client *http.Client
+	key     string
+	version FofaVersion
+	client  *http.Client
 }
 
-// NewFofaClient 创建Fofa客户端
-func NewFofaClient(email, key string) *FofaClient {
+// NewFofaClient 创建Fofa客户端（默认fofa.info版本）
+func NewFofaClient(key, version string) *FofaClient {
+	v := FofaVersionDefault
+	if version == "v5" {
+		v = FofaVersionV5
+	}
 	return &FofaClient{
-		email: email,
-		key:   key,
+		key:     key,
+		version: v,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// getBaseURL 根据版本返回API基础URL
+func (c *FofaClient) getBaseURL() string {
+	if c.version == FofaVersionV5 {
+		return "https://v5.fofa.info"
+	}
+	return "https://fofa.info"
 }
 
 // FofaResult Fofa查询结果
@@ -63,17 +83,17 @@ type FofaAsset struct {
 
 // Search 搜索
 func (c *FofaClient) Search(ctx context.Context, query string, page, size int) (*FofaResult, error) {
-	if c.email == "" || c.key == "" {
-		return nil, fmt.Errorf("fofa email or key is empty")
+	if c.key == "" {
+		return nil, fmt.Errorf("fofa key is empty")
 	}
 
 	// Base64编码查询语句
 	queryBase64 := base64.StdEncoding.EncodeToString([]byte(query))
 
-	// 构建URL
+	// 构建URL（新版API只需要key，不需要email）
 	apiURL := fmt.Sprintf(
-		"https://fofa.info/api/v1/search/all?email=%s&key=%s&qbase64=%s&page=%d&size=%d&fields=host,ip,port,protocol,domain,title,server,country,city,as_number,banner,cert,icp,product,os",
-		url.QueryEscape(c.email),
+		"%s/api/v1/search/all?key=%s&qbase64=%s&page=%d&size=%d&fields=host,ip,port,protocol,domain,title,server,country,city,as_number,banner,cert,icp,product,os",
+		c.getBaseURL(),
 		url.QueryEscape(c.key),
 		url.QueryEscape(queryBase64),
 		page,

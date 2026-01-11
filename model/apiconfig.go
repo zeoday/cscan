@@ -15,6 +15,7 @@ type APIConfig struct {
 	Platform   string             `bson:"platform" json:"platform"` // fofa/hunter/quake
 	Key        string             `bson:"key" json:"key"`
 	Secret     string             `bson:"secret" json:"secret"`
+	Version    string             `bson:"version" json:"version"` // fofa版本: v4/v5
 	Status     string             `bson:"status" json:"status"`
 	CreateTime time.Time          `bson:"create_time" json:"createTime"`
 	UpdateTime time.Time          `bson:"update_time" json:"updateTime"`

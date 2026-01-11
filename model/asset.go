@@ -253,6 +253,11 @@ func (m *AssetModel) Count(ctx context.Context, filter bson.M) (int64, error) {
 	return m.coll.CountDocuments(ctx, filter)
 }
 
+// CountByTaskId 根据任务ID统计资产数量
+func (m *AssetModel) CountByTaskId(ctx context.Context, taskId string) (int64, error) {
+	return m.coll.CountDocuments(ctx, bson.M{"taskId": taskId})
+}
+
 func (m *AssetModel) Update(ctx context.Context, id string, update bson.M) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

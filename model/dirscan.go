@@ -176,3 +176,25 @@ func (m *DirScanDictModel) FindBuiltin(ctx context.Context) ([]DirScanDict, erro
 	}
 	return docs, nil
 }
+
+// UpsertByName 根据名称更新或插入字典
+func (m *DirScanDictModel) UpsertByName(ctx context.Context, doc *DirScanDict) error {
+	now := time.Now()
+	filter := bson.M{"name": doc.Name}
+	update := bson.M{
+		"$set": bson.M{
+			"description": doc.Description,
+			"content":     doc.Content,
+			"path_count":  doc.PathCount,
+			"enabled":     doc.Enabled,
+			"is_builtin":  doc.IsBuiltin,
+			"update_time": now,
+		},
+		"$setOnInsert": bson.M{
+			"create_time": now,
+		},
+	}
+	opts := options.Update().SetUpsert(true)
+	_, err := m.coll.UpdateOne(ctx, filter, update, opts)
+	return err
+}

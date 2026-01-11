@@ -599,6 +599,9 @@ func (l *MainTaskRetryLogic) MainTaskRetry(req *types.MainTaskRetryReq, workspac
 		if config.Fingerprint != nil && config.Fingerprint.Enable {
 			enabledModules++
 		}
+		if config.DirScan != nil && config.DirScan.Enable {
+			enabledModules++
+		}
 		if config.PocScan != nil && config.PocScan.Enable {
 			enabledModules++
 		}
@@ -787,6 +790,9 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 			enabledModules++
 		}
 		if config.Fingerprint != nil && config.Fingerprint.Enable {
+			enabledModules++
+		}
+		if config.DirScan != nil && config.DirScan.Enable {
 			enabledModules++
 		}
 		if config.PocScan != nil && config.PocScan.Enable {

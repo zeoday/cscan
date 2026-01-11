@@ -89,6 +89,41 @@ type NucleiOptions struct {
 	OnVulnerabilityFound func(vul *Vulnerability)      `json:"-"`                    // 发现漏洞时的回调函数
 }
 
+// Validate 验证 NucleiOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *NucleiOptions) Validate() error {
+	if o.RateLimit < 0 {
+		return fmt.Errorf("rateLimit must be non-negative, got %d", o.RateLimit)
+	}
+	if o.Concurrency < 0 {
+		return fmt.Errorf("concurrency must be non-negative, got %d", o.Concurrency)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.TargetTimeout < 0 {
+		return fmt.Errorf("targetTimeout must be non-negative, got %d", o.TargetTimeout)
+	}
+	if o.Retries < 0 {
+		return fmt.Errorf("retries must be non-negative, got %d", o.Retries)
+	}
+	// 验证 severity 格式
+	if o.Severity != "" {
+		validSeverities := map[string]bool{
+			"critical": true, "high": true, "medium": true,
+			"low": true, "info": true, "unknown": true,
+		}
+		severities := strings.Split(o.Severity, ",")
+		for _, s := range severities {
+			s = strings.TrimSpace(strings.ToLower(s))
+			if !validSeverities[s] {
+				return fmt.Errorf("invalid severity '%s', must be one of: critical, high, medium, low, info, unknown", s)
+			}
+		}
+	}
+	return nil
+}
+
 // Scan 执行Nuclei扫描
 func (s *NucleiScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
@@ -592,7 +627,8 @@ func (s *NucleiScanner) prepareTargets(assets []*Asset) []string {
 
 	for _, asset := range assets {
 		// 使用 IsHTTP 字段判断（端口扫描阶段已设置）
-		if !asset.IsHTTP {
+		// 同时检查端口是否为常见HTTP端口，避免对非HTTP服务进行扫描
+		if !asset.IsHTTP && !IsHTTPService(asset.Service, asset.Port) {
 			skipped++
 			logx.Debugf("Skipping non-HTTP asset: %s:%d (service: %s, isHttp: %v)", asset.Host, asset.Port, asset.Service, asset.IsHTTP)
 			continue

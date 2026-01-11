@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +24,65 @@ const (
 	TaskStatusRevoked = "REVOKED"
 )
 
+// PriorityQueueMetrics 优先级队列性能指标
+type PriorityQueueMetrics struct {
+	PushCount      int64         // 推送任务总数
+	PopCount       int64         // 弹出任务总数
+	PushLatencySum int64         // 推送延迟总和（纳秒）
+	PopLatencySum  int64         // 弹出延迟总和（纳秒）
+	LastPushTime   time.Time     // 最后推送时间
+	LastPopTime    time.Time     // 最后弹出时间
+	mu             sync.RWMutex
+}
+
+// RecordPush 记录推送操作
+func (m *PriorityQueueMetrics) RecordPush(latency time.Duration) {
+	atomic.AddInt64(&m.PushCount, 1)
+	atomic.AddInt64(&m.PushLatencySum, int64(latency))
+	m.mu.Lock()
+	m.LastPushTime = time.Now()
+	m.mu.Unlock()
+}
+
+// RecordPop 记录弹出操作
+func (m *PriorityQueueMetrics) RecordPop(latency time.Duration) {
+	atomic.AddInt64(&m.PopCount, 1)
+	atomic.AddInt64(&m.PopLatencySum, int64(latency))
+	m.mu.Lock()
+	m.LastPopTime = time.Now()
+	m.mu.Unlock()
+}
+
+// GetStats 获取统计信息
+func (m *PriorityQueueMetrics) GetStats() map[string]interface{} {
+	pushCount := atomic.LoadInt64(&m.PushCount)
+	popCount := atomic.LoadInt64(&m.PopCount)
+	pushLatencySum := atomic.LoadInt64(&m.PushLatencySum)
+	popLatencySum := atomic.LoadInt64(&m.PopLatencySum)
+
+	m.mu.RLock()
+	lastPush := m.LastPushTime
+	lastPop := m.LastPopTime
+	m.mu.RUnlock()
+
+	var avgPushLatency, avgPopLatency float64
+	if pushCount > 0 {
+		avgPushLatency = float64(pushLatencySum) / float64(pushCount) / float64(time.Millisecond)
+	}
+	if popCount > 0 {
+		avgPopLatency = float64(popLatencySum) / float64(popCount) / float64(time.Millisecond)
+	}
+
+	return map[string]interface{}{
+		"pushCount":       pushCount,
+		"popCount":        popCount,
+		"avgPushLatencyMs": avgPushLatency,
+		"avgPopLatencyMs":  avgPopLatency,
+		"lastPushTime":    lastPush,
+		"lastPopTime":     lastPop,
+	}
+}
+
 // TaskInfo 任务信息
 type TaskInfo struct {
 	TaskId      string   `json:"taskId"`
@@ -35,14 +95,53 @@ type TaskInfo struct {
 	Workers     []string `json:"workers,omitempty"` // 指定执行任务的 Worker 列表，为空表示任意 Worker
 }
 
+// WorkerLoad Worker负载信息
+type WorkerLoad struct {
+	WorkerName     string    `json:"workerName"`
+	CurrentTasks   int       `json:"currentTasks"`
+	MaxConcurrency int       `json:"maxConcurrency"`
+	CPUPercent     float64   `json:"cpuPercent"`
+	MemPercent     float64   `json:"memPercent"`
+	LastHeartbeat  time.Time `json:"lastHeartbeat"`
+}
+
+// LoadScore 计算负载分数（越低越好）
+func (w *WorkerLoad) LoadScore() float64 {
+	if w.MaxConcurrency == 0 {
+		return 100.0
+	}
+	// 综合考虑任务负载、CPU和内存
+	taskLoad := float64(w.CurrentTasks) / float64(w.MaxConcurrency) * 100
+	return taskLoad*0.5 + w.CPUPercent*0.3 + w.MemPercent*0.2
+}
+
+// IsAvailable 检查Worker是否可用
+func (w *WorkerLoad) IsAvailable() bool {
+	// 心跳超过30秒认为不可用
+	if time.Since(w.LastHeartbeat) > 30*time.Second {
+		return false
+	}
+	// 任务已满
+	if w.CurrentTasks >= w.MaxConcurrency {
+		return false
+	}
+	// CPU或内存过高
+	if w.CPUPercent > 90 || w.MemPercent > 90 {
+		return false
+	}
+	return true
+}
+
 // Scheduler 任务调度器
 type Scheduler struct {
-	rdb         *redis.Client
-	cron        *cron.Cron
-	queueKey    string
+	rdb           *redis.Client
+	cron          *cron.Cron
+	queueKey      string
 	processingKey string
-	mu          sync.Mutex
-	handlers    map[string]TaskHandler
+	workerLoadKey string // Worker负载信息Key
+	mu            sync.Mutex
+	handlers      map[string]TaskHandler
+	metrics       *PriorityQueueMetrics // 性能指标
 }
 
 // TaskHandler 任务处理函数
@@ -55,7 +154,9 @@ func NewScheduler(rdb *redis.Client) *Scheduler {
 		cron:          cron.New(cron.WithSeconds()),
 		queueKey:      "cscan:task:queue",
 		processingKey: "cscan:task:processing",
+		workerLoadKey: "cscan:worker:load",
 		handlers:      make(map[string]TaskHandler),
+		metrics:       &PriorityQueueMetrics{},
 	}
 }
 
@@ -91,22 +192,45 @@ func (s *Scheduler) GetWorkerQueueKey(workerName string) string {
 	return fmt.Sprintf("cscan:task:queue:worker:%s", strings.ToLower(workerName))
 }
 
+// GetMetrics 获取性能指标
+func (s *Scheduler) GetMetrics() *PriorityQueueMetrics {
+	return s.metrics
+}
+
+// calculatePriorityScore 计算优先级分数
+// 分数越小优先级越高，确保高优先级任务先被处理
+// Priority值越大，优先级越高（减去更多）
+func (s *Scheduler) calculatePriorityScore(priority int, createTime time.Time) float64 {
+	// 基础分数为创建时间戳
+	baseScore := float64(createTime.Unix())
+	// 优先级调整：每个优先级单位减少1000秒的分数
+	// 这确保高优先级任务即使创建时间较晚也会先被处理
+	priorityAdjustment := float64(priority * 1000)
+	return baseScore - priorityAdjustment
+}
+
 // PushTask 推送任务到队列
 // 如果任务指定了 Workers，则推送到每个 Worker 的专属队列
 // 否则推送到公共队列
 func (s *Scheduler) PushTask(ctx context.Context, task *TaskInfo) error {
+	startTime := time.Now()
+	defer func() {
+		s.metrics.RecordPush(time.Since(startTime))
+	}()
+
 	if task.TaskId == "" {
 		task.TaskId = uuid.New().String()
 	}
-	task.CreateTime = time.Now().Local().Format("2006-01-02 15:04:05")
+	now := time.Now()
+	task.CreateTime = now.Local().Format("2006-01-02 15:04:05")
 
 	data, err := json.Marshal(task)
 	if err != nil {
 		return err
 	}
 
-	// 使用优先级队列，分数越小优先级越高
-	score := float64(time.Now().Unix()) - float64(task.Priority*1000)
+	// 使用统一的优先级分数计算
+	score := s.calculatePriorityScore(task.Priority, now)
 
 	// 如果指定了 Workers，推送到每个 Worker 的专属队列
 	if len(task.Workers) > 0 {
@@ -137,6 +261,15 @@ func (s *Scheduler) PushTaskBatch(ctx context.Context, tasks []*TaskInfo) error 
 		return nil
 	}
 
+	startTime := time.Now()
+	defer func() {
+		// 记录每个任务的平均推送时间
+		avgLatency := time.Since(startTime) / time.Duration(len(tasks))
+		for range tasks {
+			s.metrics.RecordPush(avgLatency)
+		}
+	}()
+
 	pipe := s.rdb.Pipeline()
 	baseTime := time.Now()
 
@@ -151,9 +284,9 @@ func (s *Scheduler) PushTaskBatch(ctx context.Context, tasks []*TaskInfo) error 
 			continue
 		}
 
-		// 使用优先级队列，分数越小优先级越高
+		// 使用统一的优先级分数计算
 		// 同一批次的任务按顺序递增分数，保持顺序
-		score := float64(baseTime.Unix()) - float64(task.Priority*1000) + float64(i)*0.001
+		score := s.calculatePriorityScore(task.Priority, baseTime) + float64(i)*0.001
 
 		// 如果指定了 Workers，推送到每个 Worker 的专属队列
 		if len(task.Workers) > 0 {
@@ -179,7 +312,12 @@ func (s *Scheduler) PushTaskBatch(ctx context.Context, tasks []*TaskInfo) error 
 
 // PopTask 从队列获取任务
 func (s *Scheduler) PopTask(ctx context.Context) (*TaskInfo, error) {
-	// 获取优先级最高的任务
+	startTime := time.Now()
+	defer func() {
+		s.metrics.RecordPop(time.Since(startTime))
+	}()
+
+	// 获取优先级最高的任务（分数最小）
 	results, err := s.rdb.ZPopMin(ctx, s.queueKey, 1).Result()
 	if err != nil {
 		return nil, err
@@ -197,6 +335,90 @@ func (s *Scheduler) PopTask(ctx context.Context) (*TaskInfo, error) {
 	s.rdb.SAdd(ctx, s.processingKey, task.TaskId)
 
 	return &task, nil
+}
+
+// PopTaskForWorker 从队列获取任务（考虑Worker负载）
+// 优先从Worker专属队列获取，然后从公共队列获取
+func (s *Scheduler) PopTaskForWorker(ctx context.Context, workerName string) (*TaskInfo, error) {
+	startTime := time.Now()
+	defer func() {
+		s.metrics.RecordPop(time.Since(startTime))
+	}()
+
+	// 1. 优先从Worker专属队列获取
+	workerQueueKey := s.GetWorkerQueueKey(workerName)
+	results, err := s.rdb.ZPopMin(ctx, workerQueueKey, 1).Result()
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	// 2. 如果专属队列为空，从公共队列获取
+	if len(results) == 0 {
+		results, err = s.rdb.ZPopMin(ctx, s.queueKey, 1).Result()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	var task TaskInfo
+	if err := json.Unmarshal([]byte(results[0].Member.(string)), &task); err != nil {
+		return nil, err
+	}
+
+	// 添加到处理中集合
+	s.rdb.SAdd(ctx, s.processingKey, task.TaskId)
+
+	return &task, nil
+}
+
+// PeekTask 查看队列中优先级最高的任务（不移除）
+func (s *Scheduler) PeekTask(ctx context.Context) (*TaskInfo, error) {
+	results, err := s.rdb.ZRangeWithScores(ctx, s.queueKey, 0, 0).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	var task TaskInfo
+	if err := json.Unmarshal([]byte(results[0].Member.(string)), &task); err != nil {
+		return nil, err
+	}
+
+	return &task, nil
+}
+
+// GetTasksByPriority 获取指定优先级范围的任务
+func (s *Scheduler) GetTasksByPriority(ctx context.Context, minPriority, maxPriority int, limit int64) ([]*TaskInfo, error) {
+	// 计算分数范围（注意：分数越小优先级越高）
+	now := time.Now()
+	maxScore := s.calculatePriorityScore(minPriority, now)
+	minScore := s.calculatePriorityScore(maxPriority, now)
+
+	results, err := s.rdb.ZRangeByScoreWithScores(ctx, s.queueKey, &redis.ZRangeBy{
+		Min:   fmt.Sprintf("%f", minScore),
+		Max:   fmt.Sprintf("%f", maxScore),
+		Count: limit,
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]*TaskInfo, 0, len(results))
+	for _, r := range results {
+		var task TaskInfo
+		if err := json.Unmarshal([]byte(r.Member.(string)), &task); err != nil {
+			continue
+		}
+		tasks = append(tasks, &task)
+	}
+
+	return tasks, nil
 }
 
 // CompleteTask 完成任务
@@ -265,8 +487,15 @@ type DomainScanConfig struct {
 	All                bool     `json:"all"`                // 使用所有数据源(慢)
 	Recursive          bool     `json:"recursive"`          // 只使用递归数据源
 	RemoveWildcard     bool     `json:"removeWildcard"`     // 移除泛解析域名
-	ResolveDNS         bool     `json:"resolveDNS"`         // 是否解析DNS
+	ResolveDNS         bool     `json:"resolveDNS"`         // 是否解析DNS（使用dnsx）
 	Concurrent         int      `json:"concurrent"`         // DNS解析并发数
+	SubdomainDictIds   []string `json:"subdomainDictIds"`   // 子域名暴力破解字典ID列表
+	// Dnsx增强功能
+	RecursiveBrute       bool     `json:"recursiveBrute"`       // 递归爆破
+	RecursiveDictIds     []string `json:"recursiveDictIds"`     // 递归爆破字典ID列表
+	WildcardDetect       bool     `json:"wildcardDetect"`       // 泛解析检测并处理
+	SubdomainCrawl       bool     `json:"subdomainCrawl"`       // 子域爬取（从响应体和JS中发现子域）
+	TakeoverCheck        bool     `json:"takeoverCheck"`        // 子域接管检查
 }
 
 type FingerprintConfig struct {
@@ -337,4 +566,204 @@ type TaskResult struct {
 func (r *TaskResult) FormatResult() string {
 	return fmt.Sprintf("状态:%s 资产:%d 漏洞:%d 耗时:%ds",
 		r.Status, r.AssetCount, r.VulCount, r.Duration)
+}
+
+// ==================== Worker Load Management ====================
+
+// UpdateWorkerLoad 更新Worker负载信息
+func (s *Scheduler) UpdateWorkerLoad(ctx context.Context, load *WorkerLoad) error {
+	data, err := json.Marshal(load)
+	if err != nil {
+		return err
+	}
+	// 使用Hash存储，key为worker名称
+	return s.rdb.HSet(ctx, s.workerLoadKey, load.WorkerName, data).Err()
+}
+
+// GetWorkerLoad 获取单个Worker负载信息
+func (s *Scheduler) GetWorkerLoad(ctx context.Context, workerName string) (*WorkerLoad, error) {
+	data, err := s.rdb.HGet(ctx, s.workerLoadKey, workerName).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var load WorkerLoad
+	if err := json.Unmarshal([]byte(data), &load); err != nil {
+		return nil, err
+	}
+	return &load, nil
+}
+
+// GetAllWorkerLoads 获取所有Worker负载信息
+func (s *Scheduler) GetAllWorkerLoads(ctx context.Context) ([]*WorkerLoad, error) {
+	data, err := s.rdb.HGetAll(ctx, s.workerLoadKey).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	loads := make([]*WorkerLoad, 0, len(data))
+	for _, v := range data {
+		var load WorkerLoad
+		if err := json.Unmarshal([]byte(v), &load); err != nil {
+			continue
+		}
+		loads = append(loads, &load)
+	}
+	return loads, nil
+}
+
+// GetAvailableWorkers 获取可用的Worker列表（按负载排序）
+func (s *Scheduler) GetAvailableWorkers(ctx context.Context) ([]*WorkerLoad, error) {
+	loads, err := s.GetAllWorkerLoads(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 过滤可用的Worker
+	available := make([]*WorkerLoad, 0)
+	for _, load := range loads {
+		if load.IsAvailable() {
+			available = append(available, load)
+		}
+	}
+
+	// 按负载分数排序（升序，负载低的在前）
+	for i := 0; i < len(available)-1; i++ {
+		for j := i + 1; j < len(available); j++ {
+			if available[i].LoadScore() > available[j].LoadScore() {
+				available[i], available[j] = available[j], available[i]
+			}
+		}
+	}
+
+	return available, nil
+}
+
+// SelectWorkerForTask 为任务选择最佳Worker
+// 返回负载最低的可用Worker
+func (s *Scheduler) SelectWorkerForTask(ctx context.Context) (*WorkerLoad, error) {
+	workers, err := s.GetAvailableWorkers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(workers) == 0 {
+		return nil, nil
+	}
+	return workers[0], nil
+}
+
+// RemoveWorkerLoad 移除Worker负载信息（Worker下线时调用）
+func (s *Scheduler) RemoveWorkerLoad(ctx context.Context, workerName string) error {
+	return s.rdb.HDel(ctx, s.workerLoadKey, workerName).Err()
+}
+
+// ==================== Task Cancellation ====================
+
+// CancelSignal 取消信号
+type CancelSignal struct {
+	TaskId    string    `json:"taskId"`
+	Action    string    `json:"action"` // STOP, PAUSE
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// GetCancelSignalKey 获取取消信号的Redis Key
+func (s *Scheduler) GetCancelSignalKey(taskId string) string {
+	return fmt.Sprintf("cscan:task:cancel:%s", taskId)
+}
+
+// SendCancelSignal 发送取消信号
+func (s *Scheduler) SendCancelSignal(ctx context.Context, taskId, action string) error {
+	signal := &CancelSignal{
+		TaskId:    taskId,
+		Action:    action,
+		Timestamp: time.Now(),
+	}
+	data, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+
+	key := s.GetCancelSignalKey(taskId)
+	// 设置信号，5分钟后自动过期
+	return s.rdb.Set(ctx, key, data, 5*time.Minute).Err()
+}
+
+// CheckCancelSignal 检查取消信号
+func (s *Scheduler) CheckCancelSignal(ctx context.Context, taskId string) (*CancelSignal, error) {
+	key := s.GetCancelSignalKey(taskId)
+	data, err := s.rdb.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var signal CancelSignal
+	if err := json.Unmarshal([]byte(data), &signal); err != nil {
+		return nil, err
+	}
+	return &signal, nil
+}
+
+// ClearCancelSignal 清除取消信号
+func (s *Scheduler) ClearCancelSignal(ctx context.Context, taskId string) error {
+	key := s.GetCancelSignalKey(taskId)
+	return s.rdb.Del(ctx, key).Err()
+}
+
+// PublishCancelSignal 通过Pub/Sub发布取消信号（实时通知）
+func (s *Scheduler) PublishCancelSignal(ctx context.Context, taskId, action string) error {
+	signal := &CancelSignal{
+		TaskId:    taskId,
+		Action:    action,
+		Timestamp: time.Now(),
+	}
+	data, err := json.Marshal(signal)
+	if err != nil {
+		return err
+	}
+
+	// 同时设置Key（用于轮询检查）和发布消息（用于实时通知）
+	key := s.GetCancelSignalKey(taskId)
+	if err := s.rdb.Set(ctx, key, data, 5*time.Minute).Err(); err != nil {
+		return err
+	}
+
+	// 发布到取消信号频道
+	return s.rdb.Publish(ctx, "cscan:task:cancel", data).Err()
+}
+
+// SubscribeCancelSignals 订阅取消信号
+func (s *Scheduler) SubscribeCancelSignals(ctx context.Context) <-chan *CancelSignal {
+	ch := make(chan *CancelSignal, 100)
+
+	go func() {
+		defer close(ch)
+
+		pubsub := s.rdb.Subscribe(ctx, "cscan:task:cancel")
+		defer pubsub.Close()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-pubsub.Channel():
+				var signal CancelSignal
+				if err := json.Unmarshal([]byte(msg.Payload), &signal); err != nil {
+					continue
+				}
+				select {
+				case ch <- &signal:
+				default:
+					// 通道满了，丢弃旧信号
+				}
+			}
+		}
+	}()
+
+	return ch
 }

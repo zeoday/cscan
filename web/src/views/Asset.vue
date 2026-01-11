@@ -345,7 +345,16 @@
             </el-col>
           </el-row>
           <el-form-item label="高级选项">
-            <el-checkbox v-model="scanForm.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
+            <div style="display: block; width: 100%">
+              <el-checkbox v-model="scanForm.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
+            </div>
+            <div v-if="scanForm.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
+              <el-checkbox v-model="scanForm.excludeCDN">排除 CDN/WAF (-ec)</el-checkbox>
+            </div>
+          </el-form-item>
+          <el-form-item label="排除目标">
+            <el-input v-model="scanForm.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
+            <span class="form-hint">排除的 IP/CIDR，逗号分隔</span>
           </el-form-item>
         </template>
         
@@ -462,6 +471,8 @@ const scanForm = reactive({
   scanType: 'c',
   portscanTimeout: 60,
   skipHostDiscovery: false,
+  excludeCDN: false,
+  excludeHosts: '',
   portidentifyEnable: false,
   portidentifyTimeout: 30,
   portidentifyArgs: '',
@@ -919,6 +930,8 @@ function handleQuickScan(command) {
     scanType: 'c',
     portscanTimeout: 60,
     skipHostDiscovery: false,
+    excludeCDN: false,
+    excludeHosts: '',
     portidentifyEnable: false,
     portidentifyTimeout: 30,
     portidentifyArgs: '',
@@ -989,7 +1002,9 @@ function buildScanConfig() {
       portThreshold: scanForm.portThreshold,
       scanType: scanForm.scanType,
       timeout: scanForm.portscanTimeout,
-      skipHostDiscovery: scanForm.skipHostDiscovery
+      skipHostDiscovery: scanForm.skipHostDiscovery,
+      excludeCDN: scanForm.excludeCDN,
+      excludeHosts: scanForm.excludeHosts
     },
     portidentify: {
       enable: scanForm.portidentifyEnable,

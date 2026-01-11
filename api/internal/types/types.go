@@ -791,6 +791,7 @@ type APIConfig struct {
 	Platform   string `json:"platform"`
 	Key        string `json:"key"`
 	Secret     string `json:"secret"`
+	Version    string `json:"version"` // fofa版本: v4/v5
 	Status     string `json:"status"`
 	CreateTime string `json:"createTime"`
 }
@@ -806,6 +807,7 @@ type APIConfigSaveReq struct {
 	Platform string `json:"platform"`
 	Key      string `json:"key"`
 	Secret   string `json:"secret,optional"`
+	Version  string `json:"version,optional"` // fofa版本: v4/v5
 }
 
 
@@ -1309,7 +1311,29 @@ type MatchedFingerprintInfo struct {
 	MatchedConditions string `json:"matchedConditions"` // 命中的条件
 }
 
-// ==================== HTTP服务映射 ====================
+// ==================== HTTP服务设置 ====================
+// HttpServiceConfig HTTP服务端口配置
+type HttpServiceConfig struct {
+	HttpPorts   []int  `json:"httpPorts"`   // HTTP端口列表
+	HttpsPorts  []int  `json:"httpsPorts"`  // HTTPS端口列表
+	Description string `json:"description"` // 描述
+}
+
+// HttpServiceConfigGetResp 获取HTTP服务配置响应
+type HttpServiceConfigGetResp struct {
+	Code int               `json:"code"`
+	Msg  string            `json:"msg"`
+	Data HttpServiceConfig `json:"data"`
+}
+
+// HttpServiceConfigSaveReq 保存HTTP服务配置请求
+type HttpServiceConfigSaveReq struct {
+	HttpPorts   []int  `json:"httpPorts"`
+	HttpsPorts  []int  `json:"httpsPorts"`
+	Description string `json:"description,optional"`
+}
+
+// HttpServiceMapping HTTP服务映射
 type HttpServiceMapping struct {
 	Id          string `json:"id"`
 	ServiceName string `json:"serviceName"` // 服务名称（小写）
@@ -1371,20 +1395,44 @@ type ReportVul struct {
 	CreateTime string `json:"createTime"`
 }
 
+// ReportDirScan 报告中的目录扫描结果
+type ReportDirScan struct {
+	Authority     string `json:"authority"`
+	URL           string `json:"url"`
+	Path          string `json:"path"`
+	StatusCode    int    `json:"statusCode"`
+	ContentLength int64  `json:"contentLength"`
+	ContentType   string `json:"contentType"`
+	Title         string `json:"title"`
+	CreateTime    string `json:"createTime"`
+}
+
+// ReportDirScanStat 目录扫描统计
+type ReportDirScanStat struct {
+	Total     int `json:"total"`
+	Status2xx int `json:"status_2xx"`
+	Status3xx int `json:"status_3xx"`
+	Status4xx int `json:"status_4xx"`
+	Status5xx int `json:"status_5xx"`
+}
+
 type ReportData struct {
-	TaskId      string         `json:"taskId"`
-	TaskName    string         `json:"taskName"`
-	Target      string         `json:"target"`
-	Status      string         `json:"status"`
-	CreateTime  string         `json:"createTime"`
-	AssetCount  int            `json:"assetCount"`
-	VulCount    int            `json:"vulCount"`
-	Assets      []ReportAsset  `json:"assets"`
-	Vuls        []ReportVul    `json:"vuls"`
-	TopPorts    []StatItem     `json:"topPorts"`
-	TopServices []StatItem     `json:"topServices"`
-	TopApps     []StatItem     `json:"topApps"`
-	VulStats    map[string]int `json:"vulStats"`
+	TaskId       string            `json:"taskId"`
+	TaskName     string            `json:"taskName"`
+	Target       string            `json:"target"`
+	Status       string            `json:"status"`
+	CreateTime   string            `json:"createTime"`
+	AssetCount   int               `json:"assetCount"`
+	VulCount     int               `json:"vulCount"`
+	DirScanCount int               `json:"dirScanCount"`
+	Assets       []ReportAsset     `json:"assets"`
+	Vuls         []ReportVul       `json:"vuls"`
+	DirScans     []ReportDirScan   `json:"dirScans"`
+	DirScanStat  ReportDirScanStat `json:"dirScanStat"`
+	TopPorts     []StatItem        `json:"topPorts"`
+	TopServices  []StatItem        `json:"topServices"`
+	TopApps      []StatItem        `json:"topApps"`
+	VulStats     map[string]int    `json:"vulStats"`
 }
 
 type ReportDetailResp struct {
@@ -1708,4 +1756,139 @@ type DirScanDictSimple struct {
 	Name      string `json:"name"`
 	PathCount int    `json:"pathCount"`
 	IsBuiltin bool   `json:"isBuiltin"`
+}
+
+// ==================== 子域名字典 ====================
+
+// SubdomainDict 子域名字典
+type SubdomainDict struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`        // 字典名称
+	Description string `json:"description"` // 描述
+	Content     string `json:"content"`     // 字典内容（每行一个子域名前缀）
+	WordCount   int    `json:"wordCount"`   // 词条数量
+	Enabled     bool   `json:"enabled"`     // 是否启用
+	IsBuiltin   bool   `json:"isBuiltin"`   // 是否内置字典
+	CreateTime  string `json:"createTime"`
+	UpdateTime  string `json:"updateTime"`
+}
+
+// SubdomainDictListReq 子域名字典列表请求
+type SubdomainDictListReq struct {
+	Page     int   `json:"page,default=1"`
+	PageSize int   `json:"pageSize,default=20"`
+	Enabled  *bool `json:"enabled,optional"` // 状态筛选
+}
+
+// SubdomainDictListResp 子域名字典列表响应
+type SubdomainDictListResp struct {
+	Code  int             `json:"code"`
+	Msg   string          `json:"msg"`
+	Total int             `json:"total"`
+	List  []SubdomainDict `json:"list"`
+}
+
+// SubdomainDictSaveReq 保存子域名字典请求
+type SubdomainDictSaveReq struct {
+	Id          string `json:"id,optional"`
+	Name        string `json:"name"`
+	Description string `json:"description,optional"`
+	Content     string `json:"content"`
+	Enabled     bool   `json:"enabled"`
+}
+
+// SubdomainDictDeleteReq 删除子域名字典请求
+type SubdomainDictDeleteReq struct {
+	Id string `json:"id"`
+}
+
+// SubdomainDictClearResp 清空子域名字典响应
+type SubdomainDictClearResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Deleted int    `json:"deleted"` // 删除数量
+}
+
+// SubdomainDictEnabledListResp 启用的子域名字典列表响应（用于任务创建时选择）
+type SubdomainDictEnabledListResp struct {
+	Code int                      `json:"code"`
+	Msg  string                   `json:"msg"`
+	List []SubdomainDictSimple    `json:"list"`
+}
+
+// SubdomainDictSimple 简化的子域名字典信息（用于选择列表）
+type SubdomainDictSimple struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	WordCount int    `json:"wordCount"`
+	IsBuiltin bool   `json:"isBuiltin"`
+}
+
+
+// ==================== 通知配置 ====================
+
+// NotifyConfig 通知配置
+type NotifyConfig struct {
+	Id              string `json:"id"`
+	Name            string `json:"name"`            // 配置名称
+	Provider        string `json:"provider"`        // 提供者类型
+	Config          string `json:"config"`          // JSON格式的配置详情
+	Status          string `json:"status"`          // enable/disable
+	MessageTemplate string `json:"messageTemplate"` // 自定义消息模板
+	CreateTime      string `json:"createTime"`
+	UpdateTime      string `json:"updateTime"`
+}
+
+// NotifyConfigListResp 通知配置列表响应
+type NotifyConfigListResp struct {
+	Code int            `json:"code"`
+	Msg  string         `json:"msg"`
+	List []NotifyConfig `json:"list"`
+}
+
+// NotifyConfigSaveReq 保存通知配置请求
+type NotifyConfigSaveReq struct {
+	Id              string `json:"id,optional"`
+	Name            string `json:"name,optional"`
+	Provider        string `json:"provider"`
+	Config          string `json:"config"`
+	Status          string `json:"status,optional"`
+	MessageTemplate string `json:"messageTemplate,optional"`
+}
+
+// NotifyConfigDeleteReq 删除通知配置请求
+type NotifyConfigDeleteReq struct {
+	Id string `json:"id"`
+}
+
+// NotifyConfigTestReq 测试通知配置请求
+type NotifyConfigTestReq struct {
+	Provider        string `json:"provider"`
+	Config          string `json:"config"`
+	MessageTemplate string `json:"messageTemplate,optional"`
+}
+
+// NotifyProvider 通知提供者信息
+type NotifyProvider struct {
+	Id           string              `json:"id"`
+	Name         string              `json:"name"`
+	Description  string              `json:"description"`
+	ConfigFields []NotifyConfigField `json:"configFields"`
+}
+
+// NotifyConfigField 通知配置字段
+type NotifyConfigField struct {
+	Name        string   `json:"name"`
+	Label       string   `json:"label"`
+	Type        string   `json:"type"`        // text, password, number, textarea, switch, select
+	Required    bool     `json:"required"`
+	Placeholder string   `json:"placeholder,omitempty"`
+	Options     []string `json:"options,omitempty"` // 用于select类型
+}
+
+// NotifyProviderListResp 通知提供者列表响应
+type NotifyProviderListResp struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	List []NotifyProvider `json:"list"`
 }

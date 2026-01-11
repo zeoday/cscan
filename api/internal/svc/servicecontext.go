@@ -34,9 +34,11 @@ type ServiceContext struct {
 	NucleiTemplateModel     *model.NucleiTemplateModel
 	FingerprintModel        *model.FingerprintModel
 	HttpServiceMappingModel  *model.HttpServiceMappingModel
+	HttpServiceModel         *model.HttpServiceModel // 新的HTTP服务设置模型
 	ActiveFingerprintModel   *model.ActiveFingerprintModel
 	CommandHistoryModel      *model.CommandHistoryModel
 	AuditLogModel            *model.AuditLogModel
+	NotifyConfigModel        *model.NotifyConfigModel
 
 	// 调度器
 	Scheduler *scheduler.Scheduler
@@ -108,9 +110,11 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		NucleiTemplateModel:     model.NewNucleiTemplateModel(mongoDB),
 		FingerprintModel:        model.NewFingerprintModel(mongoDB),
 		HttpServiceMappingModel:  model.NewHttpServiceMappingModel(mongoDB),
+		HttpServiceModel:         model.NewHttpServiceModel(mongoDB),
 		ActiveFingerprintModel:   model.NewActiveFingerprintModel(mongoDB),
 		CommandHistoryModel:      model.NewCommandHistoryModel(mongoDB),
 		AuditLogModel:            model.NewAuditLogModel(mongoDB),
+		NotifyConfigModel:        model.NewNotifyConfigModel(mongoDB),
 		Scheduler:               scheduler.NewScheduler(rdb),
 		TemplateCategories:      []string{},
 		TemplateTags:            []string{},
@@ -124,6 +128,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		svcCtx.CustomPocModel,
 		svcCtx.ActiveFingerprintModel,
 		model.NewDirScanDictModel(svcCtx.MongoDB),
+		model.NewSubdomainDictModel(svcCtx.MongoDB),
 	)
 
 	return svcCtx
@@ -159,6 +164,11 @@ func (s *ServiceContext) GetAssetHistoryModel(workspaceId string) *model.AssetHi
 		workspaceId = "default"
 	}
 	return model.NewAssetHistoryModel(s.MongoDB, workspaceId)
+}
+
+// GetDirScanResultModel 获取目录扫描结果模型
+func (s *ServiceContext) GetDirScanResultModel() *model.DirScanResultModel {
+	return model.NewDirScanResultModel(s.MongoDB)
 }
 
 // RefreshTemplateCache 刷新模板元数据缓存

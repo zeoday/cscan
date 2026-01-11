@@ -106,7 +106,7 @@ var subfinderProviders = [
     { provider: "censys", keys: [], status: "disable", description: "Censys互联网搜索引擎 (格式: API_ID:API_SECRET)", create_time: now, update_time: now },
     { provider: "certspotter", keys: [], status: "disable", description: "证书透明度日志监控", create_time: now, update_time: now },
     { provider: "chaos", keys: [], status: "disable", description: "ProjectDiscovery Chaos数据", create_time: now, update_time: now },
-    { provider: "fofa", keys: [], status: "disable", description: "FOFA网络空间搜索引擎 (格式: email:key)", create_time: now, update_time: now },
+    { provider: "fofa", keys: [], status: "disable", description: "FOFA网络空间搜索引擎", create_time: now, update_time: now },
     { provider: "fullhunt", keys: [], status: "disable", description: "FullHunt攻击面管理", create_time: now, update_time: now },
     { provider: "github", keys: [], status: "disable", description: "GitHub代码搜索 (Personal Access Token)", create_time: now, update_time: now },
     { provider: "hunter", keys: [], status: "disable", description: "鹰图平台", create_time: now, update_time: now },

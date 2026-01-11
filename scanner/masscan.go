@@ -31,6 +31,22 @@ type MasscanOptions struct {
 	Timeout           int    `json:"timeout"`
 	PortThreshold     int    `json:"portThreshold"`     // 端口阈值，实时检测
 	SkipHostDiscovery bool   `json:"skipHostDiscovery"` // 跳过主机发现 (-Pn)
+	ExcludeHosts      string `json:"excludeHosts"`      // 排除的目标，逗号分隔 (--exclude)
+}
+
+// Validate 验证 MasscanOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *MasscanOptions) Validate() error {
+	if o.Rate < 0 {
+		return fmt.Errorf("rate must be non-negative, got %d", o.Rate)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.PortThreshold < 0 {
+		return fmt.Errorf("portThreshold must be non-negative, got %d", o.PortThreshold)
+	}
+	return nil
 }
 
 // MasscanResult Masscan输出结果
@@ -80,6 +96,7 @@ func (s *MasscanScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanRes
 					Timeout           int    `json:"timeout"`
 					PortThreshold     int    `json:"portThreshold"`
 					SkipHostDiscovery bool   `json:"skipHostDiscovery"`
+					ExcludeHosts      string `json:"excludeHosts"`
 				}
 				if err := json.Unmarshal(data, &portConfig); err == nil {
 					if portConfig.Ports != "" {
@@ -95,14 +112,15 @@ func (s *MasscanScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanRes
 						opts.PortThreshold = portConfig.PortThreshold
 					}
 					opts.SkipHostDiscovery = portConfig.SkipHostDiscovery
+					opts.ExcludeHosts = portConfig.ExcludeHosts
 				}
 			}
 		}
 	}
 
-	logx.Infof("Masscan Scan config - Ports: %s, Rate: %d, Timeout: %d, PortThreshold: %d", opts.Ports, opts.Rate, opts.Timeout, opts.PortThreshold)
+	logx.Infof("Masscan Scan config - Ports: %s, Rate: %d, Timeout: %d, PortThreshold: %d, ExcludeHosts: %s", opts.Ports, opts.Rate, opts.Timeout, opts.PortThreshold, opts.ExcludeHosts)
 
-	logx.Infof("Masscan Scan config - Ports: %s, Rate: %d, Timeout: %d, PortThreshold: %d", opts.Ports, opts.Rate, opts.Timeout, opts.PortThreshold)
+	logx.Infof("Masscan Scan config - Ports: %s, Rate: %d, Timeout: %d, PortThreshold: %d, ExcludeHosts: %s", opts.Ports, opts.Rate, opts.Timeout, opts.PortThreshold, opts.ExcludeHosts)
 
 	// 检查masscan是否安装
 	if !checkMasscanInstalled() {
@@ -158,6 +176,10 @@ func (s *MasscanScanner) runMasscan(ctx context.Context, targets []string, opts 
 	// 跳过主机发现
 	if opts.SkipHostDiscovery {
 		args = append(args, "-Pn")
+	}
+	// 排除目标
+	if opts.ExcludeHosts != "" {
+		args = append(args, "--exclude", opts.ExcludeHosts)
 	}
 	args = append(args, targets...)
 

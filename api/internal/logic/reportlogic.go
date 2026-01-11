@@ -84,6 +84,26 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 	}
 	l.Logger.Infof("Found %d vuls for task (objectId=%s, UUID=%s)", len(vuls), queryTaskId, task.TaskId)
 
+	// 获取目录扫描结果
+	dirScanModel := l.svcCtx.GetDirScanResultModel()
+	dirScanFilter := bson.M{
+		"$or": []bson.M{
+			{"main_task_id": queryTaskId},
+			{"main_task_id": bson.M{"$regex": "^" + queryTaskId + "-\\d+$"}},
+			{"main_task_id": task.TaskId},
+			{"main_task_id": bson.M{"$regex": "^" + task.TaskId + "-\\d+$"}},
+		},
+	}
+	// 如果有 workspaceId，添加过滤条件
+	if workspaceId != "" && workspaceId != "all" {
+		dirScanFilter["workspace_id"] = workspaceId
+	}
+	dirScans, err := dirScanModel.FindByFilter(l.ctx, dirScanFilter, 1, 1000)
+	if err != nil {
+		l.Logger.Errorf("查询目录扫描结果失败: %v", err)
+	}
+	l.Logger.Infof("Found %d dirscan results for task (objectId=%s, UUID=%s)", len(dirScans), queryTaskId, task.TaskId)
+
 	// 统计信息
 	portStats := make(map[int]int)
 	serviceStats := make(map[string]int)
@@ -104,6 +124,20 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 		severity := strings.ToLower(vul.Severity)
 		if _, ok := severityStats[severity]; ok {
 			severityStats[severity]++
+		}
+	}
+
+	// 目录扫描统计
+	dirScanStat := types.ReportDirScanStat{Total: len(dirScans)}
+	for _, ds := range dirScans {
+		if ds.StatusCode >= 200 && ds.StatusCode < 300 {
+			dirScanStat.Status2xx++
+		} else if ds.StatusCode >= 300 && ds.StatusCode < 400 {
+			dirScanStat.Status3xx++
+		} else if ds.StatusCode >= 400 && ds.StatusCode < 500 {
+			dirScanStat.Status4xx++
+		} else if ds.StatusCode >= 500 {
+			dirScanStat.Status5xx++
 		}
 	}
 
@@ -152,23 +186,41 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 		topApps = append(topApps, types.StatItem{Name: app, Count: count})
 	}
 
+	// 转换目录扫描结果列表
+	dirScanList := make([]types.ReportDirScan, 0, len(dirScans))
+	for _, ds := range dirScans {
+		dirScanList = append(dirScanList, types.ReportDirScan{
+			Authority:     ds.Authority,
+			URL:           ds.URL,
+			Path:          ds.Path,
+			StatusCode:    ds.StatusCode,
+			ContentLength: ds.ContentLength,
+			ContentType:   ds.ContentType,
+			Title:         ds.Title,
+			CreateTime:    ds.CreateTime.Local().Format("2006-01-02 15:04:05"),
+		})
+	}
+
 	return &types.ReportDetailResp{
 		Code: 0,
 		Msg:  "success",
 		Data: &types.ReportData{
-			TaskId:      req.TaskId,
-			TaskName:    task.Name,
-			Target:      task.Target,
-			Status:      task.Status,
-			CreateTime:  task.CreateTime.Local().Format("2006-01-02 15:04:05"),
-			AssetCount:  len(assets),
-			VulCount:    len(vuls),
-			Assets:      assetList,
-			Vuls:        vulList,
-			TopPorts:    topPorts,
-			TopServices: topServices,
-			TopApps:     topApps,
-			VulStats:    severityStats,
+			TaskId:       req.TaskId,
+			TaskName:     task.Name,
+			Target:       task.Target,
+			Status:       task.Status,
+			CreateTime:   task.CreateTime.Local().Format("2006-01-02 15:04:05"),
+			AssetCount:   len(assets),
+			VulCount:     len(vuls),
+			DirScanCount: len(dirScans),
+			Assets:       assetList,
+			Vuls:         vulList,
+			DirScans:     dirScanList,
+			DirScanStat:  dirScanStat,
+			TopPorts:     topPorts,
+			TopServices:  topServices,
+			TopApps:      topApps,
+			VulStats:     severityStats,
 		},
 	}, nil
 }
@@ -223,6 +275,21 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 	}
 	vuls, _ := vulModel.Find(l.ctx, vulFilter, 0, 0)
 
+	// 获取目录扫描结果
+	dirScanModel := l.svcCtx.GetDirScanResultModel()
+	dirScanFilter := bson.M{
+		"$or": []bson.M{
+			{"main_task_id": queryTaskId},
+			{"main_task_id": bson.M{"$regex": "^" + queryTaskId + "-\\d+$"}},
+			{"main_task_id": task.TaskId},
+			{"main_task_id": bson.M{"$regex": "^" + task.TaskId + "-\\d+$"}},
+		},
+	}
+	if workspaceId != "" && workspaceId != "all" {
+		dirScanFilter["workspace_id"] = workspaceId
+	}
+	dirScans, _ := dirScanModel.FindByFilter(l.ctx, dirScanFilter, 1, 10000)
+
 	// 创建Excel文件
 	f := excelize.NewFile()
 	defer f.Close()
@@ -242,6 +309,8 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 	f.SetCellValue("概览", "B7", len(assets))
 	f.SetCellValue("概览", "A8", "漏洞数量")
 	f.SetCellValue("概览", "B8", len(vuls))
+	f.SetCellValue("概览", "A9", "目录扫描数量")
+	f.SetCellValue("概览", "B9", len(dirScans))
 
 	// 设置概览样式
 	titleStyle, _ := f.NewStyle(&excelize.Style{
@@ -289,6 +358,25 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 		f.SetCellValue("漏洞列表", fmt.Sprintf("F%d", row), v.CreateTime.Local().Format("2006-01-02 15:04:05"))
 	}
 
+	// 目录扫描Sheet
+	f.NewSheet("目录扫描")
+	dirScanHeaders := []string{"目标", "URL", "路径", "状态码", "大小", "类型", "标题", "发现时间"}
+	for i, h := range dirScanHeaders {
+		cell := fmt.Sprintf("%c1", 'A'+i)
+		f.SetCellValue("目录扫描", cell, h)
+	}
+	for i, ds := range dirScans {
+		row := i + 2
+		f.SetCellValue("目录扫描", fmt.Sprintf("A%d", row), ds.Authority)
+		f.SetCellValue("目录扫描", fmt.Sprintf("B%d", row), ds.URL)
+		f.SetCellValue("目录扫描", fmt.Sprintf("C%d", row), ds.Path)
+		f.SetCellValue("目录扫描", fmt.Sprintf("D%d", row), ds.StatusCode)
+		f.SetCellValue("目录扫描", fmt.Sprintf("E%d", row), ds.ContentLength)
+		f.SetCellValue("目录扫描", fmt.Sprintf("F%d", row), ds.ContentType)
+		f.SetCellValue("目录扫描", fmt.Sprintf("G%d", row), ds.Title)
+		f.SetCellValue("目录扫描", fmt.Sprintf("H%d", row), ds.CreateTime.Local().Format("2006-01-02 15:04:05"))
+	}
+
 	// 设置列宽
 	f.SetColWidth("资产列表", "A", "A", 30)
 	f.SetColWidth("资产列表", "B", "B", 15)
@@ -298,6 +386,10 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 	f.SetColWidth("漏洞列表", "B", "B", 50)
 	f.SetColWidth("漏洞列表", "C", "C", 40)
 	f.SetColWidth("漏洞列表", "E", "E", 50)
+	f.SetColWidth("目录扫描", "A", "A", 25)
+	f.SetColWidth("目录扫描", "B", "B", 50)
+	f.SetColWidth("目录扫描", "C", "C", 30)
+	f.SetColWidth("目录扫描", "G", "G", 30)
 
 	// 写入buffer
 	var buf bytes.Buffer

@@ -31,6 +31,18 @@ type NmapOptions struct {
 	Args    string `json:"args"` // 额外参数
 }
 
+// Validate 验证 NmapOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *NmapOptions) Validate() error {
+	if o.Rate < 0 {
+		return fmt.Errorf("rate must be non-negative, got %d", o.Rate)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	return nil
+}
+
 // NmapRun Nmap XML输出结构
 type NmapRun struct {
 	XMLName xml.Name   `xml:"nmaprun"`

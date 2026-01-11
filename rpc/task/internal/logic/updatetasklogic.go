@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"cscan/pkg/notify"
 	"cscan/rpc/task/internal/svc"
 	"cscan/rpc/task/pb"
 	"cscan/scheduler"
@@ -141,10 +142,14 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 		// 单任务（subTaskCount <= 1）完成时设置结束时间
 		update["end_time"] = now
 		update["result"] = result
+		// 触发任务完成通知
+		l.sendTaskNotification(workspaceId, mainTaskId, state)
 	case "FAILURE":
 		// 任务失败时设置结束时间
 		update["end_time"] = now
 		update["result"] = result
+		// 触发任务失败通知
+		l.sendTaskNotification(workspaceId, mainTaskId, state)
 	case "STOPPED":
 		// 任务停止时设置结束时间
 		update["end_time"] = now
@@ -159,4 +164,78 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 			l.Logger.Infof("UpdateTask: task updated in DB, mainTaskId=%s, state=%s", mainTaskId, state)
 		}
 	}
+}
+
+// sendTaskNotification 发送任务完成通知
+func (l *UpdateTaskLogic) sendTaskNotification(workspaceId, mainTaskId, status string) {
+	// 获取任务详情
+	taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
+	task, err := taskModel.FindById(l.ctx, mainTaskId)
+	if err != nil {
+		l.Logger.Errorf("sendTaskNotification: failed to get task, mainTaskId=%s, error=%v", mainTaskId, err)
+		return
+	}
+
+	// 获取资产和漏洞统计
+	assetModel := l.svcCtx.GetAssetModel(workspaceId)
+	vulModel := l.svcCtx.GetVulModel(workspaceId)
+
+	assetCount, _ := assetModel.CountByTaskId(l.ctx, mainTaskId)
+	vulCount, _ := vulModel.CountByTaskId(l.ctx, mainTaskId)
+
+	// 获取启用的通知配置
+	configs, err := l.svcCtx.NotifyConfigModel.FindEnabled(l.ctx)
+	if err != nil {
+		l.Logger.Errorf("sendTaskNotification: failed to get notify configs, error=%v", err)
+		return
+	}
+
+	if len(configs) == 0 {
+		l.Logger.Infof("sendTaskNotification: no enabled notify configs")
+		return
+	}
+
+	// 构建通知配置列表
+	var configItems []notify.ConfigItem
+	for _, c := range configs {
+		configItems = append(configItems, notify.ConfigItem{
+			Provider:        c.Provider,
+			Config:          c.Config,
+			MessageTemplate: c.MessageTemplate,
+		})
+	}
+
+	// 构建通知结果
+	result := &notify.NotifyResult{
+		TaskId:      mainTaskId,
+		TaskName:    task.Name,
+		Status:      status,
+		AssetCount:  int(assetCount),
+		VulCount:    int(vulCount),
+		WorkspaceId: workspaceId,
+	}
+
+	// 设置时间（处理指针类型）
+	if task.StartTime != nil {
+		result.StartTime = *task.StartTime
+	}
+	if task.EndTime != nil {
+		result.EndTime = *task.EndTime
+	}
+
+	// 计算耗时
+	if task.StartTime != nil && task.EndTime != nil {
+		d := task.EndTime.Sub(*task.StartTime)
+		if d.Hours() >= 1 {
+			result.Duration = d.Round(time.Minute).String()
+		} else if d.Minutes() >= 1 {
+			result.Duration = d.Round(time.Second).String()
+		} else {
+			result.Duration = d.Round(time.Millisecond).String()
+		}
+	}
+
+	// 异步发送通知
+	notify.SendNotificationAsync(l.ctx, configItems, result)
+	l.Logger.Infof("sendTaskNotification: notification queued for task %s, status=%s", mainTaskId, status)
 }

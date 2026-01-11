@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -24,6 +25,15 @@ type DomainScanOptions struct {
 	Subfinder  bool `json:"subfinder"`
 	Massdns    bool `json:"massdns"`
 	Concurrent int  `json:"concurrent"`
+}
+
+// Validate 验证 DomainScanOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *DomainScanOptions) Validate() error {
+	if o.Concurrent < 0 {
+		return fmt.Errorf("concurrent must be non-negative, got %d", o.Concurrent)
+	}
+	return nil
 }
 
 // Scan 执行域名扫描

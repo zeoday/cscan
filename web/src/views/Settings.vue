@@ -18,15 +18,18 @@
             <el-tabs v-model="apiConfigTab" type="card">
               <el-tab-pane label="Fofa" name="fofa">
                 <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
-                  <el-form-item label="Email">
-                    <el-input v-model="apiConfigs.fofa.key" placeholder="Fofa账号邮箱" />
+                  <el-form-item label="API版本">
+                    <el-radio-group v-model="apiConfigs.fofa.version">
+                      <el-radio value="v1">v1 (fofa.info)</el-radio>
+                      <el-radio value="v5">v5 (v5.fofa.info)</el-radio>
+                    </el-radio-group>
                   </el-form-item>
                   <el-form-item label="API Key">
-                    <el-input v-model="apiConfigs.fofa.secret" placeholder="Fofa API Key" show-password />
+                    <el-input v-model="apiConfigs.fofa.key" placeholder="Fofa API Key" show-password />
                   </el-form-item>
                   <el-form-item>
                     <el-button type="primary" @click="saveApiConfig('fofa')">保存</el-button>
-                    <el-button type="success" @click="openApiUrl('https://fofa.info/userInfo')">申请API</el-button>
+                    <el-button type="success" @click="openApiUrl(apiConfigs.fofa.version === 'v5' ? 'https://v5.fofa.info/userInfo' : 'https://fofa.info/userInfo')">申请API</el-button>
                   </el-form-item>
                 </el-form>
               </el-tab-pane>
@@ -157,6 +160,48 @@
           </div>
         </el-tab-pane>
 
+        <!-- 通知配置 -->
+        <el-tab-pane label="通知配置" name="notify">
+          <div class="tab-content">
+            <el-alert type="info" :closable="false" style="margin-bottom: 20px">
+              <template #title>配置任务完成通知，支持邮件、飞书、钉钉、企微、Slack、Discord、Telegram、Teams、Gotify、Webhook等渠道</template>
+            </el-alert>
+            
+            <div class="tab-action-bar">
+              <el-button type="primary" @click="showNotifyDialog()">
+                <el-icon><Plus /></el-icon>添加通知渠道
+              </el-button>
+            </div>
+            
+            <el-table :data="notifyConfigList" v-loading="notifyLoading" stripe max-height="500">
+              <el-table-column prop="name" label="名称" min-width="120" />
+              <el-table-column label="渠道" width="140">
+                <template #default="{ row }">
+                  <el-tag>{{ getProviderName(row.provider) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="100">
+                <template #default="{ row }">
+                  <el-switch
+                    v-model="row.status"
+                    active-value="enable"
+                    inactive-value="disable"
+                    @change="handleNotifyStatusChange(row)"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column prop="updateTime" label="更新时间" width="160" />
+              <el-table-column label="操作" width="200" fixed="right">
+                <template #default="{ row }">
+                  <el-button type="primary" link size="small" @click="showNotifyDialog(row)">编辑</el-button>
+                  <el-button type="success" link size="small" @click="handleTestNotify(row)" :loading="row.testing">测试</el-button>
+                  <el-button type="danger" link size="small" @click="handleDeleteNotify(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </el-tab-pane>
+
 
         <!-- 用户管理 -->
         <el-tab-pane label="用户管理" name="user">
@@ -257,6 +302,87 @@
         <el-button type="primary" :loading="orgSubmitting" @click="handleOrgSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 通知配置对话框 -->
+    <el-dialog v-model="notifyDialogVisible" :title="notifyForm.id ? '编辑通知配置' : '添加通知渠道'" width="600px">
+      <el-form ref="notifyFormRef" :model="notifyForm" :rules="notifyRules" label-width="120px">
+        <el-form-item label="渠道类型" prop="provider">
+          <el-select v-model="notifyForm.provider" placeholder="请选择通知渠道" @change="handleProviderChange" :disabled="!!notifyForm.id">
+            <el-option v-for="p in notifyProviders" :key="p.id" :label="p.name" :value="p.id">
+              <span>{{ p.name }}</span>
+              <span style="color: #999; font-size: 12px; margin-left: 8px">{{ p.description }}</span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="配置名称" prop="name">
+          <el-input v-model="notifyForm.name" placeholder="请输入配置名称" />
+        </el-form-item>
+        
+        <!-- 动态配置字段 -->
+        <template v-if="currentProviderFields.length > 0">
+          <el-divider content-position="left">渠道配置</el-divider>
+          <el-form-item 
+            v-for="field in currentProviderFields" 
+            :key="field.name" 
+            :label="field.label"
+            :prop="'configData.' + field.name"
+            :rules="field.required ? [{ required: true, message: '请输入' + field.label, trigger: 'blur' }] : []"
+          >
+            <el-input 
+              v-if="field.type === 'text'" 
+              v-model="notifyForm.configData[field.name]" 
+              :placeholder="field.placeholder" 
+            />
+            <el-input 
+              v-else-if="field.type === 'password'" 
+              v-model="notifyForm.configData[field.name]" 
+              :placeholder="field.placeholder" 
+              show-password 
+            />
+            <el-input 
+              v-else-if="field.type === 'textarea'" 
+              v-model="notifyForm.configData[field.name]" 
+              type="textarea" 
+              :rows="3" 
+              :placeholder="field.placeholder" 
+            />
+            <el-input-number 
+              v-else-if="field.type === 'number'" 
+              v-model="notifyForm.configData[field.name]" 
+              :placeholder="field.placeholder" 
+              controls-position="right"
+            />
+            <el-switch 
+              v-else-if="field.type === 'switch'" 
+              v-model="notifyForm.configData[field.name]" 
+            />
+            <el-select 
+              v-else-if="field.type === 'select'" 
+              v-model="notifyForm.configData[field.name]" 
+              :placeholder="field.placeholder || '请选择'"
+              clearable
+            >
+              <el-option v-for="opt in field.options" :key="opt" :label="opt || '默认'" :value="opt" />
+            </el-select>
+          </el-form-item>
+        </template>
+        
+        <el-divider content-position="left">消息模板（可选）</el-divider>
+        <el-form-item label="自定义模板">
+          <el-input 
+            v-model="notifyForm.messageTemplate" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="留空使用默认模板。支持变量: {{.TaskName}}, {{.Status}}, {{.AssetCount}}, {{.VulCount}}, {{.Duration}}" 
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="notifyDialogVisible = false">取消</el-button>
+        <el-button type="success" @click="handleTestNotifyForm" :loading="notifyTesting">测试</el-button>
+        <el-button type="primary" :loading="notifySubmitting" @click="handleNotifySubmit">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -269,6 +395,7 @@ import { Plus } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { getSubfinderProviderList, getSubfinderProviderInfo, saveSubfinderProvider as saveSubfinderProviderApi } from '@/api/subfinder'
 import { getUserList, createUser, updateUser, deleteUser, resetUserPassword } from '@/api/auth'
+import { getNotifyProviders, getNotifyConfigList, saveNotifyConfig, deleteNotifyConfig, testNotifyConfig } from '@/api/notify'
 
 const route = useRoute()
 const activeTab = ref('onlineapi')
@@ -277,7 +404,7 @@ const subfinderLoading = ref(false)
 const subfinderProviders = ref([])
 
 const apiConfigs = reactive({
-  fofa: { key: '', secret: '' },
+  fofa: { key: '', secret: '', version: 'v1' },
   hunter: { key: '', secret: '' },
   quake: { key: '', secret: '' }
 })
@@ -335,6 +462,21 @@ const orgFormRef = ref()
 const orgForm = reactive({ id: '', name: '', description: '' })
 const orgRules = { name: [{ required: true, message: '请输入组织名称', trigger: 'blur' }] }
 
+// 通知配置相关
+const notifyLoading = ref(false)
+const notifyConfigList = ref([])
+const notifyProviders = ref([])
+const notifyDialogVisible = ref(false)
+const notifySubmitting = ref(false)
+const notifyTesting = ref(false)
+const notifyFormRef = ref()
+const notifyForm = ref({ id: '', name: '', provider: '', configData: {}, messageTemplate: '', status: 'enable' })
+const notifyRules = {
+  provider: [{ required: true, message: '请选择通知渠道', trigger: 'change' }],
+  name: [{ required: true, message: '请输入配置名称', trigger: 'blur' }]
+}
+const currentProviderFields = ref([])
+
 onMounted(() => {
   // 处理URL中的tab参数
   if (route.query.tab) {
@@ -352,6 +494,9 @@ watch(activeTab, (val) => {
     loadUserList()
   } else if (val === 'organization' && orgList.value.length === 0) {
     loadOrgList()
+  } else if (val === 'notify' && notifyProviders.value.length === 0) {
+    loadNotifyProviders()
+    loadNotifyConfigList()
   }
 })
 
@@ -363,6 +508,9 @@ async function loadApiConfigs() {
       if (apiConfigs[item.platform]) {
         apiConfigs[item.platform].key = item.key
         apiConfigs[item.platform].secret = item.secret
+        if (item.platform === 'fofa' && item.version) {
+          apiConfigs.fofa.version = item.version
+        }
       }
     })
   }
@@ -370,11 +518,16 @@ async function loadApiConfigs() {
 
 async function saveApiConfig(platform) {
   const config = apiConfigs[platform]
-  const res = await request.post('/onlineapi/config/save', {
+  const data = {
     platform,
     key: config.key,
     secret: config.secret
-  })
+  }
+  // Fofa需要传递版本信息
+  if (platform === 'fofa') {
+    data.version = config.version
+  }
+  const res = await request.post('/onlineapi/config/save', data)
   if (res.code === 0) {
     ElMessage.success('保存成功')
   } else {
@@ -631,6 +784,171 @@ async function handleOrgStatusChange(row) {
     row.status = row.status === 'enable' ? 'disable' : 'enable'
     ElMessage.error(data.msg || '状态更新失败')
   }
+}
+
+// 通知配置管理
+async function loadNotifyProviders() {
+  try {
+    const res = await getNotifyProviders()
+    if (res.code === 0) {
+      notifyProviders.value = res.list || []
+    }
+  } catch (error) {
+    console.error('加载通知提供者失败:', error)
+  }
+}
+
+async function loadNotifyConfigList() {
+  notifyLoading.value = true
+  try {
+    const res = await getNotifyConfigList()
+    if (res.code === 0) {
+      notifyConfigList.value = (res.list || []).map(item => ({ ...item, testing: false }))
+    }
+  } finally {
+    notifyLoading.value = false
+  }
+}
+
+function getProviderName(providerId) {
+  const provider = notifyProviders.value.find(p => p.id === providerId)
+  return provider ? provider.name : providerId
+}
+
+function handleProviderChange(providerId) {
+  const provider = notifyProviders.value.find(p => p.id === providerId)
+  currentProviderFields.value = provider ? provider.configFields || [] : []
+  // 重置配置数据
+  notifyForm.value.configData = {}
+}
+
+function showNotifyDialog(row = null) {
+  if (row) {
+    // 编辑模式
+    let configData = {}
+    try {
+      configData = JSON.parse(row.config || '{}')
+    } catch (e) {
+      configData = {}
+    }
+    notifyForm.value = {
+      id: row.id,
+      name: row.name,
+      provider: row.provider,
+      configData: configData,
+      messageTemplate: row.messageTemplate || '',
+      status: row.status
+    }
+    // 加载对应provider的字段
+    const provider = notifyProviders.value.find(p => p.id === row.provider)
+    currentProviderFields.value = provider ? provider.configFields || [] : []
+  } else {
+    // 新增模式
+    notifyForm.value = { id: '', name: '', provider: '', configData: {}, messageTemplate: '', status: 'enable' }
+    currentProviderFields.value = []
+  }
+  notifyDialogVisible.value = true
+}
+
+async function handleNotifySubmit() {
+  if (!notifyFormRef.value) return
+  try {
+    await notifyFormRef.value.validate()
+    notifySubmitting.value = true
+    
+    const data = {
+      id: notifyForm.value.id,
+      name: notifyForm.value.name,
+      provider: notifyForm.value.provider,
+      config: JSON.stringify(notifyForm.value.configData),
+      messageTemplate: notifyForm.value.messageTemplate,
+      status: notifyForm.value.status
+    }
+    
+    const res = await saveNotifyConfig(data)
+    if (res.code === 0) {
+      ElMessage.success(res.msg || '保存成功')
+      notifyDialogVisible.value = false
+      loadNotifyConfigList()
+    } else {
+      ElMessage.error(res.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('表单验证失败:', error)
+  } finally {
+    notifySubmitting.value = false
+  }
+}
+
+async function handleNotifyStatusChange(row) {
+  const data = {
+    id: row.id,
+    name: row.name,
+    provider: row.provider,
+    config: row.config,
+    messageTemplate: row.messageTemplate,
+    status: row.status
+  }
+  const res = await saveNotifyConfig(data)
+  if (res.code === 0) {
+    ElMessage.success('状态更新成功')
+  } else {
+    row.status = row.status === 'enable' ? 'disable' : 'enable'
+    ElMessage.error(res.msg || '状态更新失败')
+  }
+}
+
+async function handleTestNotify(row) {
+  row.testing = true
+  try {
+    const res = await testNotifyConfig({
+      provider: row.provider,
+      config: row.config,
+      messageTemplate: row.messageTemplate
+    })
+    if (res.code === 0) {
+      ElMessage.success(res.msg || '测试成功，请检查是否收到通知')
+    } else {
+      ElMessage.error(res.msg || '测试失败')
+    }
+  } finally {
+    row.testing = false
+  }
+}
+
+async function handleTestNotifyForm() {
+  if (!notifyForm.value.provider) {
+    ElMessage.warning('请先选择通知渠道')
+    return
+  }
+  notifyTesting.value = true
+  try {
+    const res = await testNotifyConfig({
+      provider: notifyForm.value.provider,
+      config: JSON.stringify(notifyForm.value.configData),
+      messageTemplate: notifyForm.value.messageTemplate
+    })
+    if (res.code === 0) {
+      ElMessage.success(res.msg || '测试成功，请检查是否收到通知')
+    } else {
+      ElMessage.error(res.msg || '测试失败')
+    }
+  } finally {
+    notifyTesting.value = false
+  }
+}
+
+async function handleDeleteNotify(row) {
+  try {
+    await ElMessageBox.confirm('确定要删除该通知配置吗？', '提示', { type: 'warning' })
+    const res = await deleteNotifyConfig(row.id)
+    if (res.code === 0) {
+      ElMessage.success(res.msg || '删除成功')
+      loadNotifyConfigList()
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch (error) {}
 }
 </script>
 

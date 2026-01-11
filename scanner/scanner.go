@@ -4,12 +4,29 @@ import (
 	"context"
 )
 
+// ScannerOptions 扫描器选项接口
+// 所有扫描器的选项结构体都应该实现此接口
+// 用于类型安全的配置验证
+type ScannerOptions interface {
+	// Validate 验证选项是否有效
+	// 返回 nil 表示验证通过，否则返回描述性错误
+	Validate() error
+}
+
 // Scanner 扫描器接口
 type Scanner interface {
 	// Name 扫描器名称
 	Name() string
 	// Scan 执行扫描
 	Scan(ctx context.Context, config *ScanConfig) (*ScanResult, error)
+}
+
+// TypedScanner 类型安全的扫描器接口（泛型版本）
+// 用于需要强类型选项的扫描器实现
+type TypedScanner[T ScannerOptions] interface {
+	Scanner
+	// ScanWithOptions 使用类型安全的选项执行扫描
+	ScanWithOptions(ctx context.Context, config *ScanConfig, opts T) (*ScanResult, error)
 }
 
 // ScanConfig 扫描配置
@@ -24,6 +41,21 @@ type ScanConfig struct {
 	TaskLogger func(level, format string, args ...interface{}) `json:"-"`
 	// OnProgress 进度回调，参数为当前进度(0-100)和描述
 	OnProgress func(progress int, message string) `json:"-"`
+}
+
+// GetTypedOptions 从 ScanConfig 中提取类型安全的选项
+// 如果 Options 已经是目标类型，直接返回
+// 否则返回 nil 和 false
+func GetTypedOptions[T ScannerOptions](config *ScanConfig) (T, bool) {
+	if config.Options == nil {
+		var zero T
+		return zero, false
+	}
+	if opts, ok := config.Options.(T); ok {
+		return opts, true
+	}
+	var zero T
+	return zero, false
 }
 
 // ScanResult 扫描结果
@@ -63,6 +95,10 @@ type Asset struct {
 	Path          string `json:"path,omitempty"`          // 发现的路径
 	ContentLength int64  `json:"contentLength,omitempty"` // 响应内容长度
 	ContentType   string `json:"contentType,omitempty"`   // 响应内容类型
+	// 子域接管检测字段
+	TakeoverRisk    bool   `json:"takeoverRisk,omitempty"`    // 是否存在接管风险
+	TakeoverService string `json:"takeoverService,omitempty"` // 可接管的服务
+	TakeoverCName   string `json:"takeoverCname,omitempty"`   // 指向的CNAME
 }
 
 // IPInfo IP信息

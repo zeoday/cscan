@@ -315,7 +315,7 @@
             <el-table-column label="操作" width="150">
               <template #default="{ row }">
                 <el-button type="primary" link size="small" @click="showDirscanDictForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteDirscanDict(row)" :disabled="row.isBuiltin">删除</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteDirscanDict(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -328,6 +328,66 @@
             class="pagination"
             @size-change="loadDirscanDicts"
             @current-change="loadDirscanDicts"
+          />
+        </el-card>
+      </el-tab-pane>
+
+      <!-- 子域名字典 -->
+      <el-tab-pane label="子域名字典" name="subdomainDict">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>子域名字典管理</span>
+              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+                共 {{ subdomainDictPagination.total || 0 }} 个字典
+              </span>
+              <div style="margin-left: auto">
+                <el-button type="danger" size="small" @click="handleClearSubdomainDict" :loading="clearSubdomainDictLoading" style="margin-right: 10px">
+                  <el-icon><Delete /></el-icon>清空自定义
+                </el-button>
+                <el-button type="primary" size="small" @click="showSubdomainDictForm()">
+                  <el-icon><Plus /></el-icon>新增字典
+                </el-button>
+              </div>
+            </div>
+          </template>
+          <p class="tip-text">
+            管理子域名暴力破解使用的字典文件，支持自定义子域名前缀列表。创建任务时可选择要使用的字典进行子域名枚举。
+          </p>
+          <el-table :data="subdomainDicts" stripe v-loading="subdomainDictLoading" max-height="500">
+            <el-table-column prop="name" label="字典名称" width="200" />
+            <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="wordCount" label="词条数量" width="100" />
+            <el-table-column prop="isBuiltin" label="类型" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">
+                  {{ row.isBuiltin ? '内置' : '自定义' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="enabled" label="状态" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
+                  {{ row.enabled ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <el-button type="primary" link size="small" @click="showSubdomainDictForm(row)">编辑</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteSubdomainDict(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            v-model:current-page="subdomainDictPagination.page"
+            v-model:page-size="subdomainDictPagination.pageSize"
+            :total="subdomainDictPagination.total"
+            :page-sizes="[20, 50, 100]"
+            layout="total, sizes, prev, pager, next"
+            class="pagination"
+            @size-change="loadSubdomainDicts"
+            @current-change="loadSubdomainDicts"
           />
         </el-card>
       </el-tab-pane>
@@ -365,6 +425,41 @@
       <template #footer>
         <el-button @click="dirscanDictDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSaveDirscanDict">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 子域名字典编辑对话框 -->
+    <el-dialog v-model="subdomainDictDialogVisible" :title="subdomainDictForm.id ? '编辑字典' : '新增字典'" width="700px">
+      <el-form ref="subdomainDictFormRef" :model="subdomainDictForm" :rules="subdomainDictRules" label-width="100px">
+        <el-form-item label="字典名称" prop="name">
+          <el-input v-model="subdomainDictForm.name" placeholder="输入字典名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="subdomainDictForm.description" placeholder="可选描述" />
+        </el-form-item>
+        <el-form-item label="词条列表" prop="content">
+          <div style="width: 100%">
+            <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
+              每行一个子域名前缀，支持 # 开头的注释行
+            </div>
+            <el-input
+              v-model="subdomainDictForm.content"
+              type="textarea"
+              :rows="15"
+              placeholder="www&#10;mail&#10;ftp&#10;admin&#10;api&#10;dev&#10;test"
+            />
+            <div style="margin-top: 8px; color: #909399; font-size: 12px">
+              当前词条数量: {{ countSubdomainWords(subdomainDictForm.content) }}
+            </div>
+          </div>
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="subdomainDictForm.enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="subdomainDictDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveSubdomainDict">保存</el-button>
       </template>
     </el-dialog>
 
@@ -967,6 +1062,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete, MagicStick, FolderOpened } from '@element-plus/icons-vue'
 import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, clearNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc, getAIConfig, saveAIConfig, validatePocSyntax } from '@/api/poc'
 import { getDirScanDictList, saveDirScanDict, deleteDirScanDict, clearDirScanDict } from '@/api/dirscan'
+import { getSubdomainDictList, saveSubdomainDict, deleteSubdomainDict, clearSubdomainDict } from '@/api/subdomain'
 import jsYaml from 'js-yaml'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
@@ -1039,6 +1135,29 @@ const dirscanDictRules = {
   content: [{ required: true, message: '请输入路径列表', trigger: 'blur' }]
 }
 const dirscanDictPagination = reactive({
+  page: 1,
+  pageSize: 20,
+  total: 0
+})
+
+// 子域名字典
+const subdomainDicts = ref([])
+const subdomainDictLoading = ref(false)
+const subdomainDictDialogVisible = ref(false)
+const subdomainDictFormRef = ref()
+const clearSubdomainDictLoading = ref(false)
+const subdomainDictForm = reactive({
+  id: '',
+  name: '',
+  description: '',
+  content: '',
+  enabled: true
+})
+const subdomainDictRules = {
+  name: [{ required: true, message: '请输入字典名称', trigger: 'blur' }],
+  content: [{ required: true, message: '请输入词条列表', trigger: 'blur' }]
+}
+const subdomainDictPagination = reactive({
   page: 1,
   pageSize: 20,
   total: 0
@@ -1306,6 +1425,8 @@ function handleTabChange(tab) {
     loadCustomPocs()
   } else if (tab === 'dirscanDict' && dirscanDicts.value.length === 0) {
     loadDirscanDicts()
+  } else if (tab === 'subdomainDict' && subdomainDicts.value.length === 0) {
+    loadSubdomainDicts()
   }
 }
 
@@ -3906,6 +4027,135 @@ async function handleClearDirscanDict() {
 
 // 计算字典路径数量
 function countDictPaths(content) {
+  if (!content) return 0
+  const lines = content.split('\n')
+  let count = 0
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith('#')) {
+      count++
+    }
+  }
+  return count
+}
+
+// ==================== 子域名字典相关方法 ====================
+
+// 加载子域名字典列表
+async function loadSubdomainDicts() {
+  subdomainDictLoading.value = true
+  try {
+    const res = await getSubdomainDictList({
+      page: subdomainDictPagination.page,
+      pageSize: subdomainDictPagination.pageSize
+    })
+    if (res.code === 0) {
+      subdomainDicts.value = res.list || []
+      subdomainDictPagination.total = res.total || 0
+    }
+  } catch (e) {
+    console.error('加载子域名字典失败:', e)
+  } finally {
+    subdomainDictLoading.value = false
+  }
+}
+
+// 显示子域名字典编辑表单
+function showSubdomainDictForm(row = null) {
+  if (row) {
+    Object.assign(subdomainDictForm, {
+      id: row.id,
+      name: row.name,
+      description: row.description || '',
+      content: row.content || '',
+      enabled: row.enabled
+    })
+  } else {
+    Object.assign(subdomainDictForm, {
+      id: '',
+      name: '',
+      description: '',
+      content: '',
+      enabled: true
+    })
+  }
+  subdomainDictDialogVisible.value = true
+}
+
+// 保存子域名字典
+async function handleSaveSubdomainDict() {
+  try {
+    await subdomainDictFormRef.value.validate()
+  } catch (e) {
+    return
+  }
+
+  try {
+    const res = await saveSubdomainDict({
+      id: subdomainDictForm.id || undefined,
+      name: subdomainDictForm.name,
+      description: subdomainDictForm.description,
+      content: subdomainDictForm.content,
+      enabled: subdomainDictForm.enabled
+    })
+    if (res.code === 0) {
+      ElMessage.success(subdomainDictForm.id ? '更新成功' : '创建成功')
+      subdomainDictDialogVisible.value = false
+      loadSubdomainDicts()
+    } else {
+      ElMessage.error(res.msg || '保存失败')
+    }
+  } catch (e) {
+    console.error('保存子域名字典失败:', e)
+    ElMessage.error('保存失败')
+  }
+}
+
+// 删除子域名字典
+async function handleDeleteSubdomainDict(row) {
+  try {
+    await ElMessageBox.confirm(`确定要删除字典 "${row.name}" 吗？`, '确认删除', {
+      type: 'warning'
+    })
+    const res = await deleteSubdomainDict({ id: row.id })
+    if (res.code === 0) {
+      ElMessage.success('删除成功')
+      loadSubdomainDicts()
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('删除子域名字典失败:', e)
+    }
+  }
+}
+
+// 清空自定义子域名字典
+async function handleClearSubdomainDict() {
+  try {
+    await ElMessageBox.confirm('确定要清空所有自定义字典吗？内置字典不会被删除。', '确认清空', {
+      type: 'warning'
+    })
+    clearSubdomainDictLoading.value = true
+    const res = await clearSubdomainDict()
+    if (res.code === 0) {
+      ElMessage.success(`已清空 ${res.deleted} 个自定义字典`)
+      loadSubdomainDicts()
+    } else {
+      ElMessage.error(res.msg || '清空失败')
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('清空子域名字典失败:', e)
+    }
+  } finally {
+    clearSubdomainDictLoading.value = false
+  }
+}
+
+// 计算子域名词条数量
+function countSubdomainWords(content) {
   if (!content) return 0
   const lines = content.split('\n')
   let count = 0

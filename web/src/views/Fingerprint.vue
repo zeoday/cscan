@@ -320,77 +320,144 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- HTTP服务映射 -->
-      <el-tab-pane label="HTTP服务映射" name="httpServiceMapping" >
-        <el-card >
-          <template #header>
-            <div class="card-header">
-              <span>HTTP服务映射配置</span>
-              <el-button type="primary" size="small" @click="showHttpServiceMappingForm()">
-                <el-icon><Plus /></el-icon>新增映射
-              </el-button>
-            </div>
-          </template>
-          <p class="tip-text">
-            配置端口扫描识别的 Service 名称与 HTTP/非HTTP 服务的映射关系。指纹识别时会根据此配置判断是否对该端口进行 HTTP 探测。
-            <br/>
-            <span style="color: #e6a23c">注意：每次扫描前会实时从数据库获取最新配置，修改后立即生效。</span>
-          </p>
-          <!-- 筛选条件 -->
-          <el-form :inline="true" class="filter-form">
-            <el-form-item label="类型">
-              <el-select v-model="httpServiceFilter.isHttp" placeholder="全部类型" clearable style="width: 150px" @change="loadHttpServiceMappings">
-                <el-option label="HTTP服务" :value="true" />
-                <el-option label="非HTTP服务" :value="false" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="搜索">
-              <el-input v-model="httpServiceFilter.keyword" placeholder="服务名称" clearable style="width: 180px" @keyup.enter="loadHttpServiceMappings" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="loadHttpServiceMappings">搜索</el-button>
-            </el-form-item>
-          </el-form>
-          <!-- 统计信息 -->
-          <div class="stats-bar">
-            <el-tag type="success" size="small">HTTP服务: {{ httpServiceStats.httpCount || 0 }}</el-tag>
-            <el-tag type="info" size="small">非HTTP服务: {{ httpServiceStats.nonHttpCount || 0 }}</el-tag>
-            <el-tag size="small">总计: {{ httpServiceStats.total || 0 }}</el-tag>
-          </div>
-          <!-- 映射列表 -->
-          <el-table :data="httpServiceMappings" stripe v-loading="httpServiceLoading" max-height="500">
-            <el-table-column prop="serviceName" label="服务名称" width="180" />
-            <el-table-column prop="isHttp" label="服务类型" width="120">
-              <template #default="{ row }">
-                <el-tag :type="row.isHttp ? 'success' : 'info'" size="small">
-                  {{ row.isHttp ? 'HTTP服务' : '非HTTP服务' }}
-                </el-tag>
+      <!-- HTTP映射 -->
+      <el-tab-pane label="HTTP映射" name="httpServiceMapping" >
+        <el-tabs v-model="httpServiceSubTab" type="card" @tab-change="handleHttpServiceSubTabChange">
+          <!-- 服务映射 -->
+          <el-tab-pane label="服务映射" name="serviceMapping">
+            <el-card>
+              <template #header>
+                <div class="card-header">
+                  <span>服务映射配置</span>
+                  <el-button type="primary" size="small" @click="showHttpServiceMappingForm()">
+                    <el-icon><Plus /></el-icon>新增映射
+                  </el-button>
+                </div>
               </template>
-            </el-table-column>
-            <el-table-column prop="description" label="描述" min-width="200" />
-            <el-table-column prop="enabled" label="状态" width="80">
-              <template #default="{ row }">
-                <el-switch v-model="row.enabled" @change="handleToggleHttpServiceEnabled(row)" size="small" />
+              <p class="tip-text">
+                配置端口扫描识别的 Service 名称与 HTTP/非HTTP 服务的映射关系。指纹识别时会根据此配置判断是否对该端口进行 HTTP 探测。
+                <br/>
+                <span style="color: #e6a23c">注意：每次扫描前会实时从数据库获取最新配置，修改后立即生效。</span>
+              </p>
+              <!-- 筛选条件 -->
+              <el-form :inline="true" class="filter-form">
+                <el-form-item label="类型">
+                  <el-select v-model="httpServiceFilter.isHttp" placeholder="全部类型" clearable style="width: 150px" @change="loadHttpServiceMappings">
+                    <el-option label="HTTP服务" :value="true" />
+                    <el-option label="非HTTP服务" :value="false" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="搜索">
+                  <el-input v-model="httpServiceFilter.keyword" placeholder="服务名称" clearable style="width: 180px" @keyup.enter="loadHttpServiceMappings" />
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" @click="loadHttpServiceMappings">搜索</el-button>
+                </el-form-item>
+              </el-form>
+              <!-- 统计信息 -->
+              <div class="stats-bar">
+                <el-tag type="success" size="small">HTTP服务: {{ httpServiceStats.httpCount || 0 }}</el-tag>
+                <el-tag type="info" size="small">非HTTP服务: {{ httpServiceStats.nonHttpCount || 0 }}</el-tag>
+                <el-tag size="small">总计: {{ httpServiceStats.total || 0 }}</el-tag>
+              </div>
+              <!-- 映射列表 -->
+              <el-table :data="httpServiceMappings" stripe v-loading="httpServiceLoading" max-height="500">
+                <el-table-column prop="serviceName" label="服务名称" width="180" />
+                <el-table-column prop="isHttp" label="服务类型" width="120">
+                  <template #default="{ row }">
+                    <el-tag :type="row.isHttp ? 'success' : 'info'" size="small">
+                      {{ row.isHttp ? 'HTTP服务' : '非HTTP服务' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="description" label="描述" min-width="200" />
+                <el-table-column prop="enabled" label="状态" width="80">
+                  <template #default="{ row }">
+                    <el-switch v-model="row.enabled" @change="handleToggleHttpServiceEnabled(row)" size="small" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120">
+                  <template #default="{ row }">
+                    <el-button type="primary" link size="small" @click="showHttpServiceMappingForm(row)">编辑</el-button>
+                    <el-button type="danger" link size="small" @click="handleDeleteHttpServiceMapping(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-pagination
+                v-model:current-page="httpServicePagination.page"
+                v-model:page-size="httpServicePagination.pageSize"
+                :total="httpServicePagination.total"
+                :page-sizes="[10,20, 50, 100]"
+                layout="total, sizes, prev, pager, next"
+                class="pagination"
+                @size-change="loadHttpServiceMappings"
+                @current-change="loadHttpServiceMappings"
+              />
+            </el-card>
+          </el-tab-pane>
+
+          <!-- Web端口设置 -->
+          <el-tab-pane label="端口映射" name="webPorts">
+            <el-card>
+              <template #header>
+                <div class="card-header">
+                  <span>Web端口配置</span>
+                  <el-button type="primary" size="small" @click="handleSaveWebPortsConfig" :loading="webPortsSaving">
+                    <el-icon><Check /></el-icon>保存配置
+                  </el-button>
+                </div>
               </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120">
-              <template #default="{ row }">
-                <el-button type="primary" link size="small" @click="showHttpServiceMappingForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteHttpServiceMapping(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            v-model:current-page="httpServicePagination.page"
-            v-model:page-size="httpServicePagination.pageSize"
-            :total="httpServicePagination.total"
-            :page-sizes="[10,20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            class="pagination"
-            @size-change="loadHttpServiceMappings"
-            @current-change="loadHttpServiceMappings"
-          />
-        </el-card>
+              <p class="tip-text">
+                配置默认的 HTTP/HTTPS 端口列表。当端口扫描无法识别服务名称时，会根据端口号判断是否为 Web 服务。
+                <br/>
+                <span style="color: #e6a23c">注意：每次扫描前会实时从数据库获取最新配置，修改后立即生效。</span>
+              </p>
+              
+              <el-form :model="webPortsConfig" label-width="120px" v-loading="webPortsLoading" class="web-ports-form">
+                <el-form-item label="HTTP端口">
+                  <div class="ports-input-wrapper">
+                    <el-input
+                      v-model="webPortsConfig.httpPortsText"
+                      type="textarea"
+                      :rows="4"
+                      placeholder="输入HTTP端口，多个端口用逗号、空格或换行分隔，如: 80, 8080, 8000"
+                    />
+                    <div class="ports-count">
+                      共 {{ parsePortsCount(webPortsConfig.httpPortsText) }} 个端口
+                    </div>
+                  </div>
+                  <div class="form-tip">常见HTTP端口：80, 8080, 8000, 8888, 3000, 5000, 9000 等</div>
+                </el-form-item>
+                
+                <el-form-item label="HTTPS端口">
+                  <div class="ports-input-wrapper">
+                    <el-input
+                      v-model="webPortsConfig.httpsPortsText"
+                      type="textarea"
+                      :rows="3"
+                      placeholder="输入HTTPS端口，多个端口用逗号、空格或换行分隔，如: 443, 8443"
+                    />
+                    <div class="ports-count">
+                      共 {{ parsePortsCount(webPortsConfig.httpsPortsText) }} 个端口
+                    </div>
+                  </div>
+                  <div class="form-tip">常见HTTPS端口：443, 8443, 9443, 4443 等</div>
+                </el-form-item>
+                
+                <el-form-item label="描述">
+                  <el-input v-model="webPortsConfig.description" placeholder="可选描述信息" />
+                </el-form-item>
+              </el-form>
+              
+              <el-divider content-position="left">快捷操作</el-divider>
+              <div class="quick-actions">
+                <el-button size="small" @click="resetWebPortsToDefault">恢复默认配置</el-button>
+                <el-button size="small" @click="addCommonHttpPorts">添加常用HTTP端口</el-button>
+                <el-button size="small" @click="addCommonHttpsPorts">添加常用HTTPS端口</el-button>
+              </div>
+            </el-card>
+          </el-tab-pane>
+        </el-tabs>
       </el-tab-pane>
     </el-tabs>
 
@@ -1137,8 +1204,8 @@ SpringBoot-Actuator:
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, ArrowDown, Delete, Upload, Search, Download, Operation, Loading } from '@element-plus/icons-vue'
-import { getFingerprintList, saveFingerprint, deleteFingerprint, getFingerprintCategories, syncFingerprints, updateFingerprintEnabled, batchUpdateFingerprintEnabled, importFingerprints, clearCustomFingerprints, validateFingerprint as validateFingerprintApi, batchValidateFingerprints, matchFingerprintAssets, getHttpServiceMappingList, saveHttpServiceMapping, deleteHttpServiceMapping, getActiveFingerprintList, saveActiveFingerprint, deleteActiveFingerprint, importActiveFingerprints, exportActiveFingerprints, clearActiveFingerprints, validateActiveFingerprint } from '@/api/fingerprint'
+import { Plus, Refresh, ArrowDown, Delete, Upload, Search, Download, Operation, Loading, Check } from '@element-plus/icons-vue'
+import { getFingerprintList, saveFingerprint, deleteFingerprint, getFingerprintCategories, syncFingerprints, updateFingerprintEnabled, batchUpdateFingerprintEnabled, importFingerprints, clearCustomFingerprints, validateFingerprint as validateFingerprintApi, batchValidateFingerprints, matchFingerprintAssets, getHttpServiceMappingList, saveHttpServiceMapping, deleteHttpServiceMapping, getHttpServiceConfig, saveHttpServiceConfig, getActiveFingerprintList, saveActiveFingerprint, deleteActiveFingerprint, importActiveFingerprints, exportActiveFingerprints, clearActiveFingerprints, validateActiveFingerprint } from '@/api/fingerprint'
 import { saveAs } from 'file-saver'
 
 const activeTab = ref('builtin')
@@ -1241,6 +1308,7 @@ const fingerprintRules = {
 }
 
 // HTTP服务映射
+const httpServiceSubTab = ref('serviceMapping') // 子tab: serviceMapping, webPorts
 const httpServiceMappings = ref([])
 const httpServiceLoading = ref(false)
 const httpServiceFilter = reactive({
@@ -1271,6 +1339,19 @@ const httpServiceMappingForm = reactive({
 const httpServiceMappingRules = {
   serviceName: [{ required: true, message: '请输入服务名称', trigger: 'blur' }]
 }
+
+// Web端口配置
+const webPortsLoading = ref(false)
+const webPortsSaving = ref(false)
+const webPortsConfig = reactive({
+  httpPortsText: '',
+  httpsPortsText: '',
+  description: ''
+})
+
+// 默认端口配置
+const defaultHttpPorts = [80, 8080, 8000, 8888, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 9000, 9001, 9080, 3000, 3001, 5000, 5001, 8008, 8009, 8181, 8200, 8300, 8400, 8500, 8600, 8800, 8880, 8983, 9090, 9091, 9200, 9300, 10000]
+const defaultHttpsPorts = [443, 8443, 9443, 4443, 10443]
 
 // 主动扫描指纹
 const activeFingerprints = ref([])
@@ -2156,6 +2237,107 @@ async function handleDeleteHttpServiceMapping(row) {
   } else {
     ElMessage.error(res.msg || '删除失败')
   }
+}
+
+// ==================== Web端口配置相关方法 ====================
+
+// 处理HTTP服务子tab切换
+function handleHttpServiceSubTabChange(tab) {
+  if (tab === 'serviceMapping' && httpServiceMappings.value.length === 0) {
+    loadHttpServiceMappings()
+  } else if (tab === 'webPorts' && !webPortsConfig.httpPortsText) {
+    loadWebPortsConfig()
+  }
+}
+
+// 加载Web端口配置
+async function loadWebPortsConfig() {
+  webPortsLoading.value = true
+  try {
+    const res = await getHttpServiceConfig()
+    if (res.code === 0 && res.data) {
+      const data = res.data
+      webPortsConfig.httpPortsText = (data.httpPorts || []).join(', ')
+      webPortsConfig.httpsPortsText = (data.httpsPorts || []).join(', ')
+      webPortsConfig.description = data.description || ''
+    }
+  } catch (e) {
+    console.error('Failed to load web ports config:', e)
+  } finally {
+    webPortsLoading.value = false
+  }
+}
+
+// 解析端口文本为数组
+function parsePortsText(text) {
+  if (!text) return []
+  // 支持逗号、空格、换行分隔
+  return text.split(/[,\s\n]+/)
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => !isNaN(n) && n > 0 && n <= 65535)
+    .filter((v, i, a) => a.indexOf(v) === i) // 去重
+    .sort((a, b) => a - b)
+}
+
+// 计算端口数量
+function parsePortsCount(text) {
+  return parsePortsText(text).length
+}
+
+// 保存Web端口配置
+async function handleSaveWebPortsConfig() {
+  const httpPorts = parsePortsText(webPortsConfig.httpPortsText)
+  const httpsPorts = parsePortsText(webPortsConfig.httpsPortsText)
+  
+  if (httpPorts.length === 0 && httpsPorts.length === 0) {
+    ElMessage.warning('请至少配置一个端口')
+    return
+  }
+  
+  webPortsSaving.value = true
+  try {
+    const res = await saveHttpServiceConfig({
+      httpPorts,
+      httpsPorts,
+      description: webPortsConfig.description
+    })
+    if (res.code === 0) {
+      ElMessage.success('保存成功')
+      // 更新显示的文本（格式化后的）
+      webPortsConfig.httpPortsText = httpPorts.join(', ')
+      webPortsConfig.httpsPortsText = httpsPorts.join(', ')
+    } else {
+      ElMessage.error(res.msg || '保存失败')
+    }
+  } finally {
+    webPortsSaving.value = false
+  }
+}
+
+// 恢复默认配置
+function resetWebPortsToDefault() {
+  webPortsConfig.httpPortsText = defaultHttpPorts.join(', ')
+  webPortsConfig.httpsPortsText = defaultHttpsPorts.join(', ')
+  webPortsConfig.description = '默认HTTP服务端口配置'
+  ElMessage.info('已恢复默认配置，请点击保存生效')
+}
+
+// 添加常用HTTP端口
+function addCommonHttpPorts() {
+  const commonPorts = [80, 8080, 8000, 8888, 3000, 5000, 9000]
+  const currentPorts = parsePortsText(webPortsConfig.httpPortsText)
+  const newPorts = [...new Set([...currentPorts, ...commonPorts])].sort((a, b) => a - b)
+  webPortsConfig.httpPortsText = newPorts.join(', ')
+  ElMessage.info('已添加常用HTTP端口，请点击保存生效')
+}
+
+// 添加常用HTTPS端口
+function addCommonHttpsPorts() {
+  const commonPorts = [443, 8443, 9443, 4443]
+  const currentPorts = parsePortsText(webPortsConfig.httpsPortsText)
+  const newPorts = [...new Set([...currentPorts, ...commonPorts])].sort((a, b) => a - b)
+  webPortsConfig.httpsPortsText = newPorts.join(', ')
+  ElMessage.info('已添加常用HTTPS端口，请点击保存生效')
 }
 
 // ==================== 主动扫描指纹相关方法 ====================

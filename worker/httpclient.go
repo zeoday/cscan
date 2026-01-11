@@ -305,6 +305,30 @@ type HttpServiceResp struct {
 	Count    int32                `json:"count"`
 }
 
+// HttpServiceConfig HTTP服务配置
+type HttpServiceConfig struct {
+	HttpPorts   []int  `json:"httpPorts"`
+	HttpsPorts  []int  `json:"httpsPorts"`
+	Description string `json:"description"`
+}
+
+// HttpServiceConfigResp HTTP服务配置响应
+type HttpServiceConfigResp struct {
+	Code    int               `json:"code"`
+	Msg     string            `json:"msg"`
+	Success bool              `json:"success"`
+	Data    HttpServiceConfig `json:"data"`
+}
+
+// HttpServiceSettingsResp HTTP服务设置完整响应（包含端口配置和服务映射）
+type HttpServiceSettingsResp struct {
+	Code     int                  `json:"code"`
+	Msg      string               `json:"msg"`
+	Success  bool                 `json:"success"`
+	Config   HttpServiceConfig    `json:"config"`
+	Mappings []HttpServiceMapping `json:"mappings"`
+}
+
 // PocByIdReq POC获取请求
 type PocByIdReq struct {
 	PocId   string `json:"pocId"`
@@ -653,6 +677,21 @@ func (c *WorkerHTTPClient) GetHttpServiceMappings(ctx context.Context, enabledOn
 	return &resp, nil
 }
 
+// GetHttpServiceSettings 获取HTTP服务设置（包含端口配置和服务映射）
+func (c *WorkerHTTPClient) GetHttpServiceSettings(ctx context.Context) (*HttpServiceSettingsResp, error) {
+	respBody, err := c.doRequest(ctx, http.MethodPost, "/api/v1/worker/config/httpservice/settings", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp HttpServiceSettingsResp
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response failed: %w", err)
+	}
+
+	return &resp, nil
+}
+
 // GetPocById 根据ID获取POC
 func (c *WorkerHTTPClient) GetPocById(ctx context.Context, pocId, pocType string) (*PocByIdResp, error) {
 	req := &PocByIdReq{
@@ -707,6 +746,47 @@ func (c *WorkerHTTPClient) GetDirScanDicts(ctx context.Context, dictIds []string
 	}
 
 	var resp DirScanDictResp
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response failed: %w", err)
+	}
+
+	return &resp, nil
+}
+
+// ==================== Subdomain Dict ====================
+
+// SubdomainDictReq 子域名字典获取请求
+type SubdomainDictReq struct {
+	DictIds []string `json:"dictIds"`
+}
+
+// SubdomainDictItem 子域名字典项
+type SubdomainDictItem struct {
+	Id      string `json:"id"`
+	Name    string `json:"name"`
+	Content string `json:"content"` // 字典内容（每行一个前缀）
+}
+
+// SubdomainDictResp 子域名字典获取响应
+type SubdomainDictResp struct {
+	Code  int                 `json:"code"`
+	Msg   string              `json:"msg"`
+	Dicts []SubdomainDictItem `json:"dicts"`
+	Count int                 `json:"count"`
+}
+
+// GetSubdomainDicts 获取子域名字典
+func (c *WorkerHTTPClient) GetSubdomainDicts(ctx context.Context, dictIds []string) (*SubdomainDictResp, error) {
+	req := &SubdomainDictReq{
+		DictIds: dictIds,
+	}
+
+	respBody, err := c.doRequest(ctx, http.MethodPost, "/api/v1/worker/config/subdomaindict", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp SubdomainDictResp
 	if err := json.Unmarshal(respBody, &resp); err != nil {
 		return nil, fmt.Errorf("unmarshal response failed: %w", err)
 	}

@@ -169,6 +169,8 @@
             <el-descriptions-item label="扫描类型">{{ parsedConfig.portscan?.scanType === 's' ? 'SYN' : 'CONNECT' }}</el-descriptions-item>
             <el-descriptions-item label="超时时间">{{ parsedConfig.portscan?.timeout || 60 }}秒</el-descriptions-item>
             <el-descriptions-item label="跳过主机发现">{{ parsedConfig.portscan?.skipHostDiscovery ? '是' : '否' }}</el-descriptions-item>
+            <el-descriptions-item label="排除CDN/WAF">{{ parsedConfig.portscan?.excludeCDN ? '是' : '否' }}</el-descriptions-item>
+            <el-descriptions-item label="排除目标">{{ parsedConfig.portscan?.excludeHosts || '-' }}</el-descriptions-item>
           </el-descriptions>
         </div>
         
@@ -380,8 +382,18 @@
                 </el-col>
               </el-row>
               <el-form-item label="高级选项">
-                <el-checkbox v-model="form.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
-                <span class="form-hint">跳过主机存活检测，直接扫描端口</span>
+                <div style="display: block; width: 100%">
+                  <el-checkbox v-model="form.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
+                  <span class="form-hint">跳过主机存活检测，直接扫描端口</span>
+                </div>
+                <div v-if="form.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
+                  <el-checkbox v-model="form.excludeCDN">排除 CDN/WAF (-ec)</el-checkbox>
+                  <span class="form-hint">CDN/WAF IP 仅扫描 80,443 端口</span>
+                </div>
+              </el-form-item>
+              <el-form-item label="排除目标">
+                <el-input v-model="form.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
+                <span class="form-hint">排除的 IP/CIDR，逗号分隔</span>
               </el-form-item>
             </template>
           </el-form>
@@ -612,6 +624,8 @@ const form = reactive({
   scanType: 'c',
   portscanTimeout: 60,
   skipHostDiscovery: false,
+  excludeCDN: false,
+  excludeHosts: '',
   portidentifyEnable: false,
   portidentifyTimeout: 30,
   portidentifyArgs: '',
@@ -874,6 +888,8 @@ function applyConfig(config) {
     scanType: config.portscan?.scanType || 'c',
     portscanTimeout: config.portscan?.timeout || 60,
     skipHostDiscovery: config.portscan?.skipHostDiscovery ?? false,
+    excludeCDN: config.portscan?.excludeCDN ?? false,
+    excludeHosts: config.portscan?.excludeHosts || '',
     portidentifyEnable: config.portidentify?.enable ?? false,
     portidentifyTimeout: config.portidentify?.timeout || 30,
     portidentifyArgs: config.portidentify?.args || '',
@@ -914,7 +930,7 @@ function buildConfig() {
   return {
     batchSize: form.batchSize,
     domainscan: { enable: form.domainscanEnable, subfinder: form.domainscanSubfinder, timeout: form.domainscanTimeout, maxEnumerationTime: form.domainscanMaxEnumTime, threads: form.domainscanThreads, rateLimit: form.domainscanRateLimit, all: form.domainscanAll, recursive: form.domainscanRecursive, removeWildcard: form.domainscanRemoveWildcard, resolveDNS: form.domainscanResolveDNS, concurrent: form.domainscanConcurrent },
-    portscan: { enable: form.portscanEnable, tool: form.portscanTool, rate: form.portscanRate, ports: form.ports, portThreshold: form.portThreshold, scanType: form.scanType, timeout: form.portscanTimeout, skipHostDiscovery: form.skipHostDiscovery },
+    portscan: { enable: form.portscanEnable, tool: form.portscanTool, rate: form.portscanRate, ports: form.ports, portThreshold: form.portThreshold, scanType: form.scanType, timeout: form.portscanTimeout, skipHostDiscovery: form.skipHostDiscovery, excludeCDN: form.excludeCDN, excludeHosts: form.excludeHosts },
     portidentify: { enable: form.portidentifyEnable, timeout: form.portidentifyTimeout, args: form.portidentifyArgs },
     fingerprint: { enable: form.fingerprintEnable, tool: form.fingerprintTool, iconHash: form.fingerprintIconHash, customEngine: form.fingerprintCustomEngine, screenshot: form.fingerprintScreenshot, targetTimeout: form.fingerprintTimeout },
     pocscan: { enable: form.pocscanEnable, useNuclei: true, autoScan: form.pocscanAutoScan, automaticScan: form.pocscanAutomaticScan, customPocOnly: form.pocscanCustomOnly, severity: form.pocscanSeverity.join(','), targetTimeout: form.pocscanTargetTimeout }
@@ -925,7 +941,7 @@ function buildConfig() {
 const scanConfigFields = [
   'batchSize',
   'domainscanEnable', 'domainscanSubfinder', 'domainscanTimeout', 'domainscanMaxEnumTime', 'domainscanThreads', 'domainscanRateLimit', 'domainscanAll', 'domainscanRecursive', 'domainscanRemoveWildcard', 'domainscanResolveDNS', 'domainscanConcurrent',
-  'portscanEnable', 'portscanTool', 'portscanRate', 'ports', 'portThreshold', 'scanType', 'portscanTimeout', 'skipHostDiscovery',
+  'portscanEnable', 'portscanTool', 'portscanRate', 'ports', 'portThreshold', 'scanType', 'portscanTimeout', 'skipHostDiscovery', 'excludeCDN', 'excludeHosts',
   'portidentifyEnable', 'portidentifyTimeout', 'portidentifyArgs',
   'fingerprintEnable', 'fingerprintTool', 'fingerprintIconHash', 'fingerprintCustomEngine', 'fingerprintScreenshot', 'fingerprintTimeout',
   'pocscanEnable', 'pocscanAutoScan', 'pocscanAutomaticScan', 'pocscanCustomOnly', 'pocscanSeverity', 'pocscanTargetTimeout'

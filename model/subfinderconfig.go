@@ -169,7 +169,7 @@ var SubfinderProviderInfo = []struct {
 	{"chaos", "Chaos", "ProjectDiscovery Chaos数据", "API Key", "https://chaos.projectdiscovery.io/"},
 	{"chinaz", "Chinaz", "站长之家", "API Key", "https://www.chinaz.com/"},
 	{"dnsdb", "DNSDB", "Farsight DNSDB", "API Key", "https://www.dnsdb.info/"},
-	{"fofa", "FOFA", "FOFA网络空间搜索引擎", "email:key", "https://fofa.info/userInfo"},
+	{"fofa", "FOFA", "FOFA网络空间搜索引擎", "API Key", "https://fofa.info/userInfo"},
 	{"fullhunt", "FullHunt", "FullHunt攻击面管理", "API Key", "https://fullhunt.io/"},
 	{"github", "GitHub", "GitHub代码搜索", "Personal Access Token", "https://github.com/settings/tokens"},
 	{"hunter", "Hunter", "鹰图平台", "API Key", "https://hunter.qianxin.com/home/myInfo"},

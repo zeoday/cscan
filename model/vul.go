@@ -102,6 +102,11 @@ func (m *VulModel) Count(ctx context.Context, filter bson.M) (int64, error) {
 	return m.coll.CountDocuments(ctx, filter)
 }
 
+// CountByTaskId 根据任务ID统计漏洞数量
+func (m *VulModel) CountByTaskId(ctx context.Context, taskId string) (int64, error) {
+	return m.coll.CountDocuments(ctx, bson.M{"task_id": taskId})
+}
+
 func (m *VulModel) Delete(ctx context.Context, id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

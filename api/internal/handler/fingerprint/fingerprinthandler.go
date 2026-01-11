@@ -290,6 +290,94 @@ func HttpServiceMappingDeleteHandler(svcCtx *svc.ServiceContext) http.HandlerFun
 	}
 }
 
+// ==================== HTTP服务设置 ====================
+
+// HttpServiceConfigGetHandler 获取HTTP服务配置
+func HttpServiceConfigGetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logic.NewHttpServiceConfigGetLogic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceConfigGet()
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// HttpServiceConfigSaveHandler 保存HTTP服务配置
+func HttpServiceConfigSaveHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HttpServiceConfigSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewHttpServiceConfigSaveLogic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceConfigSave(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// HttpServiceMappingListV2Handler HTTP服务映射列表（使用新模型）
+func HttpServiceMappingListV2Handler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HttpServiceMappingListReq
+		httpx.Parse(r, &req)
+
+		l := logic.NewHttpServiceMappingListV2Logic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceMappingListV2(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// HttpServiceMappingSaveV2Handler 保存HTTP服务映射（使用新模型）
+func HttpServiceMappingSaveV2Handler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HttpServiceMappingSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewHttpServiceMappingSaveV2Logic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceMappingSaveV2(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// HttpServiceMappingDeleteV2Handler 删除HTTP服务映射（使用新模型）
+func HttpServiceMappingDeleteV2Handler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HttpServiceMappingDeleteReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewHttpServiceMappingDeleteV2Logic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceMappingDeleteV2(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
 
 // FingerprintMatchAssetsHandler 验证指纹匹配现有资产
 func FingerprintMatchAssetsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

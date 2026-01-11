@@ -120,6 +120,22 @@ type WorkerHttpServiceResp struct {
 	Count    int32                      `json:"count"`
 }
 
+// WorkerHttpServiceConfig HTTP服务端口配置
+type WorkerHttpServiceConfig struct {
+	HttpPorts   []int  `json:"httpPorts"`
+	HttpsPorts  []int  `json:"httpsPorts"`
+	Description string `json:"description"`
+}
+
+// WorkerHttpServiceSettingsResp HTTP服务设置完整响应
+type WorkerHttpServiceSettingsResp struct {
+	Code     int                        `json:"code"`
+	Msg      string                     `json:"msg"`
+	Success  bool                       `json:"success"`
+	Config   WorkerHttpServiceConfig    `json:"config"`
+	Mappings []WorkerHttpServiceMapping `json:"mappings"`
+}
+
 // ==================== Active Fingerprints Config Types ====================
 
 // WorkerActiveFingerprintsReq 主动指纹获取请求
@@ -351,6 +367,56 @@ func WorkerConfigHttpServiceHandler(svcCtx *svc.ServiceContext) http.HandlerFunc
 			Success:  true,
 			Mappings: mappings,
 			Count:    rpcResp.Count,
+		})
+	}
+}
+
+// WorkerConfigHttpServiceSettingsHandler HTTP服务设置获取接口（包含端口配置和服务映射）
+// POST /api/v1/worker/config/httpservice/settings
+func WorkerConfigHttpServiceSettingsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// 获取端口配置
+		config, err := svcCtx.HttpServiceModel.GetConfig(ctx)
+		if err != nil {
+			logx.Errorf("[WorkerConfigHttpServiceSettings] GetConfig error: %v", err)
+			// 使用默认配置
+			config = &model.HttpServiceConfig{
+				HttpPorts:  []int{80, 8080, 8000, 8888, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 9000, 9001, 9080, 3000, 3001, 5000, 5001, 8008, 8009, 8181, 8200, 8300, 8400, 8500, 8600, 8800, 8880, 8983, 9090, 9091, 9200, 9300, 10000},
+				HttpsPorts: []int{443, 8443, 9443, 4443, 10443},
+			}
+		}
+
+		// 获取服务映射
+		mappingDocs, err := svcCtx.HttpServiceModel.GetEnabledMappings(ctx)
+		if err != nil {
+			logx.Errorf("[WorkerConfigHttpServiceSettings] GetEnabledMappings error: %v", err)
+			mappingDocs = []model.HttpServiceMapping{}
+		}
+
+		// 转换映射数据
+		mappings := make([]WorkerHttpServiceMapping, 0, len(mappingDocs))
+		for _, m := range mappingDocs {
+			mappings = append(mappings, WorkerHttpServiceMapping{
+				Id:          m.Id.Hex(),
+				ServiceName: m.ServiceName,
+				IsHttp:      m.IsHttp,
+				Description: m.Description,
+				Enabled:     m.Enabled,
+			})
+		}
+
+		httpx.OkJson(w, &WorkerHttpServiceSettingsResp{
+			Code:    0,
+			Msg:     "success",
+			Success: true,
+			Config: WorkerHttpServiceConfig{
+				HttpPorts:   config.HttpPorts,
+				HttpsPorts:  config.HttpsPorts,
+				Description: config.Description,
+			},
+			Mappings: mappings,
 		})
 	}
 }
@@ -592,4 +658,73 @@ func parseDictPaths(content string) []string {
 		paths = append(paths, line)
 	}
 	return paths
+}
+
+// ==================== Subdomain Dict Config Types ====================
+
+// WorkerSubdomainDictReq 子域名字典获取请求
+type WorkerSubdomainDictReq struct {
+	DictIds []string `json:"dictIds"` // 字典ID列表
+}
+
+// WorkerSubdomainDictItem 子域名字典项
+type WorkerSubdomainDictItem struct {
+	Id      string `json:"id"`
+	Name    string `json:"name"`
+	Content string `json:"content"` // 字典内容（每行一个前缀）
+}
+
+// WorkerSubdomainDictResp 子域名字典获取响应
+type WorkerSubdomainDictResp struct {
+	Code  int                       `json:"code"`
+	Msg   string                    `json:"msg"`
+	Dicts []WorkerSubdomainDictItem `json:"dicts"`
+	Count int                       `json:"count"`
+}
+
+// ==================== Subdomain Dict Handler ====================
+
+// WorkerConfigSubdomainDictHandler 子域名字典配置获取接口
+// POST /api/v1/worker/config/subdomaindict
+func WorkerConfigSubdomainDictHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req WorkerSubdomainDictReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpx.OkJson(w, &WorkerSubdomainDictResp{Code: 400, Msg: "参数解析失败"})
+			return
+		}
+
+		if len(req.DictIds) == 0 {
+			httpx.OkJson(w, &WorkerSubdomainDictResp{Code: 400, Msg: "dictIds不能为空"})
+			return
+		}
+
+		ctx := r.Context()
+		dictModel := model.NewSubdomainDictModel(svcCtx.MongoDB)
+
+		// 获取字典
+		dicts, err := dictModel.FindByIds(ctx, req.DictIds)
+		if err != nil {
+			logx.Errorf("[WorkerConfigSubdomainDict] FindByIds error: %v", err)
+			httpx.OkJson(w, &WorkerSubdomainDictResp{Code: 500, Msg: "获取字典失败"})
+			return
+		}
+
+		// 转换数据
+		items := make([]WorkerSubdomainDictItem, 0, len(dicts))
+		for _, d := range dicts {
+			items = append(items, WorkerSubdomainDictItem{
+				Id:      d.Id.Hex(),
+				Name:    d.Name,
+				Content: d.Content,
+			})
+		}
+
+		httpx.OkJson(w, &WorkerSubdomainDictResp{
+			Code:  0,
+			Msg:   "success",
+			Dicts: items,
+			Count: len(items),
+		})
+	}
 }

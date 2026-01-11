@@ -78,6 +78,16 @@ export function deleteHttpServiceMapping(data) {
   return request.post('/fingerprint/httpservice/delete', data)
 }
 
+// 获取HTTP端口配置
+export function getHttpServiceConfig() {
+  return request.get('/api/v1/httpservice/config')
+}
+
+// 保存HTTP端口配置
+export function saveHttpServiceConfig(data) {
+  return request.post('/api/v1/httpservice/config', data)
+}
+
 
 // ==================== 主动扫描指纹 API ====================
 

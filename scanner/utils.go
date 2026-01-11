@@ -280,19 +280,17 @@ func portsToString(ports []int) string {
 
 
 // IsHTTPService 判断是否为HTTP服务
-// 优先使用数据库中的HTTP服务映射配置，如果没有配置则使用默认规则
+// 优先使用数据库中的HTTP服务设置（端口+服务映射），如果没有配置则使用默认规则
 func IsHTTPService(service string, port int) bool {
 	serviceLower := strings.ToLower(service)
 
-	// 1. 优先使用全局HTTP服务检查器（从数据库加载的映射）
+	// 1. 优先使用全局HTTP服务检查器（从数据库加载的配置）
 	if globalHttpServiceChecker != nil {
-		isHttp, found := globalHttpServiceChecker.IsHttpService(serviceLower)
-		if found {
-			return isHttp
-		}
+		// 使用综合判断方法（同时检查服务名称和端口）
+		return globalHttpServiceChecker.CheckIsHttp(serviceLower, port)
 	}
 
-	// 2. 根据服务名称判断（默认规则）
+	// 2. 回退到默认规则：根据服务名称判断
 	httpServices := []string{"http", "https", "http-proxy", "http-alt", "https-alt", "ssl/http", "ssl/https"}
 	for _, hs := range httpServices {
 		if serviceLower == hs {
@@ -300,7 +298,7 @@ func IsHTTPService(service string, port int) bool {
 		}
 	}
 
-	// 3. 根据常见HTTP端口判断
+	// 3. 回退到默认规则：根据常见HTTP端口判断
 	httpPorts := map[int]bool{
 		80: true, 443: true, 8080: true, 8443: true, 8000: true, 8888: true,
 		8081: true, 8082: true, 8083: true, 8084: true, 8085: true, 8086: true,
@@ -314,16 +312,6 @@ func IsHTTPService(service string, port int) bool {
 		return true
 	}
 
-	// 4. 如果服务名为空且端口不在已知非HTTP端口列表中，默认认为可能是HTTP
-	nonHTTPPorts := map[int]bool{
-		21: true, 22: true, 23: true, 25: true, 53: true, 110: true, 143: true,
-		389: true, 445: true, 465: true, 587: true, 636: true, 993: true, 995: true,
-		1433: true, 1521: true, 3306: true, 3389: true, 5432: true, 5900: true,
-		6379: true, 11211: true, 27017: true,
-	}
-	if service == "" && !nonHTTPPorts[port] {
-		return true
-	}
-
+	// 4. 如果服务名为空且端口不在已知HTTP端口列表中，默认认为不是HTTP
 	return false
 }

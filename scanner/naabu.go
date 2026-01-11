@@ -39,6 +39,26 @@ type NaabuOptions struct {
 	ScanType          string `json:"scanType"`          // s=SYN, c=CONNECT，默认 c
 	PortThreshold     int    `json:"portThreshold"`     // 端口阈值，使用 naabu 原生 -port-threshold 参数
 	SkipHostDiscovery bool   `json:"skipHostDiscovery"` // 跳过主机发现 (-Pn)
+	ExcludeCDN        bool   `json:"excludeCDN"`        // 排除 CDN/WAF，仅扫描 80,443 端口 (-ec)
+	ExcludeHosts      string `json:"excludeHosts"`      // 排除的目标，逗号分隔 (-eh)
+}
+
+// Validate 验证 NaabuOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *NaabuOptions) Validate() error {
+	if o.Rate < 0 {
+		return fmt.Errorf("rate must be non-negative, got %d", o.Rate)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.PortThreshold < 0 {
+		return fmt.Errorf("portThreshold must be non-negative, got %d", o.PortThreshold)
+	}
+	if o.ScanType != "" && o.ScanType != "s" && o.ScanType != "c" {
+		return fmt.Errorf("scanType must be 's' (SYN) or 'c' (CONNECT), got %s", o.ScanType)
+	}
+	return nil
 }
 
 // Scan 执行Naabu扫描
@@ -97,6 +117,8 @@ func (s *NaabuScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResul
 					PortThreshold     int    `json:"portThreshold"`
 					ScanType          string `json:"scanType"`
 					SkipHostDiscovery bool   `json:"skipHostDiscovery"`
+					ExcludeCDN        bool   `json:"excludeCDN"`
+					ExcludeHosts      string `json:"excludeHosts"`
 				}
 				if err := json.Unmarshal(data, &portConfig); err == nil {
 					if portConfig.Ports != "" {
@@ -115,6 +137,8 @@ func (s *NaabuScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResul
 						opts.ScanType = portConfig.ScanType
 					}
 					opts.SkipHostDiscovery = portConfig.SkipHostDiscovery
+					opts.ExcludeCDN = portConfig.ExcludeCDN
+					opts.ExcludeHosts = portConfig.ExcludeHosts
 				}
 				
 			}
@@ -186,7 +210,7 @@ func (s *NaabuScanner) runNaabuWithLogger(ctx context.Context, targets []string,
 	}
 
 	totalTargets := len(targets)
-	logInfo("Naabu: scanning %d targets, timeout %ds/target, skipHostDiscovery=%v, ports=%s", totalTargets, timeout, opts.SkipHostDiscovery, opts.Ports)
+	logInfo("Naabu: scanning %d targets, timeout %ds/target, skipHostDiscovery=%v, excludeCDN=%v, excludeHosts=%s, ports=%s", totalTargets, timeout, opts.SkipHostDiscovery, opts.ExcludeCDN, opts.ExcludeHosts, opts.Ports)
 
 	// 串行扫描每个目标
 	for i, target := range targets {
@@ -242,8 +266,8 @@ func (s *NaabuScanner) scanSingleTargetWithLogger(ctx context.Context, target, p
 	defer cancel()
 
 	// 调试日志：打印扫描配置
-	logInfo("Naabu: scanning %s, ports=%s, topPorts=%s, rate=%d, scanType=%s, skipHostDiscovery=%v, timeout=%ds",
-		target, portsStr, topPorts, opts.Rate, opts.ScanType, opts.SkipHostDiscovery, timeout)
+	logInfo("Naabu: scanning %s, ports=%s, topPorts=%s, rate=%d, scanType=%s, skipHostDiscovery=%v, excludeCDN=%v, excludeHosts=%s, timeout=%ds",
+		target, portsStr, topPorts, opts.Rate, opts.ScanType, opts.SkipHostDiscovery, opts.ExcludeCDN, opts.ExcludeHosts, timeout)
 
 	options := runner.Options{
 		Host:          goflags.StringSlice([]string{target}),
@@ -254,6 +278,7 @@ func (s *NaabuScanner) scanSingleTargetWithLogger(ctx context.Context, target, p
 		ScanType:      opts.ScanType,
 		Silent:        true,
 		PortThreshold: opts.PortThreshold, // 使用 Naabu 原生端口阈值参数
+		ExcludeCDN:    opts.ExcludeCDN,    // 排除 CDN/WAF，仅扫描 80,443 端口
 		OnResult: func(hr *result.HostResult) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -278,9 +303,14 @@ func (s *NaabuScanner) scanSingleTargetWithLogger(ctx context.Context, target, p
 		options.SkipHostDiscovery = true
 	}
 
+	// 设置排除的目标
+	if opts.ExcludeHosts != "" {
+		options.ExcludeIps = opts.ExcludeHosts
+	}
+
 	// 打印完整的naabu配置
-	logInfo("Naabu config: Host=%v, Ports=%s, TopPorts=%s, Rate=%d, Timeout=%d, ScanType=%s, Silent=%v, PortThreshold=%d, SkipHostDiscovery=%v",
-		options.Host, options.Ports, options.TopPorts, options.Rate, options.Timeout, options.ScanType, options.Silent, options.PortThreshold, options.SkipHostDiscovery)
+	logInfo("Naabu config: Host=%v, Ports=%s, TopPorts=%s, Rate=%d, Timeout=%d, ScanType=%s, Silent=%v, PortThreshold=%d, SkipHostDiscovery=%v, ExcludeCDN=%v, ExcludeIps=%s",
+		options.Host, options.Ports, options.TopPorts, options.Rate, options.Timeout, options.ScanType, options.Silent, options.PortThreshold, options.SkipHostDiscovery, options.ExcludeCDN, options.ExcludeIps)
 
 	logInfo("Naabu: creating runner for %s", target)
 	naabuRunner, err := runner.NewRunner(&options)

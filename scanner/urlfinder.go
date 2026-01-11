@@ -39,6 +39,18 @@ type URLFinderOptions struct {
 	Headers       map[string]string `json:"headers"` // 自定义请求头
 }
 
+// Validate 验证 URLFinderOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *URLFinderOptions) Validate() error {
+	if o.Threads < 0 {
+		return fmt.Errorf("threads must be non-negative, got %d", o.Threads)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	return nil
+}
+
 // URLFinderResult 目录扫描结果
 type URLFinderResult struct {
 	URL           string `json:"url"`
@@ -103,7 +115,8 @@ func (s *URLFinderScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanR
 	var targets []string
 	if config.Assets != nil && len(config.Assets) > 0 {
 		for _, asset := range config.Assets {
-			if asset.IsHTTP {
+			// 同时检查 IsHTTP 字段和端口是否为常见HTTP端口
+			if asset.IsHTTP && IsHTTPService(asset.Service, asset.Port) {
 				scheme := "http"
 				if asset.Port == 443 || strings.HasPrefix(asset.Service, "https") {
 					scheme = "https"
@@ -114,6 +127,8 @@ func (s *URLFinderScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanR
 				} else {
 					targets = append(targets, fmt.Sprintf("%s://%s:%d", scheme, asset.Host, asset.Port))
 				}
+			} else {
+				logDebug("[URLFinder] 跳过非HTTP资产: %s:%d (service: %s, isHttp: %v)", asset.Host, asset.Port, asset.Service, asset.IsHTTP)
 			}
 		}
 	} else if len(config.Targets) > 0 {

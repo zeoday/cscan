@@ -58,7 +58,7 @@ func (l *OnlineAPILogic) Search(req *types.OnlineSearchReq, workspaceId string) 
 
 	switch req.Platform {
 	case "fofa":
-		client := onlineapi.NewFofaClient(config.Key, config.Secret)
+		client := onlineapi.NewFofaClient(config.Key, config.Version)
 		result, err := client.Search(l.ctx, req.Query, req.Page, req.PageSize)
 		if err != nil {
 			return &types.OnlineSearchResp{Code: 500, Msg: "查询失败: " + err.Error()}, nil
@@ -187,7 +187,7 @@ PageLoop:
 
 		switch req.Platform {
 		case "fofa":
-			client := onlineapi.NewFofaClient(config.Key, config.Secret)
+			client := onlineapi.NewFofaClient(config.Key, config.Version)
 			result, err := client.Search(l.ctx, req.Query, currentPage, pageSize)
 			if err != nil {
 				if currentPage == 1 {
@@ -311,6 +311,7 @@ func (l *OnlineAPILogic) ConfigList(workspaceId string) (*types.APIConfigListRes
 			Platform:   doc.Platform,
 			Key:        doc.Key,
 			Secret:     maskSecret(doc.Secret),
+			Version:    doc.Version,
 			Status:     doc.Status,
 			CreateTime: doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
@@ -326,6 +327,7 @@ func (l *OnlineAPILogic) ConfigSave(req *types.APIConfigSaveReq, workspaceId str
 		update := bson.M{
 			"key":         req.Key,
 			"secret":      req.Secret,
+			"version":     req.Version,
 			"update_time": time.Now(),
 		}
 		if err := configModel.Update(l.ctx, req.Id, update); err != nil {
@@ -337,6 +339,7 @@ func (l *OnlineAPILogic) ConfigSave(req *types.APIConfigSaveReq, workspaceId str
 			Platform: req.Platform,
 			Key:      req.Key,
 			Secret:   req.Secret,
+			Version:  req.Version,
 			Status:   "enable",
 		}
 		if err := configModel.Insert(l.ctx, doc); err != nil {

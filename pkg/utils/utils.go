@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"math/rand"
 	"net"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // IsIPAddress 判断是否为IP地址
@@ -38,4 +40,10 @@ func UniqueStrings(slice []string) []string {
 		}
 	}
 	return result
+}
+
+// RandomInt 生成指定范围内的随机整数 [min, max]
+func RandomInt(min, max int) int {
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min+1) + min
 }

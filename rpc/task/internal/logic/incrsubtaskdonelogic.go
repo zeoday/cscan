@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"cscan/pkg/notify"
 	"cscan/rpc/task/internal/svc"
 	"cscan/rpc/task/pb"
 
@@ -85,6 +86,11 @@ func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.I
 		l.Logger.Errorf("IncrSubTaskDone: failed to update progress, mainTaskId=%s, error=%v", in.MainTaskId, err)
 	}
 
+	// 如果全部完成，发送通知
+	if allDone {
+		l.sendTaskNotification(in.WorkspaceId, in.MainTaskId, "SUCCESS")
+	}
+
 	return &pb.IncrSubTaskDoneResp{
 		Success:      true,
 		Message:      "ok",
@@ -92,4 +98,78 @@ func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.I
 		SubTaskCount: int32(task.SubTaskCount),
 		AllDone:      allDone,
 	}, nil
+}
+
+// sendTaskNotification 发送任务完成通知
+func (l *IncrSubTaskDoneLogic) sendTaskNotification(workspaceId, mainTaskId, status string) {
+	// 获取任务详情
+	taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
+	task, err := taskModel.FindById(l.ctx, mainTaskId)
+	if err != nil {
+		l.Logger.Errorf("sendTaskNotification: failed to get task, mainTaskId=%s, error=%v", mainTaskId, err)
+		return
+	}
+
+	// 获取资产和漏洞统计
+	assetModel := l.svcCtx.GetAssetModel(workspaceId)
+	vulModel := l.svcCtx.GetVulModel(workspaceId)
+
+	assetCount, _ := assetModel.CountByTaskId(l.ctx, mainTaskId)
+	vulCount, _ := vulModel.CountByTaskId(l.ctx, mainTaskId)
+
+	// 获取启用的通知配置
+	configs, err := l.svcCtx.NotifyConfigModel.FindEnabled(l.ctx)
+	if err != nil {
+		l.Logger.Errorf("sendTaskNotification: failed to get notify configs, error=%v", err)
+		return
+	}
+
+	if len(configs) == 0 {
+		l.Logger.Infof("sendTaskNotification: no enabled notify configs")
+		return
+	}
+
+	// 构建通知配置列表
+	var configItems []notify.ConfigItem
+	for _, c := range configs {
+		configItems = append(configItems, notify.ConfigItem{
+			Provider:        c.Provider,
+			Config:          c.Config,
+			MessageTemplate: c.MessageTemplate,
+		})
+	}
+
+	// 构建通知结果
+	result := &notify.NotifyResult{
+		TaskId:      mainTaskId,
+		TaskName:    task.Name,
+		Status:      status,
+		AssetCount:  int(assetCount),
+		VulCount:    int(vulCount),
+		WorkspaceId: workspaceId,
+	}
+
+	// 设置时间（处理指针类型）
+	if task.StartTime != nil {
+		result.StartTime = *task.StartTime
+	}
+	if task.EndTime != nil {
+		result.EndTime = *task.EndTime
+	}
+
+	// 计算耗时
+	if task.StartTime != nil && task.EndTime != nil {
+		d := task.EndTime.Sub(*task.StartTime)
+		if d.Hours() >= 1 {
+			result.Duration = d.Round(time.Minute).String()
+		} else if d.Minutes() >= 1 {
+			result.Duration = d.Round(time.Second).String()
+		} else {
+			result.Duration = d.Round(time.Millisecond).String()
+		}
+	}
+
+	// 异步发送通知
+	notify.SendNotificationAsync(l.ctx, configItems, result)
+	l.Logger.Infof("sendTaskNotification: notification queued for task %s, status=%s", mainTaskId, status)
 }

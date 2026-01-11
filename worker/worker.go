@@ -74,6 +74,12 @@ type Worker struct {
 
 	// 终端处理器
 	terminalHandler *TerminalHandler
+
+	// 资源管理器
+	resourceManager *ResourceManager
+
+	// 任务执行器集成
+	taskRunnerIntegration *TaskRunnerIntegration
 }
 
 // getMainTaskId 从 taskId 中提取主任务ID
@@ -235,8 +241,15 @@ func NewWorker(config WorkerConfig) (*Worker, error) {
 		w.wsClient.SendTerminalOutput(sessionId, data)
 	})
 
+	// 创建资源管理器
+	w.resourceManager = NewResourceManager(config.Concurrency)
+
 	// 注册扫描器
 	w.registerScanners()
+
+	// 创建任务执行器集成（在扫描器注册后）
+	w.taskRunnerIntegration = NewTaskRunnerIntegration(w)
+	w.taskRunnerIntegration.RegisterDefaultExecutors()
 
 	// 加载HTTP服务映射配置
 	w.loadHttpServiceMappings()
@@ -294,6 +307,10 @@ func (w *Worker) handleWorkerControl(action, param string) {
 		}
 		w.logger.Info("Setting concurrency to: %d", newConcurrency)
 		w.config.Concurrency = newConcurrency
+		// 更新资源管理器的最大并发数
+		if w.resourceManager != nil {
+			w.resourceManager.SetMaxConcurrency(newConcurrency)
+		}
 		// 注意：增加并发数需要重启才能生效，减少并发数会在任务完成后自然生效
 		// 立即发送心跳，让服务端更新状态
 		go w.sendHeartbeat()
@@ -356,6 +373,7 @@ func (w *Worker) registerScanners() {
 	w.scanners["nmap"] = scanner.NewNmapScanner()
 	w.scanners["naabu"] = scanner.NewNaabuScanner()
 	w.scanners["subfinder"] = scanner.NewSubfinderScanner()
+	w.scanners["subdomain_bruteforce"] = scanner.NewSubdomainBruteforceScanner()
 	w.scanners["fingerprint"] = scanner.NewFingerprintScanner()
 	w.scanners["nuclei"] = scanner.NewNucleiScanner()
 	w.scanners["urlfinder"] = scanner.NewURLFinderScanner()
@@ -620,8 +638,14 @@ func (w *Worker) pullTask() bool {
 		return false
 	}
 
-	// 检查CPU负载，超过80%时暂停任务拉取，防止扫描引擎崩溃
-	if w.isCPUOverloaded() {
+	// 使用资源管理器检查是否可以接受新任务
+	// 这会综合检查并发槽位和系统资源（CPU/内存）
+	if w.resourceManager != nil && !w.resourceManager.CanAcceptTask() {
+		return false
+	}
+
+	// 保留原有的CPU过载检查作为备用（当resourceManager为nil时）
+	if w.resourceManager == nil && w.isCPUOverloaded() {
 		return false
 	}
 
@@ -740,6 +764,10 @@ func (w *Worker) shouldStopTask(ctx context.Context, taskId string) bool {
 
 // saveTaskProgress 保存任务进度（用于暂停后继续扫描)
 func (w *Worker) saveTaskProgress(ctx context.Context, task *scheduler.TaskInfo, completedPhases map[string]bool, assets []*scanner.Asset) {
+	// 使用新的context，因为原context可能已被取消
+	saveCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	// 构建状态
 	phases := make([]string, 0)
 	for phase, completed := range completedPhases {
@@ -756,7 +784,7 @@ func (w *Worker) saveTaskProgress(ctx context.Context, task *scheduler.TaskInfo,
 	stateJson, _ := json.Marshal(state)
 
 	// 通过 HTTP 接口保存到数据库
-	w.httpClient.UpdateTask(ctx, &TaskUpdateReq{
+	w.httpClient.UpdateTask(saveCtx, &TaskUpdateReq{
 		TaskId: task.TaskId,
 		State:  "PAUSED",
 		Result: string(stateJson),
@@ -797,6 +825,11 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 	baseCtx := context.Background()
 	startTime := time.Now()
 
+	// 获取资源槽位
+	if w.resourceManager != nil {
+		w.resourceManager.AcquireSlot()
+	}
+
 	w.mu.Lock()
 	w.taskStarted++
 	w.mu.Unlock()
@@ -823,6 +856,11 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 
 		// 清除控制信号
 		w.ClearTaskControlSignal(task.TaskId)
+
+		// 释放资源槽位
+		if w.resourceManager != nil {
+			w.resourceManager.ReleaseSlot()
+		}
 	}()
 
 	// 检查是否有停止信号（任务可能在队列中被停止)
@@ -1013,37 +1051,190 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		w.taskLog(task.TaskId, LevelInfo, "Subfinder using worker concurrency: threads=%d, dns_concurrent=%d", subfinderOpts.Threads, subfinderOpts.Concurrent)
 
 		// 执行子域名扫描
-		if s, ok := w.scanners["subfinder"]; ok {
-			result, err := s.Scan(ctx, &scanner.ScanConfig{
-				Target:      target,
-				WorkspaceId: task.WorkspaceId,
-				MainTaskId:  task.MainTaskId,
-				Options:     subfinderOpts,
-				TaskLogger:  domainTaskLogger,
-			})
+		var subfinderAssets []*scanner.Asset
+		// 只有启用Subfinder时才执行被动枚举
+		if config.DomainScan.Subfinder {
+			if s, ok := w.scanners["subfinder"]; ok {
+				result, err := s.Scan(ctx, &scanner.ScanConfig{
+					Target:      target,
+					WorkspaceId: task.WorkspaceId,
+					MainTaskId:  task.MainTaskId,
+					Options:     subfinderOpts,
+					TaskLogger:  domainTaskLogger,
+				})
 
-			if err != nil {
-				w.taskLog(task.TaskId, LevelError, "Domain scan error: %v", err)
-			} else if result != nil && len(result.Assets) > 0 {
-				// 保存子域名扫描结果到数据库
-				w.taskLog(task.TaskId, LevelInfo, "Saving %d subdomains to database", len(result.Assets))
-				w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, result.Assets)
-
-				// 将发现的子域名添加到目标列表
-				var newTargets []string
-				for _, asset := range result.Assets {
-					if asset.Host != "" {
-						newTargets = append(newTargets, asset.Host)
-					}
+				if err != nil {
+					w.taskLog(task.TaskId, LevelError, "Subfinder error: %v", err)
+				} else if result != nil && len(result.Assets) > 0 {
+					subfinderAssets = result.Assets
+					w.taskLog(task.TaskId, LevelInfo, "Subfinder: found %d subdomains", len(subfinderAssets))
 				}
-				if len(newTargets) > 0 {
-					// 更新目标（将子域名添加到原始目标）
-					target = target + "\n" + strings.Join(newTargets, "\n")
-					w.taskLog(task.TaskId, LevelInfo, "Domain scan completed: found %d subdomains", len(newTargets))
-				}
+			} else {
+				w.taskLog(task.TaskId, LevelWarn, "Subfinder scanner not available")
 			}
 		} else {
-			w.taskLog(task.TaskId, LevelWarn, "Subfinder scanner not available")
+			w.taskLog(task.TaskId, LevelInfo, "Subfinder disabled, skipping passive enumeration")
+		}
+
+		// 执行子域名暴力破解（如果配置了字典）
+		var bruteforceAssets []*scanner.Asset
+		if len(config.DomainScan.SubdomainDictIds) > 0 {
+			w.taskLog(task.TaskId, LevelInfo, "Starting subdomain bruteforce with %d dicts", len(config.DomainScan.SubdomainDictIds))
+
+			// 获取字典内容
+			dictResp, err := w.httpClient.GetSubdomainDicts(ctx, config.DomainScan.SubdomainDictIds)
+			if err != nil {
+				w.taskLog(task.TaskId, LevelError, "Bruteforce: get dicts failed: %v", err)
+			} else if dictResp != nil && len(dictResp.Dicts) > 0 {
+				// 合并所有字典内容
+				var allWords []string
+				wordSet := make(map[string]bool)
+				for _, dict := range dictResp.Dicts {
+					lines := strings.Split(dict.Content, "\n")
+					for _, line := range lines {
+						word := strings.TrimSpace(line)
+						if word != "" && !strings.HasPrefix(word, "#") && !wordSet[word] {
+							wordSet[word] = true
+							allWords = append(allWords, word)
+						}
+					}
+					w.taskLog(task.TaskId, LevelInfo, "Bruteforce: loaded dict '%s'", dict.Name)
+				}
+
+				if len(allWords) > 0 {
+					w.taskLog(task.TaskId, LevelInfo, "Bruteforce: total %d unique words", len(allWords))
+
+					// 构建暴力破解选项（包含增强功能）
+					bruteforceOpts := &scanner.SubdomainBruteforceOptions{
+						Wordlist:       strings.Join(allWords, "\n"),
+						Threads:        w.config.Concurrency * 2,
+						Timeout:        5,
+						WildcardFilter: config.DomainScan.RemoveWildcard,
+						ResolveDNS:     config.DomainScan.ResolveDNS,
+						Concurrent:     w.config.Concurrency * 10,
+						// 增强功能配置
+						RecursiveBrute: config.DomainScan.RecursiveBrute,
+						RecursiveDepth: 2,
+						WildcardDetect: config.DomainScan.WildcardDetect,
+						SubdomainCrawl: config.DomainScan.SubdomainCrawl,
+						TakeoverCheck:  config.DomainScan.TakeoverCheck,
+					}
+
+					// 获取递归爆破字典（如果启用了递归爆破）
+					if config.DomainScan.RecursiveBrute && len(config.DomainScan.RecursiveDictIds) > 0 {
+						recursiveDictResp, err := w.httpClient.GetSubdomainDicts(ctx, config.DomainScan.RecursiveDictIds)
+						if err != nil {
+							w.taskLog(task.TaskId, LevelWarn, "Bruteforce: get recursive dicts failed: %v", err)
+						} else if recursiveDictResp != nil && len(recursiveDictResp.Dicts) > 0 {
+							var recursiveWords []string
+							recursiveWordSet := make(map[string]bool)
+							for _, dict := range recursiveDictResp.Dicts {
+								lines := strings.Split(dict.Content, "\n")
+								for _, line := range lines {
+									word := strings.TrimSpace(line)
+									if word != "" && !strings.HasPrefix(word, "#") && !recursiveWordSet[word] {
+										recursiveWordSet[word] = true
+										recursiveWords = append(recursiveWords, word)
+									}
+								}
+								w.taskLog(task.TaskId, LevelInfo, "Bruteforce: loaded recursive dict '%s'", dict.Name)
+							}
+							if len(recursiveWords) > 0 {
+								bruteforceOpts.RecursiveWordlist = strings.Join(recursiveWords, "\n")
+								w.taskLog(task.TaskId, LevelInfo, "Bruteforce: recursive wordlist total %d unique words", len(recursiveWords))
+							}
+						}
+					}
+
+					// 执行暴力破解
+					if bruteScanner, ok := w.scanners["subdomain_bruteforce"]; ok {
+						bruteResult, err := bruteScanner.Scan(ctx, &scanner.ScanConfig{
+							Target:      target,
+							WorkspaceId: task.WorkspaceId,
+							MainTaskId:  task.MainTaskId,
+							Options:     bruteforceOpts,
+							TaskLogger:  domainTaskLogger,
+						})
+
+						if err != nil {
+							w.taskLog(task.TaskId, LevelError, "Bruteforce error: %v", err)
+						} else if bruteResult != nil && len(bruteResult.Assets) > 0 {
+							bruteforceAssets = bruteResult.Assets
+							w.taskLog(task.TaskId, LevelInfo, "Bruteforce: found %d subdomains", len(bruteforceAssets))
+						}
+					} else {
+						w.taskLog(task.TaskId, LevelWarn, "Subdomain bruteforce scanner not available")
+					}
+				}
+			}
+		}
+
+		// 合并subfinder和bruteforce结果
+		allAssetMap := make(map[string]*scanner.Asset)
+		for _, asset := range subfinderAssets {
+			if asset.Host != "" {
+				allAssetMap[asset.Host] = asset
+			}
+		}
+		for _, asset := range bruteforceAssets {
+			if asset.Host != "" {
+				if _, exists := allAssetMap[asset.Host]; !exists {
+					allAssetMap[asset.Host] = asset
+				}
+			}
+		}
+
+		// 转换为切片并保存
+		var mergedAssets []*scanner.Asset
+		for _, asset := range allAssetMap {
+			mergedAssets = append(mergedAssets, asset)
+		}
+
+		// 检查是否被暂停或取消
+		if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
+			w.taskLog(task.TaskId, LevelInfo, "Task stopped during domain scan")
+			return
+		} else if ctrl == "PAUSE" {
+			w.taskLog(task.TaskId, LevelInfo, "Task paused during domain scan, saving progress...")
+			// 保存已发现的子域名资产
+			if len(mergedAssets) > 0 {
+				allAssets = append(allAssets, mergedAssets...)
+			}
+			w.saveTaskProgress(ctx, task, completedPhases, allAssets)
+			return
+		}
+
+		// 检查context是否被取消
+		select {
+		case <-ctx.Done():
+			w.taskLog(task.TaskId, LevelInfo, "Domain scan cancelled by context")
+			// 保存已发现的子域名资产
+			if len(mergedAssets) > 0 {
+				allAssets = append(allAssets, mergedAssets...)
+			}
+			w.saveTaskProgress(ctx, task, completedPhases, allAssets)
+			return
+		default:
+		}
+
+		if len(mergedAssets) > 0 {
+			// 保存子域名扫描结果到数据库
+			w.taskLog(task.TaskId, LevelInfo, "Saving %d subdomains to database", len(mergedAssets))
+			w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, mergedAssets)
+
+			// 将发现的子域名添加到目标列表
+			var newTargets []string
+			for _, asset := range mergedAssets {
+				if asset.Host != "" {
+					newTargets = append(newTargets, asset.Host)
+				}
+			}
+			if len(newTargets) > 0 {
+				// 更新目标（将子域名添加到原始目标）
+				target = target + "\n" + strings.Join(newTargets, "\n")
+				w.taskLog(task.TaskId, LevelInfo, "Domain scan completed: found %d subdomains (subfinder: %d, bruteforce: %d)",
+					len(newTargets), len(subfinderAssets), len(bruteforceAssets))
+			}
 		}
 
 		completedPhases["domainscan"] = true
@@ -2813,30 +3004,75 @@ func (w *Worker) savePocValidationResult(ctx context.Context, taskId, batchId st
 
 // WorkerHttpServiceChecker Worker端的HTTP服务检查器实现
 type WorkerHttpServiceChecker struct {
-	cache map[string]bool // serviceName -> isHttp
-	mu    sync.RWMutex
+	serviceCache map[string]bool // serviceName -> isHttp
+	httpPorts    map[int]bool    // HTTP端口
+	httpsPorts   map[int]bool    // HTTPS端口
+	mu           sync.RWMutex
 }
 
 // NewWorkerHttpServiceChecker 创建HTTP服务检查器
 func NewWorkerHttpServiceChecker() *WorkerHttpServiceChecker {
 	return &WorkerHttpServiceChecker{
-		cache: make(map[string]bool),
+		serviceCache: make(map[string]bool),
+		httpPorts:    make(map[int]bool),
+		httpsPorts:   make(map[int]bool),
 	}
 }
 
-// IsHttpService 判断服务是否为HTTP服务
+// IsHttpService 判断服务名称是否为HTTP服务
 func (c *WorkerHttpServiceChecker) IsHttpService(serviceName string) (isHttp bool, found bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	isHttp, found = c.cache[serviceName]
+	isHttp, found = c.serviceCache[serviceName]
 	return
+}
+
+// IsHttpPort 判断端口是否为HTTP端口
+func (c *WorkerHttpServiceChecker) IsHttpPort(port int) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.httpPorts[port] || c.httpsPorts[port]
+}
+
+// CheckIsHttp 综合判断是否为HTTP服务（服务名称+端口）
+func (c *WorkerHttpServiceChecker) CheckIsHttp(serviceName string, port int) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// 1. 先检查服务名称映射
+	if isHttp, found := c.serviceCache[serviceName]; found {
+		return isHttp
+	}
+
+	// 2. 再检查端口
+	return c.httpPorts[port] || c.httpsPorts[port]
 }
 
 // SetMapping 设置服务映射
 func (c *WorkerHttpServiceChecker) SetMapping(serviceName string, isHttp bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.cache[serviceName] = isHttp
+	c.serviceCache[serviceName] = isHttp
+}
+
+// SetHttpPorts 设置HTTP端口列表
+func (c *WorkerHttpServiceChecker) SetHttpPorts(ports []int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.httpPorts = make(map[int]bool)
+	for _, port := range ports {
+		c.httpPorts[port] = true
+	}
+}
+
+// SetHttpsPorts 设置HTTPS端口列表
+func (c *WorkerHttpServiceChecker) SetHttpsPorts(ports []int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.httpsPorts = make(map[int]bool)
+	for _, port := range ports {
+		c.httpsPorts[port] = true
+	}
 }
 
 // executePortIdentify 执行端口识别阶段（Nmap服务识别）
@@ -2942,11 +3178,16 @@ func (w *Worker) executePortIdentify(ctx context.Context, task *scheduler.TaskIn
 
 // executeDirScan 执行目录扫描阶段
 func (w *Worker) executeDirScan(ctx context.Context, task *scheduler.TaskInfo, assets []*scanner.Asset, config *scheduler.DirScanConfig, orgId string) []*scanner.Asset {
-	// 过滤出HTTP资产
+	// 过滤出HTTP资产（必须同时满足 IsHTTP=true 且端口是常见HTTP端口或已确认为HTTP服务）
 	var httpAssets []*scanner.Asset
 	for _, asset := range assets {
-		if asset.IsHTTP {
+		// 只有明确标记为HTTP服务的资产才进行目录扫描
+		// 避免对非HTTP服务（如SSH、MySQL等）进行无效扫描
+		if asset.IsHTTP && scanner.IsHTTPService(asset.Service, asset.Port) {
 			httpAssets = append(httpAssets, asset)
+		} else if asset.IsHTTP {
+			// IsHTTP=true 但端口不是常见HTTP端口，记录跳过原因
+			w.taskLog(task.TaskId, LevelDebug, "Dir scan: skipping %s:%d (port not recognized as HTTP service)", asset.Host, asset.Port)
 		}
 	}
 
@@ -3067,7 +3308,14 @@ func (w *Worker) executeDirScan(ctx context.Context, task *scheduler.TaskInfo, a
 	}
 
 	if err != nil {
-		w.taskLog(task.TaskId, LevelError, "Dir scan error: %v", err)
+		// 目录扫描错误不应导致任务退出，只记录警告并继续
+		w.taskLog(task.TaskId, LevelWarn, "Dir scan error (continuing): %v", err)
+		// 如果有部分结果，仍然返回
+		if result != nil && len(result.Assets) > 0 {
+			w.taskLog(task.TaskId, LevelInfo, "Dir scan: returning %d partial results despite error", len(result.Assets))
+			w.saveDirScanResults(ctx, task, result.Assets)
+			return result.Assets
+		}
 		return nil
 	}
 
@@ -3186,13 +3434,19 @@ func (w *Worker) generateHTTPAssetsFromTarget(target string) []*scanner.Asset {
 				if p, err := strconv.Atoi(parts[1]); err == nil {
 					port = p
 				}
+				// 只有当端口是常见HTTP端口时才标记为HTTP服务
+				isHTTP := scanner.IsHTTPService("", port)
 				asset := &scanner.Asset{
 					Host:      host,
 					Port:      port,
 					Authority: fmt.Sprintf("%s:%d", host, port),
-					IsHTTP:    true,
+					IsHTTP:    isHTTP,
 				}
-				assets = append(assets, asset)
+				if isHTTP {
+					assets = append(assets, asset)
+				} else {
+					w.logger.Debug("Skipping non-HTTP target: %s:%d", host, port)
+				}
 				continue
 			}
 		}
@@ -3386,8 +3640,53 @@ func parsePortList(portsStr string) []int {
 	return ports
 }
 
-// loadHttpServiceMappings 从 HTTP 接口加载HTTP服务映射配置
+// loadHttpServiceMappings 从 HTTP 接口加载HTTP服务设置（端口配置+服务映射）
 func (w *Worker) loadHttpServiceMappings() {
+	ctx := context.Background()
+
+	// 通过 HTTP 接口获取 HTTP 服务设置
+	resp, err := w.httpClient.GetHttpServiceSettings(ctx)
+	if err != nil {
+		w.logger.Error("GetHttpServiceSettings HTTP failed: %v, using default settings", err)
+		// 回退到旧接口
+		w.loadHttpServiceMappingsLegacy()
+		return
+	}
+
+	if !resp.Success {
+		w.logger.Error("GetHttpServiceSettings failed: %s, using default settings", resp.Msg)
+		// 回退到旧接口
+		w.loadHttpServiceMappingsLegacy()
+		return
+	}
+
+	// 创建检查器
+	checker := NewWorkerHttpServiceChecker()
+
+	// 设置端口配置
+	if len(resp.Config.HttpPorts) > 0 {
+		checker.SetHttpPorts(resp.Config.HttpPorts)
+		w.logger.Info("Loaded %d HTTP ports from database", len(resp.Config.HttpPorts))
+	}
+	if len(resp.Config.HttpsPorts) > 0 {
+		checker.SetHttpsPorts(resp.Config.HttpsPorts)
+		w.logger.Info("Loaded %d HTTPS ports from database", len(resp.Config.HttpsPorts))
+	}
+
+	// 设置服务映射
+	for _, mapping := range resp.Mappings {
+		checker.SetMapping(mapping.ServiceName, mapping.IsHttp)
+	}
+	if len(resp.Mappings) > 0 {
+		w.logger.Info("Loaded %d HTTP service mappings from database", len(resp.Mappings))
+	}
+
+	// 设置全局检查器
+	scanner.SetHttpServiceChecker(checker)
+}
+
+// loadHttpServiceMappingsLegacy 旧版本的加载方法（兼容）
+func (w *Worker) loadHttpServiceMappingsLegacy() {
 	ctx := context.Background()
 
 	// 通过 HTTP 接口获取 HTTP 服务映射
@@ -3415,7 +3714,7 @@ func (w *Worker) loadHttpServiceMappings() {
 
 	// 设置全局检查器
 	scanner.SetHttpServiceChecker(checker)
-	w.logger.Info("Loaded %d HTTP service mappings from database", len(resp.Mappings))
+	w.logger.Info("Loaded %d HTTP service mappings from database (legacy)", len(resp.Mappings))
 }
 
 // NOTE: subscribeControlCommand 和 handleControlCommand 已移除，将在 Task 6 中通过 WebSocket 实现

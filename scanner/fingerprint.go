@@ -85,6 +85,27 @@ type FingerprintOptions struct {
 	Concurrency   int    `json:"concurrency"`   // 并发数，默认10
 }
 
+// Validate 验证 FingerprintOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *FingerprintOptions) Validate() error {
+	if o.Tool != "" && o.Tool != "httpx" && o.Tool != "builtin" {
+		return fmt.Errorf("tool must be 'httpx' or 'builtin', got %s", o.Tool)
+	}
+	if o.ActiveTimeout < 0 {
+		return fmt.Errorf("activeTimeout must be non-negative, got %d", o.ActiveTimeout)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.TargetTimeout < 0 {
+		return fmt.Errorf("targetTimeout must be non-negative, got %d", o.TargetTimeout)
+	}
+	if o.Concurrency < 0 {
+		return fmt.Errorf("concurrency must be non-negative, got %d", o.Concurrency)
+	}
+	return nil
+}
+
 
 // Scan 执行指纹识别
 func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResult, error) {
@@ -314,6 +335,8 @@ func isHttpAsset(asset *Asset) bool {
 // HttpServiceChecker HTTP服务检查器接口
 type HttpServiceChecker interface {
 	IsHttpService(serviceName string) (isHttp bool, found bool)
+	IsHttpPort(port int) bool
+	CheckIsHttp(serviceName string, port int) bool
 }
 
 // 全局HTTP服务检查器

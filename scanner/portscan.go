@@ -30,6 +30,27 @@ type PortScanOptions struct {
 	PortThreshold int    `json:"portThreshold"` // 开放端口数量阈值，超过则过滤该主机
 }
 
+// Validate 验证 PortScanOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *PortScanOptions) Validate() error {
+	if o.Tool != "" && o.Tool != "tcp" && o.Tool != "masscan" && o.Tool != "nmap" && o.Tool != "naabu" {
+		return fmt.Errorf("tool must be one of: tcp, masscan, nmap, naabu, got %s", o.Tool)
+	}
+	if o.Rate < 0 {
+		return fmt.Errorf("rate must be non-negative, got %d", o.Rate)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.Concurrent < 0 {
+		return fmt.Errorf("concurrent must be non-negative, got %d", o.Concurrent)
+	}
+	if o.PortThreshold < 0 {
+		return fmt.Errorf("portThreshold must be non-negative, got %d", o.PortThreshold)
+	}
+	return nil
+}
+
 // Scan 执行端口扫描
 func (s *PortScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResult, error) {
 	opts, ok := config.Options.(*PortScanOptions)

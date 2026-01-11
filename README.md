@@ -1,9 +1,9 @@
 # CSCAN
 
-**分布式网络资产扫描平台** | Go-Zero + Vue3
+**企业级分布式网络资产扫描平台** | Go-Zero + Vue3
 
 [![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org)
-[![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
+[![Vue](https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <img src="images/cscan.png" alt="CSCAN" width="250"/>
@@ -11,16 +11,18 @@
 ## 功能特性
 
 - **资产发现** - 端口扫描 (Naabu/Masscan)，端口服务识别 (Nmap)
-- **子域名枚举** - Subfinder 集成，建议配置多数据源
+- **子域名枚举** - Subfinder + Dnsx 集成，支持字典爆破，建议配置多数据源
 - **指纹识别** - Httpx + Wappalyzer + 自定义指纹引擎，3W+ 指纹规则
-- **漏洞检测** - Nuclei SDK 引擎，支持所有默认POC，增加800+ 自定义 POC
+- **URL 发现** - Urlfinder 集成，自动发现目标 URL 路径
+- **漏洞检测** - Nuclei SDK 引擎，支持所有默认 POC，增加 800+ 自定义 POC
 - **Web 截图** - Chromedp / HTTPX 引擎
 - **在线数据源** - FOFA / Hunter / Quake API 聚合搜索与导入
 - **报告管理** - 任务报告生成，支持 Excel 导出
 - **分布式架构** - Worker 节点水平扩展，支持多节点并行扫描
 - **多工作空间** - 项目隔离，团队协作
+- **审计日志** - 操作记录追踪
 
-## 快速开始(支持amd64+arm64)
+## 快速开始
 
 ```bash
 git clone https://github.com/tangxiaofeng7/cscan.git
@@ -28,9 +30,9 @@ cd cscan
 docker-compose up -d
 ```
 
-访问 `http://ip::3443`，默认账号 `admin / 123456`
+访问 `https://ip:3443`，默认账号 `admin / 123456`
 
-> **注意！！！执行扫描之前需要手动先部署worker**
+> **注意：执行扫描之前需要手动先部署 Worker 节点**
 
 ## 架构说明
 
@@ -59,7 +61,15 @@ cscan/
 ├── api/                # API 服务 (HTTP 接口)
 ├── rpc/                # RPC 服务 (内部通信)
 ├── worker/             # Worker 扫描节点
-├── scanner/            # 扫描引擎 (Naabu/Masscan/Nmap/Httpx/Nuclei/)
+├── scanner/            # 扫描引擎
+│   ├── naabu.go        # Naabu 端口扫描
+│   ├── masscan.go      # Masscan 端口扫描
+│   ├── nmap.go         # Nmap 服务识别
+│   ├── subfinder.go    # 子域名枚举
+│   ├── httpx_lib.go    # HTTP 探测
+│   ├── fingerprint.go  # 指纹识别
+│   ├── nuclei.go       # 漏洞扫描
+│   └── urlfinder.go    # URL 发现
 ├── scheduler/          # 任务调度器
 ├── model/              # 数据模型
 ├── onlineapi/          # 在线 API 集成 (FOFA/Hunter/Quake)
@@ -80,12 +90,11 @@ go run rpc/task/task.go -f rpc/task/etc/task.yaml
 go run api/cscan.go -f api/etc/cscan.yaml
 
 # 4. 启动前端
-cd web; npm install; npm run dev
+cd web && npm install && npm run dev
 
 # 5. 启动 Worker（需 API 地址）
-# 从Web界面获取安装命令，或使用API获取安装密钥
+# 从 Web 界面获取安装命令，或使用 API 获取安装密钥
 go run cmd/worker/main.go -k <install_key> -s http://localhost:8888
-
 ```
 
 访问 `http://localhost:3000`
@@ -115,14 +124,15 @@ cscan-worker.exe -k <install_key> -s http://<api_host>:8888
 | 组件 | 技术 |
 |------|------|
 | 后端框架 | Go-Zero |
-| 前端框架 | Vue 3 + Element Plus |
-| 数据库 | MongoDB |
-| 缓存 | Redis |
+| 前端框架 | Vue 3.4 + Element Plus + Vite |
+| 数据库 | MongoDB 6 |
+| 缓存 | Redis 7 |
 | 端口扫描 | Naabu / Masscan |
 | 服务识别 | Nmap |
 | 指纹识别 | Httpx + Wappalyzer |
 | 漏洞扫描 | Nuclei |
-| 子域名枚举 | Subfinder |
+| 子域名枚举 | Subfinder + Dnsx |
+| URL 发现 | Urlfinder |
 
 ## License
 

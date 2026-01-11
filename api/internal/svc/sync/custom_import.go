@@ -348,18 +348,20 @@ func truncateError(err error, maxLen int) string {
 
 // 为了兼容性，在ServiceContext中添加这些方法的包装
 type SyncMethods struct {
-	nucleiSync      *NucleiSyncService
-	fingerprintSync *FingerprintSyncService
-	customImport    *CustomImportService
-	dirscanDictModel *model.DirScanDictModel
+	nucleiSync           *NucleiSyncService
+	fingerprintSync      *FingerprintSyncService
+	customImport         *CustomImportService
+	dirscanDictModel     *model.DirScanDictModel
+	subdomainDictModel   *model.SubdomainDictModel
 }
 
-func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel, dirscanDictModel *model.DirScanDictModel) *SyncMethods {
+func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel, dirscanDictModel *model.DirScanDictModel, subdomainDictModel *model.SubdomainDictModel) *SyncMethods {
 	return &SyncMethods{
-		nucleiSync:       NewNucleiSyncService(nucleiModel),
-		fingerprintSync:  NewFingerprintSyncService(fpModel),
-		customImport:     NewCustomImportService(fpModel, pocModel, afpModel),
-		dirscanDictModel: dirscanDictModel,
+		nucleiSync:         NewNucleiSyncService(nucleiModel),
+		fingerprintSync:    NewFingerprintSyncService(fpModel),
+		customImport:       NewCustomImportService(fpModel, pocModel, afpModel),
+		dirscanDictModel:   dirscanDictModel,
+		subdomainDictModel: subdomainDictModel,
 	}
 }
 
@@ -375,6 +377,8 @@ func (s *SyncMethods) ImportCustomPocAndFingerprints() {
 	s.customImport.ImportAll(context.Background())
 	// 初始化内置目录扫描字典
 	s.initBuiltinDirScanDicts(context.Background())
+	// 初始化内置子域名字典
+	s.initBuiltinSubdomainDicts(context.Background())
 }
 
 func (s *SyncMethods) RefreshTemplateCache() {
@@ -392,13 +396,6 @@ func (s *SyncMethods) GetStats() map[string]int {
 // initBuiltinDirScanDicts 初始化内置目录扫描字典
 func (s *SyncMethods) initBuiltinDirScanDicts(ctx context.Context) {
 	if s.dirscanDictModel == nil {
-		return
-	}
-
-	// 检查是否已有内置字典，避免重复导入
-	builtinDicts, _ := s.dirscanDictModel.FindBuiltin(ctx)
-	if len(builtinDicts) > 0 {
-		logx.Info("[SyncMethods] Builtin dirscan dicts already exist, skipping")
 		return
 	}
 
@@ -449,8 +446,8 @@ func (s *SyncMethods) initBuiltinDirScanDicts(ctx context.Context) {
 			IsBuiltin:   true,
 		}
 
-		if err := s.dirscanDictModel.Insert(ctx, dict); err != nil {
-			logx.Errorf("[SyncMethods] Failed to insert builtin dict %s: %v", dictName, err)
+		if err := s.dirscanDictModel.UpsertByName(ctx, dict); err != nil {
+			logx.Errorf("[SyncMethods] Failed to upsert builtin dict %s: %v", dictName, err)
 			totalSkipped++
 		} else {
 			totalImported++
@@ -476,4 +473,79 @@ func countLines(content string) int {
 		}
 	}
 	return count
+}
+
+// initBuiltinSubdomainDicts 初始化内置子域名字典
+func (s *SyncMethods) initBuiltinSubdomainDicts(ctx context.Context) {
+	if s.subdomainDictModel == nil {
+		return
+	}
+
+	// 确定字典目录路径
+	dictDir := "/app/poc/custom-subname"
+	if _, err := os.Stat(dictDir); os.IsNotExist(err) {
+		dictDir = "poc/custom-subname"
+	}
+	if _, err := os.Stat(dictDir); os.IsNotExist(err) {
+		logx.Info("[SyncMethods] custom-subname directory not found, skipping builtin subdomain dicts")
+		return
+	}
+
+	logx.Infof("[SyncMethods] Initializing builtin subdomain dicts from: %s", dictDir)
+
+	totalImported := 0
+	totalSkipped := 0
+
+	err := filepath.Walk(dictDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+
+		// 只处理 .txt 文件
+		if !strings.HasSuffix(strings.ToLower(path), ".txt") {
+			return nil
+		}
+
+		// 读取文件内容
+		data, err := os.ReadFile(path)
+		if err != nil {
+			logx.Errorf("[SyncMethods] Failed to read subdomain dict file %s: %v", path, err)
+			totalSkipped++
+			return nil
+		}
+
+		content := string(data)
+		if strings.TrimSpace(content) == "" {
+			totalSkipped++
+			return nil
+		}
+
+		// 使用文件名（不含扩展名）作为字典名称
+		fileName := filepath.Base(path)
+		dictName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+
+		dict := &model.SubdomainDict{
+			Name:        dictName,
+			Description: "系统内置子域名字典",
+			Content:     content,
+			WordCount:   countLines(content),
+			Enabled:     true,
+			IsBuiltin:   true,
+		}
+
+		if err := s.subdomainDictModel.UpsertByName(ctx, dict); err != nil {
+			logx.Errorf("[SyncMethods] Failed to upsert builtin subdomain dict %s: %v", dictName, err)
+			totalSkipped++
+		} else {
+			totalImported++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		logx.Errorf("[SyncMethods] Walk subdomain dict directory error: %v", err)
+	}
+
+	logx.Infof("[SyncMethods] Builtin subdomain dicts initialized: %d imported, %d skipped", totalImported, totalSkipped)
 }

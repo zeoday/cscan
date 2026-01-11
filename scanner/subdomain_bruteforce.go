@@ -1,0 +1,957 @@
+package scanner
+
+import (
+	"context"
+	"crypto/tls"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"cscan/pkg/utils"
+
+	"github.com/projectdiscovery/dnsx/libs/dnsx"
+	"github.com/zeromicro/go-zero/core/logx"
+)
+
+// SubdomainBruteforceScanner 子域名暴力破解扫描器
+type SubdomainBruteforceScanner struct {
+	BaseScanner
+}
+
+// NewSubdomainBruteforceScanner 创建子域名暴力破解扫描器
+func NewSubdomainBruteforceScanner() *SubdomainBruteforceScanner {
+	return &SubdomainBruteforceScanner{
+		BaseScanner: BaseScanner{name: "subdomain_bruteforce"},
+	}
+}
+
+// SubdomainBruteforceOptions 子域名暴力破解选项
+type SubdomainBruteforceOptions struct {
+	Wordlist        string   `json:"wordlist"`        // 字典内容（每行一个前缀）
+	Threads         int      `json:"threads"`         // 并发线程数
+	RateLimit       int      `json:"rateLimit"`       // 速率限制
+	Timeout         int      `json:"timeout"`         // 超时时间(秒)
+	Resolvers       []string `json:"resolvers"`       // 自定义DNS解析器
+	WildcardFilter  bool     `json:"wildcardFilter"`  // 泛解析过滤
+	ResolveDNS      bool     `json:"resolveDNS"`      // 是否解析DNS
+	Concurrent      int      `json:"concurrent"`      // DNS解析并发数
+	// 增强功能
+	RecursiveBrute    bool   `json:"recursiveBrute"`    // 递归爆破
+	RecursiveDepth    int    `json:"recursiveDepth"`    // 递归深度，默认2
+	RecursiveWordlist string `json:"recursiveWordlist"` // 递归爆破字典内容
+	WildcardDetect    bool   `json:"wildcardDetect"`    // 泛解析检测并处理
+	SubdomainCrawl    bool   `json:"subdomainCrawl"`    // 子域爬取
+	TakeoverCheck     bool   `json:"takeoverCheck"`     // 子域接管检查
+}
+
+// Validate 验证 SubdomainBruteforceOptions 配置是否有效
+// 实现 ScannerOptions 接口
+func (o *SubdomainBruteforceOptions) Validate() error {
+	if o.Threads < 0 {
+		return fmt.Errorf("threads must be non-negative, got %d", o.Threads)
+	}
+	if o.RateLimit < 0 {
+		return fmt.Errorf("rateLimit must be non-negative, got %d", o.RateLimit)
+	}
+	if o.Timeout < 0 {
+		return fmt.Errorf("timeout must be non-negative, got %d", o.Timeout)
+	}
+	if o.Concurrent < 0 {
+		return fmt.Errorf("concurrent must be non-negative, got %d", o.Concurrent)
+	}
+	if o.RecursiveDepth < 0 {
+		return fmt.Errorf("recursiveDepth must be non-negative, got %d", o.RecursiveDepth)
+	}
+	return nil
+}
+
+// TakeoverResult 子域接管检测结果
+type TakeoverResult struct {
+	Subdomain   string `json:"subdomain"`
+	CName       string `json:"cname"`
+	Vulnerable  bool   `json:"vulnerable"`
+	Service     string `json:"service"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// 子域接管指纹库
+var takeoverFingerprints = map[string][]string{
+	"github":        {"There isn't a GitHub Pages site here", "For root URLs (like http://example.com/) you must provide an index.html file"},
+	"heroku":        {"No such app", "no-such-app.herokuapp.com"},
+	"amazonaws":     {"NoSuchBucket", "The specified bucket does not exist"},
+	"bitbucket":     {"Repository not found"},
+	"ghost":         {"The thing you were looking for is no longer here"},
+	"tumblr":        {"There's nothing here.", "Whatever you were looking for doesn't currently exist at this address"},
+	"shopify":       {"Sorry, this shop is currently unavailable", "Only one step left!"},
+	"wordpress":     {"Do you want to register"},
+	"teamwork":      {"Oops - We didn't find your site"},
+	"helpjuice":     {"We could not find what you're looking for"},
+	"helpscout":     {"No settings were found for this company"},
+	"cargo":         {"If you're moving your domain away from Cargo"},
+	"statuspage":    {"You are being redirected", "statuspage.io"},
+	"uservoice":     {"This UserVoice subdomain is currently available"},
+	"surge":         {"project not found"},
+	"intercom":      {"This page is reserved for artistic dogs", "Uh oh. That page doesn't exist"},
+	"webflow":       {"The page you are looking for doesn't exist or has been moved"},
+	"kajabi":        {"The page you were looking for doesn't exist"},
+	"thinkific":     {"You may have mistyped the address or the page may have moved"},
+	"tave":          {"Sorry, this page is no longer available"},
+	"wishpond":      {"https://www.wishpond.com/404?campaign=true"},
+	"aftership":     {"Oops.</h2><p class=\"text-muted text-tight\">The page you're looking for doesn't exist"},
+	"aha":           {"There is no portal here ... sending you back to Aha!"},
+	"tictail":       {"to target URL: <a href=\"https://tictail.com"},
+	"brightcove":    {"<p class=\"bc-gallery-error-code\">Error Code: 404</p>"},
+	"bigcartel":     {"<h1>Oops! We couldn&#8217;t find that page.</h1>"},
+	"acquia":        {"The site you are looking for could not be found"},
+	"fastly":        {"Fastly error: unknown domain"},
+	"pantheon":      {"The gods are wise, but do not know of the site which you seek"},
+	"zendesk":       {"Help Center Closed", "Oops, this help center no longer exists"},
+	"desk":          {"Sorry, We Couldn't Find That Page", "Please check the URL and try your request again"},
+	"unbounce":      {"The requested URL was not found on this server", "The page you're looking for doesn't exist"},
+	"pingdom":       {"Sorry, couldn't find the status page"},
+	"tilda":         {"Please renew your subscription"},
+	"smartling":     {"Domain is not configured"},
+	"campaignmonitor": {"Trying to access your account?", "Double check the URL"},
+	"azure":         {"404 Web Site not found"},
+}
+
+// Scan 执行子域名暴力破解扫描
+func (s *SubdomainBruteforceScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResult, error) {
+	result := &ScanResult{
+		WorkspaceId: config.WorkspaceId,
+		MainTaskId:  config.MainTaskId,
+		Assets:      make([]*Asset, 0),
+	}
+
+	// 解析选项
+	opts := &SubdomainBruteforceOptions{
+		Threads:        100,
+		Timeout:        5,
+		WildcardFilter: true,
+		ResolveDNS:     true,
+		Concurrent:     50,
+		RecursiveDepth: 2,
+	}
+	if config.Options != nil {
+		if o, ok := config.Options.(*SubdomainBruteforceOptions); ok {
+			opts = o
+		}
+	}
+
+	// 日志辅助函数
+	taskLog := func(level, format string, args ...interface{}) {
+		if config.TaskLogger != nil {
+			config.TaskLogger(level, format, args...)
+		}
+	}
+
+	// 检查字典内容
+	if opts.Wordlist == "" {
+		taskLog("WARN", "Bruteforce: no wordlist provided, skipping")
+		return result, nil
+	}
+
+	// 解析目标域名
+	domains := s.parseDomains(config.Target)
+	if len(domains) == 0 {
+		taskLog("INFO", "Bruteforce: no domains to scan")
+		return result, nil
+	}
+
+	taskLog("INFO", "Bruteforce: scanning %d domains with wordlist", len(domains))
+
+	// 解析字典
+	wordlist := s.parseWordlist(opts.Wordlist)
+	if len(wordlist) == 0 {
+		taskLog("WARN", "Bruteforce: wordlist is empty")
+		return result, nil
+	}
+	taskLog("INFO", "Bruteforce: loaded %d words from wordlist", len(wordlist))
+
+	// 收集所有子域名
+	var allSubdomains []string
+	var mu sync.Mutex
+
+	for _, domain := range domains {
+		select {
+		case <-ctx.Done():
+			taskLog("INFO", "Bruteforce: cancelled by context")
+			return result, ctx.Err()
+		default:
+		}
+
+		taskLog("INFO", "Bruteforce: scanning %s", domain)
+
+		// 使用dnsx SDK进行暴力破解
+		subdomains, err := s.bruteforceWithDnsxSDK(ctx, domain, wordlist, opts, taskLog)
+		if err != nil {
+			taskLog("WARN", "Bruteforce dnsx SDK error for %s: %v", domain, err)
+			continue
+		}
+
+		// 递归爆破
+		if opts.RecursiveBrute && len(subdomains) > 0 {
+			taskLog("INFO", "Bruteforce: starting recursive bruteforce for %s", domain)
+			recursiveSubdomains := s.recursiveBruteforce(ctx, domain, subdomains, opts, taskLog)
+			subdomains = append(subdomains, recursiveSubdomains...)
+		}
+
+		mu.Lock()
+		allSubdomains = append(allSubdomains, subdomains...)
+		mu.Unlock()
+
+		taskLog("INFO", "Bruteforce: found %d subdomains for %s", len(subdomains), domain)
+	}
+
+	// 去重
+	allSubdomains = utils.UniqueStrings(allSubdomains)
+	taskLog("INFO", "Bruteforce: total %d unique subdomains", len(allSubdomains))
+
+	// 子域爬取（从响应体和JS中发现新子域）
+	if opts.SubdomainCrawl && len(allSubdomains) > 0 {
+		taskLog("INFO", "Bruteforce: starting subdomain crawl from %d subdomains", len(allSubdomains))
+		crawledSubdomains := s.crawlSubdomains(ctx, allSubdomains, domains, opts, taskLog)
+		if len(crawledSubdomains) > 0 {
+			taskLog("INFO", "Bruteforce: crawled %d new subdomains", len(crawledSubdomains))
+			allSubdomains = append(allSubdomains, crawledSubdomains...)
+			allSubdomains = utils.UniqueStrings(allSubdomains)
+		}
+	}
+
+	// DNS解析（可选）- 使用dnsx进行DNS解析
+	if len(allSubdomains) > 0 {
+		if opts.ResolveDNS {
+			taskLog("INFO", "Bruteforce: resolving DNS for %d subdomains using dnsx", len(allSubdomains))
+			assets := s.resolveDomains(ctx, allSubdomains, opts.Concurrent, taskLog)
+			for _, asset := range assets {
+				asset.Source = "bruteforce"
+			}
+			result.Assets = assets
+		} else {
+			for _, subdomain := range allSubdomains {
+				result.Assets = append(result.Assets, &Asset{
+					Authority: subdomain,
+					Host:      subdomain,
+					Category:  "domain",
+					Source:    "bruteforce",
+				})
+			}
+		}
+	}
+
+	// 子域接管检查
+	if opts.TakeoverCheck && len(result.Assets) > 0 {
+		taskLog("INFO", "Bruteforce: checking subdomain takeover for %d assets", len(result.Assets))
+		s.checkSubdomainTakeover(ctx, result.Assets, opts, taskLog)
+	}
+
+	return result, nil
+}
+
+// parseDomains 解析目标中的域名
+func (s *SubdomainBruteforceScanner) parseDomains(target string) []string {
+	var domains []string
+	seen := make(map[string]bool)
+
+	lines := strings.Split(target, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// 跳过IP地址
+		if ip := net.ParseIP(line); ip != nil {
+			continue
+		}
+
+		// 跳过带端口的格式
+		if strings.Contains(line, ":") {
+			continue
+		}
+
+		// 跳过URL格式
+		if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
+			continue
+		}
+
+		// 去重
+		if !seen[line] {
+			seen[line] = true
+			domains = append(domains, line)
+		}
+	}
+
+	return domains
+}
+
+// parseWordlist 解析字典内容
+func (s *SubdomainBruteforceScanner) parseWordlist(content string) []string {
+	var words []string
+	seen := make(map[string]bool)
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		word := strings.TrimSpace(line)
+		if word == "" || strings.HasPrefix(word, "#") {
+			continue
+		}
+
+		// 去重
+		if !seen[word] {
+			seen[word] = true
+			words = append(words, word)
+		}
+	}
+
+	return words
+}
+
+// bruteforceWithDnsxSDK 使用dnsx SDK进行暴力破解
+// wildcardIPs 参数可选，如果传入nil则会自动检测泛解析
+func (s *SubdomainBruteforceScanner) bruteforceWithDnsxSDK(ctx context.Context, domain string, wordlist []string, opts *SubdomainBruteforceOptions, taskLog func(level, format string, args ...interface{})) ([]string, error) {
+	return s.bruteforceWithDnsxSDKAndWildcard(ctx, domain, wordlist, opts, nil, taskLog)
+}
+
+// bruteforceWithDnsxSDKAndWildcard 使用dnsx SDK进行暴力破解，支持传入预检测的泛解析IP
+func (s *SubdomainBruteforceScanner) bruteforceWithDnsxSDKAndWildcard(ctx context.Context, domain string, wordlist []string, opts *SubdomainBruteforceOptions, predetectedWildcardIPs map[string]bool, taskLog func(level, format string, args ...interface{})) ([]string, error) {
+	var subdomains []string
+	var mu sync.Mutex
+
+	// 泛解析检测（如果没有预检测结果）
+	var wildcardIPs map[string]bool
+	if opts.WildcardFilter || opts.WildcardDetect {
+		if predetectedWildcardIPs != nil {
+			wildcardIPs = predetectedWildcardIPs
+		} else {
+			wildcardIPs = s.detectWildcard(domain)
+			if len(wildcardIPs) > 0 {
+				taskLog("INFO", "Bruteforce: detected wildcard for %s (%d IPs)", domain, len(wildcardIPs))
+				// 如果启用了泛解析检测（WildcardDetect），检测到泛解析后直接跳过该域名
+				if opts.WildcardDetect {
+					taskLog("WARN", "Bruteforce: skipping domain %s due to wildcard detection", domain)
+					return subdomains, nil
+				}
+			}
+		}
+	}
+
+	// 创建dnsx客户端
+	dnsxOpts := dnsx.DefaultOptions
+	dnsxOpts.MaxRetries = 3
+
+	// 设置自定义解析器
+	if len(opts.Resolvers) > 0 {
+		dnsxOpts.BaseResolvers = opts.Resolvers
+	}
+
+	dnsClient, err := dnsx.New(dnsxOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dnsx client: %v", err)
+	}
+
+	// 并发控制
+	concurrent := opts.Concurrent
+	if concurrent <= 0 {
+		concurrent = 50
+	}
+
+	taskChan := make(chan string, concurrent)
+	var wg sync.WaitGroup
+
+	processed := 0
+	total := len(wordlist)
+
+	// 启动工作协程
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for word := range taskChan {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					subdomain := fmt.Sprintf("%s.%s", word, domain)
+
+					// 使用dnsx SDK进行DNS查询
+					result, err := dnsClient.Lookup(subdomain)
+					if err != nil || len(result) == 0 {
+						continue
+					}
+
+					// 泛解析过滤
+					if (opts.WildcardFilter || opts.WildcardDetect) && len(wildcardIPs) > 0 {
+						isWildcard := true
+						for _, ip := range result {
+							if !wildcardIPs[ip] {
+								isWildcard = false
+								break
+							}
+						}
+						if isWildcard {
+							continue
+						}
+					}
+
+					mu.Lock()
+					subdomains = append(subdomains, subdomain)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	// 发送任务
+	for _, word := range wordlist {
+		select {
+		case <-ctx.Done():
+			close(taskChan)
+			wg.Wait()
+			return subdomains, ctx.Err()
+		case taskChan <- word:
+			processed++
+			if processed%1000 == 0 {
+				taskLog("INFO", "Bruteforce: progress %d/%d", processed, total)
+			}
+		}
+	}
+
+	close(taskChan)
+	wg.Wait()
+
+	return subdomains, nil
+}
+
+// recursiveBruteforce 递归爆破子域名
+func (s *SubdomainBruteforceScanner) recursiveBruteforce(ctx context.Context, rootDomain string, foundSubdomains []string, opts *SubdomainBruteforceOptions, taskLog func(level, format string, args ...interface{})) []string {
+	var allNewSubdomains []string
+	depth := opts.RecursiveDepth
+	if depth <= 0 {
+		depth = 2
+	}
+
+	// 解析递归爆破字典
+	var recursiveWordlist []string
+	if opts.RecursiveWordlist != "" {
+		recursiveWordlist = s.parseWordlist(opts.RecursiveWordlist)
+	}
+	
+	// 如果没有指定递归字典，跳过递归爆破
+	if len(recursiveWordlist) == 0 {
+		taskLog("WARN", "Bruteforce: no recursive wordlist provided, skipping recursive bruteforce")
+		return allNewSubdomains
+	}
+
+	taskLog("INFO", "Bruteforce: recursive wordlist loaded %d words", len(recursiveWordlist))
+
+	// 预检测根域名的泛解析（缓存结果，避免重复检测）
+	var rootWildcardIPs map[string]bool
+	if opts.WildcardFilter || opts.WildcardDetect {
+		rootWildcardIPs = s.detectWildcard(rootDomain)
+		if len(rootWildcardIPs) > 0 {
+			taskLog("INFO", "Bruteforce: recursive - root domain %s has wildcard (%d IPs)", rootDomain, len(rootWildcardIPs))
+			// 如果启用了泛解析检测（WildcardDetect），检测到泛解析后直接跳过递归爆破
+			if opts.WildcardDetect {
+				taskLog("WARN", "Bruteforce: skipping recursive bruteforce for %s due to wildcard detection", rootDomain)
+				return allNewSubdomains
+			}
+		}
+	}
+
+	currentLevel := foundSubdomains
+	for level := 1; level <= depth; level++ {
+		select {
+		case <-ctx.Done():
+			return allNewSubdomains
+		default:
+		}
+
+		if len(currentLevel) == 0 {
+			break
+		}
+
+		taskLog("INFO", "Bruteforce: recursive level %d, scanning %d subdomains", level, len(currentLevel))
+
+		var levelSubdomains []string
+		var mu sync.Mutex
+
+		// 对每个已发现的子域名进行递归爆破（使用缓存的泛解析结果）
+		for _, subdomain := range currentLevel {
+			// 跳过根域名
+			if subdomain == rootDomain {
+				continue
+			}
+
+			// 使用预检测的泛解析结果，避免重复检测
+			newSubs, err := s.bruteforceWithDnsxSDKAndWildcard(ctx, subdomain, recursiveWordlist, opts, rootWildcardIPs, taskLog)
+			if err != nil {
+				continue
+			}
+
+			mu.Lock()
+			levelSubdomains = append(levelSubdomains, newSubs...)
+			mu.Unlock()
+		}
+
+		// 去重
+		levelSubdomains = utils.UniqueStrings(levelSubdomains)
+		
+		// 过滤已存在的子域名
+		existingSet := make(map[string]bool)
+		for _, s := range foundSubdomains {
+			existingSet[s] = true
+		}
+		for _, s := range allNewSubdomains {
+			existingSet[s] = true
+		}
+
+		var newSubdomains []string
+		for _, s := range levelSubdomains {
+			if !existingSet[s] {
+				newSubdomains = append(newSubdomains, s)
+			}
+		}
+
+		if len(newSubdomains) == 0 {
+			taskLog("INFO", "Bruteforce: recursive level %d found no new subdomains, stopping", level)
+			break
+		}
+
+		taskLog("INFO", "Bruteforce: recursive level %d found %d new subdomains", level, len(newSubdomains))
+		allNewSubdomains = append(allNewSubdomains, newSubdomains...)
+		currentLevel = newSubdomains
+	}
+
+	return allNewSubdomains
+}
+
+// crawlSubdomains 从已发现的子域名响应体和JS中爬取新子域名
+func (s *SubdomainBruteforceScanner) crawlSubdomains(ctx context.Context, subdomains []string, rootDomains []string, opts *SubdomainBruteforceOptions, taskLog func(level, format string, args ...interface{})) []string {
+	var newSubdomains []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// 构建根域名正则
+	var domainPatterns []*regexp.Regexp
+	for _, domain := range rootDomains {
+		// 转义域名中的点
+		escapedDomain := strings.ReplaceAll(domain, ".", "\\.")
+		// 匹配子域名模式: xxx.domain.com
+		pattern := regexp.MustCompile(`(?i)([a-z0-9][-a-z0-9]*\.)*` + escapedDomain)
+		domainPatterns = append(domainPatterns, pattern)
+	}
+
+	// HTTP客户端
+	client := &http.Client{
+		Timeout: time.Duration(opts.Timeout) * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 3 {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+
+	concurrent := opts.Concurrent
+	if concurrent <= 0 {
+		concurrent = 20
+	}
+
+	taskChan := make(chan string, concurrent)
+
+	// 启动工作协程
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for subdomain := range taskChan {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// 尝试HTTP和HTTPS
+					for _, scheme := range []string{"https", "http"} {
+						url := fmt.Sprintf("%s://%s", scheme, subdomain)
+						found := s.extractSubdomainsFromURL(ctx, client, url, domainPatterns, taskLog)
+						if len(found) > 0 {
+							mu.Lock()
+							newSubdomains = append(newSubdomains, found...)
+							mu.Unlock()
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	// 发送任务
+	for _, subdomain := range subdomains {
+		select {
+		case <-ctx.Done():
+			close(taskChan)
+			wg.Wait()
+			return utils.UniqueStrings(newSubdomains)
+		case taskChan <- subdomain:
+		}
+	}
+
+	close(taskChan)
+	wg.Wait()
+
+	// 去重并过滤已存在的子域名
+	existingSet := make(map[string]bool)
+	for _, s := range subdomains {
+		existingSet[s] = true
+	}
+
+	var filteredSubdomains []string
+	for _, s := range utils.UniqueStrings(newSubdomains) {
+		if !existingSet[s] {
+			filteredSubdomains = append(filteredSubdomains, s)
+		}
+	}
+
+	return filteredSubdomains
+}
+
+// extractSubdomainsFromURL 从URL响应中提取子域名
+func (s *SubdomainBruteforceScanner) extractSubdomainsFromURL(ctx context.Context, client *http.Client, url string, patterns []*regexp.Regexp, taskLog func(level, format string, args ...interface{})) []string {
+	var subdomains []string
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return subdomains
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return subdomains
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024)) // 限制1MB
+	if err != nil {
+		return subdomains
+	}
+
+	bodyStr := string(body)
+
+	// 从响应体中提取子域名
+	for _, pattern := range patterns {
+		matches := pattern.FindAllString(bodyStr, -1)
+		subdomains = append(subdomains, matches...)
+	}
+
+	// 提取JS文件URL并爬取
+	jsPattern := regexp.MustCompile(`(?i)(?:src|href)=["']([^"']*\.js[^"']*)["']`)
+	jsMatches := jsPattern.FindAllStringSubmatch(bodyStr, -1)
+	for _, match := range jsMatches {
+		if len(match) > 1 {
+			jsURL := match[1]
+			// 处理相对路径
+			if strings.HasPrefix(jsURL, "//") {
+				jsURL = "https:" + jsURL
+			} else if strings.HasPrefix(jsURL, "/") {
+				jsURL = url + jsURL
+			} else if !strings.HasPrefix(jsURL, "http") {
+				jsURL = url + "/" + jsURL
+			}
+
+			// 爬取JS文件
+			jsSubdomains := s.extractSubdomainsFromJS(ctx, client, jsURL, patterns)
+			subdomains = append(subdomains, jsSubdomains...)
+		}
+	}
+
+	return subdomains
+}
+
+// extractSubdomainsFromJS 从JS文件中提取子域名
+func (s *SubdomainBruteforceScanner) extractSubdomainsFromJS(ctx context.Context, client *http.Client, jsURL string, patterns []*regexp.Regexp) []string {
+	var subdomains []string
+
+	req, err := http.NewRequestWithContext(ctx, "GET", jsURL, nil)
+	if err != nil {
+		return subdomains
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return subdomains
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024)) // 限制2MB
+	if err != nil {
+		return subdomains
+	}
+
+	bodyStr := string(body)
+
+	for _, pattern := range patterns {
+		matches := pattern.FindAllString(bodyStr, -1)
+		subdomains = append(subdomains, matches...)
+	}
+
+	return subdomains
+}
+
+// checkSubdomainTakeover 检查子域接管漏洞
+func (s *SubdomainBruteforceScanner) checkSubdomainTakeover(ctx context.Context, assets []*Asset, opts *SubdomainBruteforceOptions, taskLog func(level, format string, args ...interface{})) {
+	var wg sync.WaitGroup
+
+	concurrent := opts.Concurrent
+	if concurrent <= 0 {
+		concurrent = 20
+	}
+
+	taskChan := make(chan *Asset, concurrent)
+
+	// HTTP客户端
+	client := &http.Client{
+		Timeout: time.Duration(opts.Timeout) * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	// 启动工作协程
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for asset := range taskChan {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					result := s.checkTakeover(ctx, client, asset)
+					if result != nil && result.Vulnerable {
+						taskLog("WARN", "Takeover: %s is vulnerable! CNAME: %s, Service: %s", 
+							result.Subdomain, result.CName, result.Service)
+						// 在资产中标记接管风险
+						asset.TakeoverRisk = true
+						asset.TakeoverService = result.Service
+						asset.TakeoverCName = result.CName
+					}
+				}
+			}
+		}()
+	}
+
+	// 发送任务
+	for _, asset := range assets {
+		select {
+		case <-ctx.Done():
+			close(taskChan)
+			wg.Wait()
+			return
+		case taskChan <- asset:
+		}
+	}
+
+	close(taskChan)
+	wg.Wait()
+}
+
+// checkTakeover 检查单个子域名的接管风险
+func (s *SubdomainBruteforceScanner) checkTakeover(ctx context.Context, client *http.Client, asset *Asset) *TakeoverResult {
+	subdomain := asset.Host
+	if subdomain == "" {
+		return nil
+	}
+
+	result := &TakeoverResult{
+		Subdomain: subdomain,
+	}
+
+	// 获取CNAME记录
+	cname, err := net.LookupCNAME(subdomain)
+	if err != nil {
+		return nil
+	}
+	cname = strings.TrimSuffix(cname, ".")
+	result.CName = cname
+
+	// 检查CNAME是否指向已知的可接管服务
+	for service, fingerprints := range takeoverFingerprints {
+		if strings.Contains(strings.ToLower(cname), service) {
+			// 尝试访问并检查响应
+			for _, scheme := range []string{"https", "http"} {
+				url := fmt.Sprintf("%s://%s", scheme, subdomain)
+				req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+				if err != nil {
+					continue
+				}
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+				resp, err := client.Do(req)
+				if err != nil {
+					// 连接失败可能意味着可接管
+					result.Vulnerable = true
+					result.Service = service
+					result.Fingerprint = "Connection failed - potential takeover"
+					return result
+				}
+				defer resp.Body.Close()
+
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 100*1024))
+				bodyStr := string(body)
+
+				// 检查指纹
+				for _, fp := range fingerprints {
+					if strings.Contains(bodyStr, fp) {
+						result.Vulnerable = true
+						result.Service = service
+						result.Fingerprint = fp
+						return result
+					}
+				}
+			}
+		}
+	}
+
+	// 检查NXDOMAIN（DNS记录存在但无法解析）
+	_, err = net.LookupIP(subdomain)
+	if err != nil {
+		// DNS解析失败，检查是否有CNAME指向外部服务
+		if cname != subdomain && cname != "" {
+			result.Vulnerable = true
+			result.Service = "unknown"
+			result.Fingerprint = "CNAME exists but target is unresolvable"
+			return result
+		}
+	}
+
+	return result
+}
+
+// detectWildcard 检测泛解析
+func (s *SubdomainBruteforceScanner) detectWildcard(domain string) map[string]bool {
+	wildcardIPs := make(map[string]bool)
+
+	// 创建dnsx客户端用于泛解析检测
+	dnsClient, err := dnsx.New(dnsx.DefaultOptions)
+	if err != nil {
+		logx.Errorf("Failed to create dnsx client for wildcard detection: %v", err)
+		return wildcardIPs
+	}
+
+	// 使用随机字符串测试泛解析
+	testSubdomains := []string{
+		fmt.Sprintf("wildcard-test-%d.%s", utils.RandomInt(100000, 999999), domain),
+		fmt.Sprintf("random-%d.%s", utils.RandomInt(100000, 999999), domain),
+		fmt.Sprintf("nonexistent-%d.%s", utils.RandomInt(100000, 999999), domain),
+	}
+
+	for _, subdomain := range testSubdomains {
+		result, err := dnsClient.Lookup(subdomain)
+		if err == nil && len(result) > 0 {
+			for _, ip := range result {
+				wildcardIPs[ip] = true
+			}
+		}
+	}
+
+	return wildcardIPs
+}
+
+// resolveDomains 使用dnsx进行DNS解析子域名
+func (s *SubdomainBruteforceScanner) resolveDomains(ctx context.Context, domains []string, concurrent int, taskLog func(level, format string, args ...interface{})) []*Asset {
+	var assets []*Asset
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	if concurrent <= 0 {
+		concurrent = 50
+	}
+
+	// 创建dnsx客户端
+	dnsxOpts := dnsx.DefaultOptions
+	dnsxOpts.MaxRetries = 3
+	dnsClient, err := dnsx.New(dnsxOpts)
+	if err != nil {
+		logx.Errorf("Failed to create dnsx client for resolution: %v", err)
+		return assets
+	}
+
+	taskChan := make(chan string, concurrent)
+
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for domain := range taskChan {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// 使用dnsx进行DNS解析
+					result, err := dnsClient.Lookup(domain)
+					if err != nil || len(result) == 0 {
+						continue
+					}
+
+					asset := &Asset{
+						Authority: domain,
+						Host:      domain,
+						Category:  "domain",
+					}
+
+					for _, ip := range result {
+						parsedIP := net.ParseIP(ip)
+						if parsedIP == nil {
+							continue
+						}
+						if ip4 := parsedIP.To4(); ip4 != nil {
+							asset.IPV4 = append(asset.IPV4, IPInfo{IP: ip4.String()})
+						} else {
+							asset.IPV6 = append(asset.IPV6, IPInfo{IP: parsedIP.String()})
+						}
+					}
+
+					// 使用dnsx查询CNAME
+					cname, err := net.LookupCNAME(domain)
+					if err == nil && cname != domain+"." {
+						asset.CName = strings.TrimSuffix(cname, ".")
+					}
+
+					mu.Lock()
+					assets = append(assets, asset)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	resolved := 0
+	for _, domain := range domains {
+		select {
+		case <-ctx.Done():
+			close(taskChan)
+			wg.Wait()
+			return assets
+		case taskChan <- domain:
+			resolved++
+			if resolved%100 == 0 && taskLog != nil {
+				taskLog("INFO", "Bruteforce DNS resolved: %d/%d", resolved, len(domains))
+			}
+		}
+	}
+
+	close(taskChan)
+	wg.Wait()
+	return assets
+}

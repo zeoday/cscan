@@ -7,10 +7,12 @@ import (
 	"cscan/api/internal/handler/asset"
 	"cscan/api/internal/handler/dirscan"
 	"cscan/api/internal/handler/fingerprint"
+	"cscan/api/internal/handler/notify"
 	"cscan/api/internal/handler/onlineapi"
 	"cscan/api/internal/handler/organization"
 	"cscan/api/internal/handler/poc"
 	"cscan/api/internal/handler/report"
+	"cscan/api/internal/handler/subdomain"
 	"cscan/api/internal/handler/subfinder"
 	"cscan/api/internal/handler/task"
 	"cscan/api/internal/handler/user"
@@ -67,9 +69,11 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/fingerprints", Handler: worker.WorkerConfigFingerprintsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/subfinder", Handler: worker.WorkerConfigSubfinderHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/httpservice", Handler: worker.WorkerConfigHttpServiceHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/worker/config/httpservice/settings", Handler: worker.WorkerConfigHttpServiceSettingsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/activefingerprints", Handler: worker.WorkerConfigActiveFingerprintsHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/poc", Handler: worker.WorkerConfigPocHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/dirscandict", Handler: worker.WorkerConfigDirScanDictHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/worker/config/subdomaindict", Handler: worker.WorkerConfigSubdomainDictHandler(svcCtx)},
 	}
 
 	// 为Worker路由包装认证中间件
@@ -222,10 +226,17 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/poc/batchValidate", Handler: poc.PocBatchValidateHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/queryResult", Handler: poc.PocValidationResultQueryHandler(svcCtx)},
 
-		// HTTP服务映射
+		// HTTP服务映射（旧接口，保持兼容）
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/httpservice/list", Handler: fingerprint.HttpServiceMappingListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/httpservice/save", Handler: fingerprint.HttpServiceMappingSaveHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/httpservice/delete", Handler: fingerprint.HttpServiceMappingDeleteHandler(svcCtx)},
+
+		// HTTP服务设置（新接口）
+		{Method: http.MethodGet, Path: "/api/v1/httpservice/config", Handler: fingerprint.HttpServiceConfigGetHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/httpservice/config", Handler: fingerprint.HttpServiceConfigSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/httpservice/mapping/list", Handler: fingerprint.HttpServiceMappingListV2Handler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/httpservice/mapping/save", Handler: fingerprint.HttpServiceMappingSaveV2Handler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/httpservice/mapping/delete", Handler: fingerprint.HttpServiceMappingDeleteV2Handler(svcCtx)},
 
 		// 主动扫描指纹
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/list", Handler: fingerprint.ActiveFingerprintListHandler(svcCtx)},
@@ -257,12 +268,26 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/clear", Handler: dirscan.DirScanDictClearHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/dict/enabled", Handler: dirscan.DirScanDictEnabledListHandler(svcCtx)},
 
+		// 子域名字典
+		{Method: http.MethodPost, Path: "/api/v1/subdomain/dict/list", Handler: subdomain.SubdomainDictListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/subdomain/dict/save", Handler: subdomain.SubdomainDictSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/subdomain/dict/delete", Handler: subdomain.SubdomainDictDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/subdomain/dict/clear", Handler: subdomain.SubdomainDictClearHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/subdomain/dict/enabled", Handler: subdomain.SubdomainDictEnabledListHandler(svcCtx)},
+
 		// 目录扫描结果
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/list", Handler: dirscan.DirScanResultListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/stat", Handler: dirscan.DirScanResultStatHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/delete", Handler: dirscan.DirScanResultDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/batchDelete", Handler: dirscan.DirScanResultBatchDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/dirscan/result/clear", Handler: dirscan.DirScanResultClearHandler(svcCtx)},
+
+		// 通知配置
+		{Method: http.MethodPost, Path: "/api/v1/notify/config/list", Handler: notify.NotifyConfigListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/notify/config/save", Handler: notify.NotifyConfigSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/notify/config/delete", Handler: notify.NotifyConfigDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/notify/config/test", Handler: notify.NotifyConfigTestHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/notify/providers", Handler: notify.NotifyProviderListHandler(svcCtx)},
 	}
 
 	// 为每个路由包装认证中间件

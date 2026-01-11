@@ -55,37 +55,103 @@
               <span class="form-hint">针对域名目标进行子域名枚举</span>
             </el-form-item>
             <template v-if="form.domainscanEnable">
-              <el-form-item label="使用Subfinder">
-                <el-switch v-model="form.domainscanSubfinder" />
-                <span class="form-hint">使用Subfinder进行子域名枚举</span>
+              <el-form-item label="扫描工具">
+                <el-checkbox v-model="form.domainscanSubfinder">Subfinder (被动枚举)</el-checkbox>
+                <el-checkbox v-model="form.domainscanBruteforce" :disabled="!form.subdomainDictIds || !form.subdomainDictIds.length">Dnsx (字典爆破)</el-checkbox>
+                <span class="form-hint">可同时启用多种扫描方式，结果自动合并去重</span>
               </el-form-item>
-              <el-row :gutter="20">
+              
+              <!-- 左右分栏布局 -->
+              <el-row :gutter="24" class="scan-tools-layout">
+                <!-- 左侧：Subfinder 配置 -->
                 <el-col :span="12">
-                  <el-form-item label="超时时间(秒)">
-                    <el-input-number v-model="form.domainscanTimeout" :min="60" :max="3600" style="width:100%" />
-                  </el-form-item>
+                  <div class="scan-tool-section">
+                    <div class="scan-tool-header">
+                      <span class="scan-tool-title">Subfinder 被动枚举</span>
+                      <el-tag :type="form.domainscanSubfinder ? 'success' : 'info'" size="small">
+                        {{ form.domainscanSubfinder ? '已启用' : '未启用' }}
+                      </el-tag>
+                    </div>
+                    <template v-if="form.domainscanSubfinder">
+                      <el-form-item label="超时时间(秒)">
+                        <el-input-number v-model="form.domainscanTimeout" :min="60" :max="3600" style="width:100%" />
+                      </el-form-item>
+                      <el-form-item label="最大枚举时间(分)">
+                        <el-input-number v-model="form.domainscanMaxEnumTime" :min="1" :max="60" style="width:100%" />
+                      </el-form-item>
+                      <el-form-item label="速率限制">
+                        <el-input-number v-model="form.domainscanRateLimit" :min="0" :max="1000" style="width:100%" />
+                        <span class="form-hint">0=不限制</span>
+                      </el-form-item>
+                      <el-form-item label="扫描选项">
+                        <el-checkbox v-model="form.domainscanRemoveWildcard">移除泛解析域名</el-checkbox>
+                      </el-form-item>
+                      <el-form-item label="DNS解析">
+                        <el-checkbox v-model="form.domainscanResolveDNS">使用Dnsx解析子域名DNS</el-checkbox>
+                        <span class="form-hint">并发数由Worker设置控制</span>
+                      </el-form-item>
+                    </template>
+                    <div v-else class="scan-tool-disabled-hint">
+                      <el-icon><InfoFilled /></el-icon>
+                      <span>请先勾选启用 Subfinder</span>
+                    </div>
+                  </div>
                 </el-col>
+                
+                <!-- 右侧：Dnsx 配置 -->
                 <el-col :span="12">
-                  <el-form-item label="最大枚举时间(分)">
-                    <el-input-number v-model="form.domainscanMaxEnumTime" :min="1" :max="60" style="width:100%" />
-                  </el-form-item>
+                  <div class="scan-tool-section">
+                    <div class="scan-tool-header">
+                      <span class="scan-tool-title">Dnsx 字典爆破</span>
+                      <el-tag :type="form.domainscanBruteforce ? 'success' : 'info'" size="small">
+                        {{ form.domainscanBruteforce ? '已启用' : '未启用' }}
+                      </el-tag>
+                    </div>
+                    <!-- 字典选择（始终显示，作为启用字典爆破的前提） -->
+                    <el-form-item label="暴力破解字典">
+                      <div class="selected-dict-summary">
+                        <el-tag type="primary" size="small" v-if="form.subdomainDictIds && form.subdomainDictIds.length">
+                          已选择: {{ form.subdomainDictIds.length }} 个字典
+                        </el-tag>
+                        <span v-else style="color: #e6a23c; font-size: 12px">
+                          请先选择字典才能启用字典爆破
+                        </span>
+                        <el-button type="primary" link @click="showSubdomainDictSelectDialog">选择字典</el-button>
+                      </div>
+                      <span class="form-hint">使用 Dnsx SDK 进行字典暴力破解</span>
+                    </el-form-item>
+                    <template v-if="form.domainscanBruteforce">
+                      <el-form-item label="增强功能">
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <el-checkbox 
+                              v-model="form.domainscanRecursiveBrute" 
+                              :disabled="!form.recursiveDictIds || !form.recursiveDictIds.length"
+                            >递归爆破</el-checkbox>
+                            <el-button type="primary" link size="small" @click="showRecursiveDictSelectDialog">选择递归字典</el-button>
+                            <el-tag type="primary" size="small" v-if="form.recursiveDictIds && form.recursiveDictIds.length">
+                              已选择: {{ form.recursiveDictIds.length }} 个字典
+                            </el-tag>
+                          </div>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">
+                            {{ (!form.recursiveDictIds || !form.recursiveDictIds.length) ? '请先选择递归字典才能启用递归爆破' : '对发现的子域名继续进行爆破，发现更深层级的子域名' }}
+                          </span>
+                          <el-checkbox v-model="form.domainscanWildcardDetect">泛解析检测</el-checkbox>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">检测并过滤泛解析域名，提高结果准确性</span>
+                          <el-checkbox v-model="form.domainscanSubdomainCrawl">子域爬取</el-checkbox>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">从已发现子域名的响应体和JS文件中提取新子域名</span>
+                          <el-checkbox v-model="form.domainscanTakeoverCheck">子域接管检查</el-checkbox>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">检测子域名是否存在接管风险（如GitHub Pages、Heroku等）</span>
+                        </div>
+                      </el-form-item>
+                    </template>
+                    <div v-if="!form.domainscanBruteforce && form.subdomainDictIds && form.subdomainDictIds.length" class="scan-tool-disabled-hint">
+                      <el-icon><InfoFilled /></el-icon>
+                      <span>已选择字典，可勾选启用 Dnsx 字典爆破</span>
+                    </div>
+                  </div>
                 </el-col>
               </el-row>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item label="速率限制">
-                    <el-input-number v-model="form.domainscanRateLimit" :min="0" :max="1000" style="width:100%" />
-                    <span class="form-hint">0=不限制</span>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-form-item label="扫描选项">
-                <el-checkbox v-model="form.domainscanRemoveWildcard">移除泛解析域名</el-checkbox>
-              </el-form-item>
-              <el-form-item label="DNS解析">
-                <el-checkbox v-model="form.domainscanResolveDNS">解析子域名DNS</el-checkbox>
-                <span class="form-hint">并发数由Worker设置控制</span>
-              </el-form-item>
             </template>
           </el-collapse-item>
 
@@ -140,8 +206,18 @@
                 </el-col>
               </el-row>
               <el-form-item label="高级选项">
-                <el-checkbox v-model="form.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
-                <span class="form-hint">跳过主机存活检测，直接扫描端口</span>
+                <div style="display: block; width: 100%">
+                  <el-checkbox v-model="form.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
+                  <span class="form-hint">跳过主机存活检测，直接扫描端口</span>
+                </div>
+                <div v-if="form.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
+                  <el-checkbox v-model="form.excludeCDN">排除 CDN/WAF (-ec)</el-checkbox>
+                  <span class="form-hint">CDN/WAF IP 仅扫描 80,443 端口</span>
+                </div>
+              </el-form-item>
+              <el-form-item label="排除目标">
+                <el-input v-model="form.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
+                <span class="form-hint">排除的 IP/CIDR，逗号分隔</span>
               </el-form-item>
             </template>
           </el-collapse-item>
@@ -367,6 +443,56 @@
       </template>
     </el-dialog>
 
+    <!-- 子域名字典选择对话框 -->
+    <el-dialog v-model="subdomainDictSelectDialogVisible" title="选择子域名暴力破解字典" width="800px" @open="handleSubdomainDictDialogOpen">
+      <el-table 
+        ref="subdomainDictTableRef"
+        :data="subdomainDictList" 
+        v-loading="subdomainDictLoading" 
+        max-height="400"
+        @selection-change="handleSubdomainDictSelectionChange"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="45" :reserve-selection="true" />
+        <el-table-column prop="name" label="字典名称" min-width="150" />
+        <el-table-column prop="wordCount" label="词条数量" width="100" />
+        <el-table-column prop="isBuiltin" label="类型" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? '内置' : '自定义' }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="subdomainDictSelectDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSubdomainDictSelection">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 递归爆破字典选择对话框 -->
+    <el-dialog v-model="recursiveDictSelectDialogVisible" title="选择递归爆破字典" width="800px" @open="handleRecursiveDictDialogOpen">
+      <el-table 
+        ref="recursiveDictTableRef"
+        :data="recursiveDictList" 
+        v-loading="recursiveDictLoading" 
+        max-height="400"
+        @selection-change="handleRecursiveDictSelectionChange"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="45" :reserve-selection="true" />
+        <el-table-column prop="name" label="字典名称" min-width="150" />
+        <el-table-column prop="wordCount" label="词条数量" width="100" />
+        <el-table-column prop="isBuiltin" label="类型" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? '内置' : '自定义' }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="recursiveDictSelectDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmRecursiveDictSelection">确定</el-button>
+      </template>
+    </el-dialog>
+
     <!-- POC选择对话框 -->
     <el-dialog v-model="pocSelectDialogVisible" title="选择POC" width="1200px" @open="handlePocDialogOpen">
       <div class="poc-select-container">
@@ -586,10 +712,11 @@
 import { ref, reactive, onMounted, watch, nextTick, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Close, Search } from '@element-plus/icons-vue'
+import { Close, Search, InfoFilled } from '@element-plus/icons-vue'
 import { createTask, updateTask, getTaskDetail, startTask, getWorkerList, getScanConfig, saveScanConfig } from '@/api/task'
 import { getNucleiTemplateList, getCustomPocList, getNucleiTemplateDetail } from '@/api/poc'
 import { getDirScanDictEnabledList } from '@/api/dirscan'
+import { getSubdomainDictEnabledList } from '@/api/subdomain'
 import { useWorkspaceStore } from '@/stores/workspace'
 import request from '@/api/request'
 
@@ -615,6 +742,20 @@ const dictList = ref([])
 const dictLoading = ref(false)
 const dictTableRef = ref()
 const selectedDictIds = ref([])
+
+// 子域名字典选择相关
+const subdomainDictSelectDialogVisible = ref(false)
+const subdomainDictList = ref([])
+const subdomainDictLoading = ref(false)
+const subdomainDictTableRef = ref()
+const selectedSubdomainDictIds = ref([])
+
+// 递归爆破字典选择相关
+const recursiveDictSelectDialogVisible = ref(false)
+const recursiveDictList = ref([])
+const recursiveDictLoading = ref(false)
+const recursiveDictTableRef = ref()
+const selectedRecursiveDictIds = ref([])
 const customPocList = ref([])
 const nucleiTemplateLoading = ref(false)
 const customPocLoading = ref(false)
@@ -681,6 +822,7 @@ const form = reactive({
   // 子域名扫描
   domainscanEnable: false,
   domainscanSubfinder: true,
+  domainscanBruteforce: false, // 字典爆破
   domainscanTimeout: 300,
   domainscanMaxEnumTime: 10,
   domainscanThreads: 10,
@@ -688,6 +830,15 @@ const form = reactive({
   domainscanRemoveWildcard: true,
   domainscanResolveDNS: true,
   domainscanConcurrent: 50,
+  subdomainDictIds: [], // 子域名暴力破解字典
+  subdomainDicts: [], // 保存已选择的字典信息
+  // Dnsx增强功能
+  domainscanRecursiveBrute: false, // 递归爆破
+  recursiveDictIds: [], // 递归爆破字典ID列表
+  recursiveDicts: [], // 保存已选择的递归字典信息
+  domainscanWildcardDetect: true,  // 泛解析检测
+  domainscanSubdomainCrawl: false, // 子域爬取
+  domainscanTakeoverCheck: false,  // 子域接管检查
   // 端口扫描
   portscanEnable: true,
   portscanTool: 'naabu',
@@ -697,6 +848,8 @@ const form = reactive({
   scanType: 'c',
   portscanTimeout: 60,
   skipHostDiscovery: false,
+  excludeCDN: false,
+  excludeHosts: '',
   // 端口识别
   portidentifyEnable: false,
   portidentifyTimeout: 30,
@@ -774,6 +927,20 @@ watch(() => form.fingerprintActiveScan, (newVal) => {
   }
 })
 
+// 当取消选择暴力破解字典时，自动取消勾选字典爆破
+watch(() => form.subdomainDictIds, (newVal) => {
+  if (!newVal || newVal.length === 0) {
+    form.domainscanBruteforce = false
+  }
+}, { deep: true })
+
+// 当取消选择递归字典时，自动取消勾选递归爆破
+watch(() => form.recursiveDictIds, (newVal) => {
+  if (!newVal || newVal.length === 0) {
+    form.domainscanRecursiveBrute = false
+  }
+}, { deep: true })
+
 async function loadWorkspaces() {
   try {
     const res = await request.post('/workspace/list', { page: 1, pageSize: 100 })
@@ -813,11 +980,15 @@ function applyConfig(config) {
   // 判断POC模式：如果有nucleiTemplateIds或customPocIds，则为手动模式
   const isManualMode = (config.pocscan?.nucleiTemplateIds?.length > 0) || (config.pocscan?.customPocIds?.length > 0)
   
+  // 判断是否启用字典爆破：如果有subdomainDictIds则启用
+  const hasBruteforce = config.domainscan?.subdomainDictIds?.length > 0
+  
   Object.assign(form, {
     batchSize: config.batchSize || 50,
     // 子域名扫描
     domainscanEnable: config.domainscan?.enable ?? false,
     domainscanSubfinder: config.domainscan?.subfinder ?? true,
+    domainscanBruteforce: hasBruteforce,
     domainscanTimeout: config.domainscan?.timeout || 300,
     domainscanMaxEnumTime: config.domainscan?.maxEnumerationTime || 10,
     domainscanThreads: config.domainscan?.threads || 10,
@@ -825,6 +996,13 @@ function applyConfig(config) {
     domainscanRemoveWildcard: config.domainscan?.removeWildcard ?? true,
     domainscanResolveDNS: config.domainscan?.resolveDNS ?? true,
     domainscanConcurrent: config.domainscan?.concurrent || 50,
+    subdomainDictIds: config.domainscan?.subdomainDictIds || [],
+    // Dnsx增强功能
+    domainscanRecursiveBrute: config.domainscan?.recursiveBrute ?? false,
+    recursiveDictIds: config.domainscan?.recursiveDictIds || [],
+    domainscanWildcardDetect: config.domainscan?.wildcardDetect ?? true,
+    domainscanSubdomainCrawl: config.domainscan?.subdomainCrawl ?? false,
+    domainscanTakeoverCheck: config.domainscan?.takeoverCheck ?? false,
     // 端口扫描
     portscanEnable: config.portscan?.enable ?? true,
     portscanTool: config.portscan?.tool || 'naabu',
@@ -834,6 +1012,8 @@ function applyConfig(config) {
     scanType: config.portscan?.scanType || 'c',
     portscanTimeout: config.portscan?.timeout || 60,
     skipHostDiscovery: config.portscan?.skipHostDiscovery ?? false,
+    excludeCDN: config.portscan?.excludeCDN ?? false,
+    excludeHosts: config.portscan?.excludeHosts || '',
     // 端口识别
     portidentifyEnable: config.portidentify?.enable ?? false,
     portidentifyTimeout: config.portidentify?.timeout || 30,
@@ -884,6 +1064,7 @@ watch(
     batchSize: form.batchSize,
     domainscanEnable: form.domainscanEnable,
     domainscanSubfinder: form.domainscanSubfinder,
+    domainscanBruteforce: form.domainscanBruteforce,
     domainscanTimeout: form.domainscanTimeout,
     domainscanMaxEnumTime: form.domainscanMaxEnumTime,
     domainscanThreads: form.domainscanThreads,
@@ -891,6 +1072,13 @@ watch(
     domainscanRemoveWildcard: form.domainscanRemoveWildcard,
     domainscanResolveDNS: form.domainscanResolveDNS,
     domainscanConcurrent: form.domainscanConcurrent,
+    subdomainDictIds: form.subdomainDictIds,
+    // Dnsx增强功能
+    domainscanRecursiveBrute: form.domainscanRecursiveBrute,
+    recursiveDictIds: form.recursiveDictIds,
+    domainscanWildcardDetect: form.domainscanWildcardDetect,
+    domainscanSubdomainCrawl: form.domainscanSubdomainCrawl,
+    domainscanTakeoverCheck: form.domainscanTakeoverCheck,
     portscanEnable: form.portscanEnable,
     portscanTool: form.portscanTool,
     portscanRate: form.portscanRate,
@@ -899,6 +1087,8 @@ watch(
     scanType: form.scanType,
     portscanTimeout: form.portscanTimeout,
     skipHostDiscovery: form.skipHostDiscovery,
+    excludeCDN: form.excludeCDN,
+    excludeHosts: form.excludeHosts,
     portidentifyEnable: form.portidentifyEnable,
     portidentifyTimeout: form.portidentifyTimeout,
     portidentifyArgs: form.portidentifyArgs,
@@ -946,7 +1136,15 @@ function buildConfig() {
       rateLimit: form.domainscanRateLimit,
       removeWildcard: form.domainscanRemoveWildcard,
       resolveDNS: form.domainscanResolveDNS,
-      concurrent: form.domainscanConcurrent
+      concurrent: form.domainscanConcurrent,
+      // 只有启用字典爆破时才传递字典ID和增强功能配置
+      subdomainDictIds: form.domainscanBruteforce ? (form.subdomainDictIds || []) : [],
+      // Dnsx增强功能（只有启用字典爆破时才生效）
+      recursiveBrute: form.domainscanBruteforce ? form.domainscanRecursiveBrute : false,
+      recursiveDictIds: (form.domainscanBruteforce && form.domainscanRecursiveBrute) ? (form.recursiveDictIds || []) : [],
+      wildcardDetect: form.domainscanBruteforce ? form.domainscanWildcardDetect : false,
+      subdomainCrawl: form.domainscanBruteforce ? form.domainscanSubdomainCrawl : false,
+      takeoverCheck: form.domainscanBruteforce ? form.domainscanTakeoverCheck : false
     },
     portscan: {
       enable: form.portscanEnable,
@@ -956,7 +1154,9 @@ function buildConfig() {
       portThreshold: form.portThreshold,
       scanType: form.scanType,
       timeout: form.portscanTimeout,
-      skipHostDiscovery: form.skipHostDiscovery
+      skipHostDiscovery: form.skipHostDiscovery,
+      excludeCDN: form.excludeCDN,
+      excludeHosts: form.excludeHosts
     },
     portidentify: {
       enable: form.portidentifyEnable,
@@ -1552,6 +1752,114 @@ function confirmDictSelection() {
   form.dirscanDicts = dictList.value.filter(d => selectedDictIds.value.includes(d.id))
   dictSelectDialogVisible.value = false
 }
+
+// ==================== 子域名字典选择相关方法 ====================
+
+// 显示子域名字典选择对话框
+function showSubdomainDictSelectDialog() {
+  selectedSubdomainDictIds.value = [...(form.subdomainDictIds || [])]
+  subdomainDictSelectDialogVisible.value = true
+}
+
+// 子域名字典对话框打开时加载数据
+async function handleSubdomainDictDialogOpen() {
+  await loadSubdomainDictList()
+  // 恢复选中状态
+  await nextTick()
+  restoreSubdomainDictTableSelection()
+}
+
+// 加载子域名字典列表
+async function loadSubdomainDictList() {
+  subdomainDictLoading.value = true
+  try {
+    const res = await getSubdomainDictEnabledList()
+    if (res.code === 0) {
+      subdomainDictList.value = res.list || []
+    }
+  } catch (e) {
+    console.error('加载子域名字典列表失败:', e)
+  } finally {
+    subdomainDictLoading.value = false
+  }
+}
+
+// 恢复子域名字典表格选中状态
+function restoreSubdomainDictTableSelection() {
+  if (!subdomainDictTableRef.value) return
+  const selectedIds = new Set(selectedSubdomainDictIds.value)
+  subdomainDictList.value.forEach(row => {
+    if (selectedIds.has(row.id)) {
+      subdomainDictTableRef.value.toggleRowSelection(row, true)
+    }
+  })
+}
+
+// 子域名字典选择变化
+function handleSubdomainDictSelectionChange(selection) {
+  selectedSubdomainDictIds.value = selection.map(d => d.id)
+}
+
+// 确认子域名字典选择
+function confirmSubdomainDictSelection() {
+  form.subdomainDictIds = [...selectedSubdomainDictIds.value]
+  form.subdomainDicts = subdomainDictList.value.filter(d => selectedSubdomainDictIds.value.includes(d.id))
+  subdomainDictSelectDialogVisible.value = false
+}
+
+// ==================== 递归爆破字典选择相关方法 ====================
+
+// 显示递归字典选择对话框
+function showRecursiveDictSelectDialog() {
+  selectedRecursiveDictIds.value = [...(form.recursiveDictIds || [])]
+  recursiveDictSelectDialogVisible.value = true
+}
+
+// 递归字典对话框打开时加载数据
+async function handleRecursiveDictDialogOpen() {
+  await loadRecursiveDictList()
+  // 恢复选中状态
+  await nextTick()
+  restoreRecursiveDictTableSelection()
+}
+
+// 加载递归字典列表（复用子域名字典列表）
+async function loadRecursiveDictList() {
+  recursiveDictLoading.value = true
+  try {
+    const res = await getSubdomainDictEnabledList()
+    if (res.code === 0) {
+      recursiveDictList.value = res.list || []
+    }
+  } catch (e) {
+    console.error('加载递归字典列表失败:', e)
+  } finally {
+    recursiveDictLoading.value = false
+  }
+}
+
+// 恢复递归字典表格选中状态
+function restoreRecursiveDictTableSelection() {
+  if (!recursiveDictTableRef.value) return
+  const selectedIds = new Set(selectedRecursiveDictIds.value)
+  recursiveDictList.value.forEach(row => {
+    if (selectedIds.has(row.id)) {
+      recursiveDictTableRef.value.toggleRowSelection(row, true)
+    }
+  })
+}
+
+// 递归字典选择变化
+function handleRecursiveDictSelectionChange(selection) {
+  selectedRecursiveDictIds.value = selection.map(d => d.id)
+}
+
+// 确认递归字典选择
+function confirmRecursiveDictSelection() {
+  form.recursiveDictIds = [...selectedRecursiveDictIds.value]
+  form.recursiveDicts = recursiveDictList.value.filter(d => selectedRecursiveDictIds.value.includes(d.id))
+  recursiveDictSelectDialogVisible.value = false
+}
 </script>
 
 <style lang="scss" scoped>
@@ -1613,6 +1921,46 @@ function confirmDictSelection() {
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  // 扫描工具左右分栏布局
+  .scan-tools-layout {
+    margin-top: 10px;
+  }
+
+  .scan-tool-section {
+    background: var(--el-fill-color-lighter);
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 280px;
+  }
+
+  .scan-tool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  .scan-tool-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--el-text-color-primary);
+  }
+
+  .scan-tool-disabled-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--el-fill-color);
+    border-radius: 4px;
+    color: var(--el-text-color-secondary);
+    font-size: 13px;
+    margin-top: 10px;
   }
 }
 
