@@ -582,7 +582,8 @@
     "noContent": "No content",
     "selectedTemplatesCount": "Selected {total} templates{added}",
     "selectedPocsCount": "Selected {total} POCs{added}",
-    "newlyAdded": " (newly added {count})"
+    "newlyAdded": " (newly added {count})",
+    "scanWorkflow": "Scan Workflow"
   },
   "search": {
     "title": "Online Search",

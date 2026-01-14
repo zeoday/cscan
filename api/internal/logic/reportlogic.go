@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -206,19 +205,10 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 		})
 	}
 
-	// 转换统计
-	topPorts := make([]types.StatItem, 0)
-	for port, count := range portStats {
-		topPorts = append(topPorts, types.StatItem{Name: strconv.Itoa(port), Count: count})
-	}
-	topServices := make([]types.StatItem, 0)
-	for svc, count := range serviceStats {
-		topServices = append(topServices, types.StatItem{Name: svc, Count: count})
-	}
-	topApps := make([]types.StatItem, 0)
-	for app, count := range appStats {
-		topApps = append(topApps, types.StatItem{Name: app, Count: count})
-	}
+	// 转换统计 - 排序并限制数量
+	topPorts := sortMapToStatItemsInt(portStats, 10)
+	topServices := sortMapToStatItems(serviceStats, 10)
+	topApps := sortMapToStatItems(appStats, 10)
 
 	// 转换目录扫描结果列表
 	dirScanList := make([]types.ReportDirScan, 0, len(dirScans))

@@ -137,6 +137,14 @@
         </div>
       </div>
 
+      <!-- 扫描工作流 -->
+      <ScanWorkflow 
+        v-if="parsedConfig"
+        :config="parsedConfig"
+        :current-phase="currentTask.currentPhase"
+        :status="currentTask.status"
+      />
+
       <!-- 执行结果 -->
       <div v-if="currentTask.result" class="result-section">
         <div class="section-title">
@@ -759,7 +767,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Search, Clock, VideoPlay, CircleCheck, Document, Setting, Connection, Monitor, Stamp, WarnTriangleFilled, FolderOpened, Grid, Aim } from '@element-plus/icons-vue'
+import { Plus, Delete, Search, Clock, VideoPlay, CircleCheck, Document, Setting, Connection, Monitor, Stamp, WarnTriangleFilled, FolderOpened, Grid, Aim, Operation } from '@element-plus/icons-vue'
+import ScanWorkflow from '@/components/ScanWorkflow.vue'
 import { getTaskList, createTask, deleteTask, batchDeleteTask, retryTask, startTask, pauseTask, resumeTask, stopTask, updateTask, getTaskLogs, getWorkerList, saveScanConfig, getScanConfig } from '@/api/task'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { validateTargets, formatValidationErrors } from '@/utils/target'

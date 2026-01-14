@@ -961,6 +961,11 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			}
 		}
 		if len(targets) == 0 {
+			w.taskLog(task.TaskId, LevelInfo, "All targets filtered by blacklist, marking task as complete")
+			// 为每个启用的模块调用 incrSubTaskDone，确保主任务进度正确更新
+			for _, phase := range enabledPhases {
+				w.incrSubTaskDone(ctx, task, phase)
+			}
 			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusSuccess, "All targets filtered by blacklist")
 			return
 		}

@@ -574,7 +574,8 @@
     "noContent": "暂无内容",
     "selectedTemplatesCount": "已选择 {total} 个模板{added}",
     "selectedPocsCount": "已选择 {total} 个POC{added}",
-    "newlyAdded": "（新增 {count} 个）"
+    "newlyAdded": "（新增 {count} 个）",
+    "scanWorkflow": "扫描流程"
   },
   "search": {
     "title": "在线搜索",

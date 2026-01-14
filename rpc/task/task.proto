@@ -68,6 +68,7 @@ message UpdateTaskReq {
   string state = 2;
   string worker = 3;
   string result = 4;
+  string phase = 5;  // 当前执行阶段
 }
 
 message UpdateTaskResp {

@@ -187,6 +187,7 @@ type UpdateTaskReq struct {
 	State         string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
 	Worker        string                 `protobuf:"bytes,3,opt,name=worker,proto3" json:"worker,omitempty"`
 	Result        string                 `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
+	Phase         string                 `protobuf:"bytes,5,opt,name=phase,proto3" json:"phase,omitempty"` // 当前执行阶段
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -245,6 +246,13 @@ func (x *UpdateTaskReq) GetWorker() string {
 func (x *UpdateTaskReq) GetResult() string {
 	if x != nil {
 		return x.Result
+	}
+	return ""
+}
+
+func (x *UpdateTaskReq) GetPhase() string {
+	if x != nil {
+		return x.Phase
 	}
 	return ""
 }
@@ -1604,7 +1612,7 @@ type GetTemplatesByTagsReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tags          []string               `protobuf:"bytes,1,rep,name=tags,proto3" json:"tags,omitempty"`
 	Severities    []string               `protobuf:"bytes,2,rep,name=severities,proto3" json:"severities,omitempty"`
-	CustomPocOnly bool                   `protobuf:"varint,3,opt,name=customPocOnly,proto3" json:"customPocOnly,omitempty"`
+	CustomPocOnly bool                   `protobuf:"varint,3,opt,name=customPocOnly,proto3" json:"customPocOnly,omitempty"` // 只获取自定义POC
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3790,12 +3798,13 @@ const file_task_proto_rawDesc = "" +
 	"\x06config\x18\b \x01(\tR\x06config\x12\x1e\n" +
 	"\n" +
 	"mainTaskId\x18\t \x01(\tR\n" +
-	"mainTaskId\"m\n" +
+	"mainTaskId\"\x83\x01\n" +
 	"\rUpdateTaskReq\x12\x16\n" +
 	"\x06taskId\x18\x01 \x01(\tR\x06taskId\x12\x14\n" +
 	"\x05state\x18\x02 \x01(\tR\x05state\x12\x16\n" +
 	"\x06worker\x18\x03 \x01(\tR\x06worker\x12\x16\n" +
-	"\x06result\x18\x04 \x01(\tR\x06result\"D\n" +
+	"\x06result\x18\x04 \x01(\tR\x06result\x12\x14\n" +
+	"\x05phase\x18\x05 \x01(\tR\x05phase\"D\n" +
 	"\x0eUpdateTaskResp\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\x9a\x01\n" +
@@ -3940,12 +3949,13 @@ const file_task_proto_rawDesc = "" +
 	"\x13RequestResourceResp\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\tR\x04hash\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"K\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"q\n" +
 	"\x15GetTemplatesByTagsReq\x12\x12\n" +
 	"\x04tags\x18\x01 \x03(\tR\x04tags\x12\x1e\n" +
 	"\n" +
 	"severities\x18\x02 \x03(\tR\n" +
-	"severities\"\x80\x01\n" +
+	"severities\x12$\n" +
+	"\rcustomPocOnly\x18\x03 \x01(\bR\rcustomPocOnly\"\x80\x01\n" +
 	"\x16GetTemplatesByTagsResp\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +

@@ -33,22 +33,33 @@ func (l *UpdateTaskLogic) UpdateTask(in *pb.UpdateTaskReq) (*pb.UpdateTaskResp, 
 	taskId := in.TaskId
 	state := in.State
 
-	l.Logger.Infof("UpdateTask: taskId=%s, state=%s", taskId, state)
+	l.Logger.Infof("UpdateTask: taskId=%s, state=%s, phase=%s", taskId, state, in.Phase)
 
 	// 从处理中集合移除
 	processingKey := "cscan:task:processing"
 	l.svcCtx.RedisClient.SRem(l.ctx, processingKey, taskId)
 
-	// 更新任务状态到Redis
+	// 更新任务状态到Redis（包含当前阶段）
 	statusKey := "cscan:task:status:" + taskId
 	statusData := map[string]interface{}{
 		"taskId": taskId,
 		"state":  state,
 		"worker": in.Worker,
 		"result": in.Result,
+		"phase":  in.Phase,
 	}
 	statusJson, _ := json.Marshal(statusData)
 	l.svcCtx.RedisClient.Set(l.ctx, statusKey, statusJson, 0)
+
+	// 更新进度信息到Redis（用于前端实时获取当前阶段）
+	if in.Phase != "" {
+		progressKey := "cscan:task:progress:" + taskId
+		progressData := map[string]interface{}{
+			"currentPhase": in.Phase,
+		}
+		progressJson, _ := json.Marshal(progressData)
+		l.svcCtx.RedisClient.Set(l.ctx, progressKey, progressJson, 24*time.Hour)
+	}
 
 	// 如果任务完成或失败，添加到完成集合
 	if state == "SUCCESS" || state == "FAILURE" || state == "COMPLETED" {
@@ -60,8 +71,8 @@ func (l *UpdateTaskLogic) UpdateTask(in *pb.UpdateTaskReq) (*pb.UpdateTaskResp, 
 		l.svcCtx.RedisClient.SAdd(l.ctx, completedKey, string(taskJson))
 	}
 
-	// 更新数据库中的任务状态（包括开始时间、结束时间、进度）
-	l.updateTaskInDB(taskId, state, in.Result)
+	// 更新数据库中的任务状态（包括开始时间、结束时间、进度、当前阶段）
+	l.updateTaskInDBWithPhase(taskId, state, in.Result, in.Phase)
 
 	return &pb.UpdateTaskResp{
 		Success: true,
@@ -71,9 +82,14 @@ func (l *UpdateTaskLogic) UpdateTask(in *pb.UpdateTaskReq) (*pb.UpdateTaskResp, 
 
 // updateTaskInDB 更新数据库中的任务状态
 func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
-	// 如果状态为空，只是进度更新，不更新数据库状态
-	if state == "" {
-		l.Logger.Infof("UpdateTask: state is empty for taskId=%s, skipping DB update (progress only)", taskId)
+	l.updateTaskInDBWithPhase(taskId, state, result, "")
+}
+
+// updateTaskInDBWithPhase 更新数据库中的任务状态（包含阶段）
+func (l *UpdateTaskLogic) updateTaskInDBWithPhase(taskId, state, result, phase string) {
+	// 如果状态为空且阶段为空，只是进度更新，不更新数据库状态
+	if state == "" && phase == "" {
+		l.Logger.Infof("UpdateTask: state and phase are empty for taskId=%s, skipping DB update (progress only)", taskId)
 		return
 	}
 
@@ -107,11 +123,19 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 	now := time.Now()
 
 	// 构建更新字段
-	update := bson.M{
-		"status": state,
+	update := bson.M{}
+	
+	// 如果有状态，更新状态
+	if state != "" {
+		update["status"] = state
+	}
+	
+	// 如果有阶段，更新当前阶段
+	if phase != "" {
+		update["current_phase"] = phase
 	}
 
-	l.Logger.Infof("UpdateTask: taskId=%s, mainTaskId=%s, subTaskCount=%d, state=%s", taskId, mainTaskId, subTaskCount, state)
+	l.Logger.Infof("UpdateTask: taskId=%s, mainTaskId=%s, subTaskCount=%d, state=%s, phase=%s", taskId, mainTaskId, subTaskCount, state, phase)
 
 	// 根据状态设置不同字段
 	switch state {
@@ -124,9 +148,14 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 			// 查询失败时仍然尝试更新状态和开始时间
 			update["start_time"] = now
 		} else if task.Status == "STARTED" {
-			// 主任务已经是STARTED状态，不需要再更新
-			l.Logger.Infof("UpdateTask: main task %s already STARTED, skipping update", mainTaskId)
-			return
+			// 主任务已经是STARTED状态，只更新阶段（如果有）
+			if phase != "" {
+				l.Logger.Infof("UpdateTask: main task %s already STARTED, updating phase only", mainTaskId)
+				update = bson.M{"current_phase": phase}
+			} else {
+				l.Logger.Infof("UpdateTask: main task %s already STARTED, skipping update", mainTaskId)
+				return
+			}
 		} else {
 			// 主任务不是STARTED状态（如PENDING/CREATED），更新状态和开始时间
 			l.Logger.Infof("UpdateTask: updating main task %s from %s to STARTED", mainTaskId, task.Status)
@@ -154,6 +183,12 @@ func (l *UpdateTaskLogic) updateTaskInDB(taskId, state, result string) {
 		// 任务停止时设置结束时间
 		update["end_time"] = now
 		update["result"] = "任务已停止"
+	case "":
+		// 只更新阶段，不更新状态
+		if phase == "" {
+			return
+		}
+		// phase 已经在上面设置了，直接更新
 	}
 
 	// 更新数据库，mainTaskId 是 MongoDB ObjectID

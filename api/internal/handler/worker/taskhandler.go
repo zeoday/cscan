@@ -115,6 +115,7 @@ func WorkerTaskUpdateHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			State:  req.State,
 			Worker: req.Worker,
 			Result: req.Result,
+			Phase:  req.Phase,
 		}
 
 		rpcResp, err := svcCtx.TaskRpcClient.UpdateTask(r.Context(), rpcReq)

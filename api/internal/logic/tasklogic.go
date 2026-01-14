@@ -543,13 +543,44 @@ func NewMainTaskRetryLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Mai
 }
 
 func (l *MainTaskRetryLogic) MainTaskRetry(req *types.MainTaskRetryReq, workspaceId string) (resp *types.BaseRespWithId, err error) {
-	taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
+	// 当 workspaceId 为 "all" 或空时，需要遍历所有工作空间查找任务
+	var oldTask *model.MainTask
+	var actualWorkspaceId string
 
-	// 获取原任务信息
-	oldTask, err := taskModel.FindById(l.ctx, req.Id)
-	if err != nil {
-		return &types.BaseRespWithId{Code: 400, Msg: "任务不存在"}, nil
+	if workspaceId == "" || workspaceId == "all" {
+		// 获取所有工作空间
+		workspaces, _ := l.svcCtx.WorkspaceModel.FindAll(l.ctx)
+		wsIds := []string{"default"}
+		for _, ws := range workspaces {
+			wsIds = append(wsIds, ws.Id.Hex())
+		}
+
+		// 遍历所有工作空间查找任务
+		for _, wsId := range wsIds {
+			taskModel := l.svcCtx.GetMainTaskModel(wsId)
+			task, err := taskModel.FindById(l.ctx, req.Id)
+			if err == nil && task != nil {
+				oldTask = task
+				actualWorkspaceId = wsId
+				break
+			}
+		}
+		if oldTask == nil {
+			return &types.BaseRespWithId{Code: 400, Msg: "任务不存在"}, nil
+		}
+	} else {
+		actualWorkspaceId = workspaceId
+		taskModel := l.svcCtx.GetMainTaskModel(workspaceId)
+		var err error
+		oldTask, err = taskModel.FindById(l.ctx, req.Id)
+		if err != nil {
+			return &types.BaseRespWithId{Code: 400, Msg: "任务不存在"}, nil
+		}
 	}
+
+	// 使用实际的工作空间ID
+	taskModel := l.svcCtx.GetMainTaskModel(actualWorkspaceId)
+	workspaceId = actualWorkspaceId
 
 	// 构建任务配置
 	taskConfig := map[string]interface{}{
@@ -761,21 +792,42 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 	if wsId == "" {
 		wsId = workspaceId
 	}
-	if wsId == "" {
-		l.Logger.Errorf("MainTaskStart: workspaceId is empty")
-		return &types.BaseResp{Code: 400, Msg: "workspaceId不能为空"}, nil
+	
+	// 当 workspaceId 为 "all" 或空时，遍历所有工作空间查找任务
+	var task *model.MainTask
+	var taskModel *model.MainTaskModel
+	if wsId == "" || wsId == "all" {
+		workspaces, _ := l.svcCtx.WorkspaceModel.FindAll(l.ctx)
+		wsIds := []string{"default"}
+		for _, ws := range workspaces {
+			wsIds = append(wsIds, ws.Id.Hex())
+		}
+		for _, ws := range wsIds {
+			tm := l.svcCtx.GetMainTaskModel(ws)
+			t, err := tm.FindById(l.ctx, req.Id)
+			if err == nil && t != nil {
+				task = t
+				taskModel = tm
+				wsId = ws
+				break
+			}
+		}
+		if task == nil {
+			l.Logger.Errorf("MainTaskStart: task not found in any workspace, id=%s", req.Id)
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
+	} else {
+		taskModel = l.svcCtx.GetMainTaskModel(wsId)
+		var err error
+		task, err = taskModel.FindById(l.ctx, req.Id)
+		if err != nil {
+			l.Logger.Errorf("MainTaskStart: task not found, id=%s, wsId=%s, error=%v", req.Id, wsId, err)
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
 	}
 	
 	fmt.Printf("[MainTaskStart] using workspaceId='%s'\n", wsId)
 	l.Logger.Infof("MainTaskStart: using workspaceId='%s'", wsId)
-	taskModel := l.svcCtx.GetMainTaskModel(wsId)
-
-	// 获取任务
-	task, err := taskModel.FindById(l.ctx, req.Id)
-	if err != nil {
-		l.Logger.Errorf("MainTaskStart: task not found, id=%s, wsId=%s, error=%v", req.Id, wsId, err)
-		return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
-	}
 
 	l.Logger.Infof("MainTaskStart: found task, id=%s, taskId=%s, currentStatus='%s', workspaceId=%s", req.Id, task.TaskId, task.Status, wsId)
 
@@ -963,17 +1015,37 @@ func (l *MainTaskPauseLogic) MainTaskPause(req *types.MainTaskControlReq, worksp
 	l.Logger.Infof("MainTaskPause: received request, id=%s, reqWorkspaceId=%s, headerWorkspaceId=%s, using=%s", 
 		req.Id, req.WorkspaceId, workspaceId, wsId)
 	
-	if wsId == "" {
-		return &types.BaseResp{Code: 400, Msg: "workspaceId不能为空"}, nil
-	}
-	
-	taskModel := l.svcCtx.GetMainTaskModel(wsId)
-
-	// 获取任务
-	task, err := taskModel.FindById(l.ctx, req.Id)
-	if err != nil {
-		l.Logger.Errorf("MainTaskPause: task not found, id=%s, error=%v", req.Id, err)
-		return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+	// 当 workspaceId 为 "all" 或空时，遍历所有工作空间查找任务
+	var task *model.MainTask
+	var taskModel *model.MainTaskModel
+	if wsId == "" || wsId == "all" {
+		workspaces, _ := l.svcCtx.WorkspaceModel.FindAll(l.ctx)
+		wsIds := []string{"default"}
+		for _, ws := range workspaces {
+			wsIds = append(wsIds, ws.Id.Hex())
+		}
+		for _, ws := range wsIds {
+			tm := l.svcCtx.GetMainTaskModel(ws)
+			t, err := tm.FindById(l.ctx, req.Id)
+			if err == nil && t != nil {
+				task = t
+				taskModel = tm
+				wsId = ws
+				break
+			}
+		}
+		if task == nil {
+			l.Logger.Errorf("MainTaskPause: task not found in any workspace, id=%s", req.Id)
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
+	} else {
+		taskModel = l.svcCtx.GetMainTaskModel(wsId)
+		var err error
+		task, err = taskModel.FindById(l.ctx, req.Id)
+		if err != nil {
+			l.Logger.Errorf("MainTaskPause: task not found, id=%s, error=%v", req.Id, err)
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
 	}
 
 	l.Logger.Infof("MainTaskPause: found task, id=%s, taskId=%s, status='%s', progress=%d, subTaskCount=%d, subTaskDone=%d", 
@@ -1038,20 +1110,44 @@ func (l *MainTaskResumeLogic) MainTaskResume(req *types.MainTaskControlReq, work
 	if wsId == "" {
 		wsId = workspaceId
 	}
-	if wsId == "" {
-		return &types.BaseResp{Code: 400, Msg: "workspaceId不能为空"}, nil
-	}
 	
 	l.Logger.Infof("MainTaskResume: id=%s, workspaceId=%s", req.Id, wsId)
 	
-	taskModel := l.svcCtx.GetMainTaskModel(wsId)
-
-	// 获取任务
-	task, err := taskModel.FindById(l.ctx, req.Id)
-	if err != nil {
-		l.Logger.Errorf("MainTaskResume: task not found, id=%s, error=%v", req.Id, err)
-		return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+	// 当 workspaceId 为 "all" 或空时，遍历所有工作空间查找任务
+	var task *model.MainTask
+	var taskModel *model.MainTaskModel
+	if wsId == "" || wsId == "all" {
+		workspaces, _ := l.svcCtx.WorkspaceModel.FindAll(l.ctx)
+		wsIds := []string{"default"}
+		for _, ws := range workspaces {
+			wsIds = append(wsIds, ws.Id.Hex())
+		}
+		for _, ws := range wsIds {
+			tm := l.svcCtx.GetMainTaskModel(ws)
+			t, err := tm.FindById(l.ctx, req.Id)
+			if err == nil && t != nil {
+				task = t
+				taskModel = tm
+				wsId = ws
+				break
+			}
+		}
+		if task == nil {
+			l.Logger.Errorf("MainTaskResume: task not found in any workspace, id=%s", req.Id)
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
+	} else {
+		taskModel = l.svcCtx.GetMainTaskModel(wsId)
+		var err error
+		task, err = taskModel.FindById(l.ctx, req.Id)
+		if err != nil {
+			l.Logger.Errorf("MainTaskResume: task not found, id=%s, error=%v", req.Id, err)
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
 	}
+	
+	// 避免 taskModel 未使用的编译错误
+	_ = taskModel
 
 	l.Logger.Infof("MainTaskResume: found task, taskId=%s, status=%s, subTaskCount=%d, subTaskDone=%d", 
 		task.TaskId, task.Status, task.SubTaskCount, task.SubTaskDone)
@@ -1198,16 +1294,36 @@ func (l *MainTaskStopLogic) MainTaskStop(req *types.MainTaskControlReq, workspac
 	if wsId == "" {
 		wsId = workspaceId
 	}
-	if wsId == "" {
-		return &types.BaseResp{Code: 400, Msg: "workspaceId不能为空"}, nil
-	}
 	
-	taskModel := l.svcCtx.GetMainTaskModel(wsId)
-
-	// 获取任务
-	task, err := taskModel.FindById(l.ctx, req.Id)
-	if err != nil {
-		return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+	// 当 workspaceId 为 "all" 或空时，遍历所有工作空间查找任务
+	var task *model.MainTask
+	var taskModel *model.MainTaskModel
+	if wsId == "" || wsId == "all" {
+		workspaces, _ := l.svcCtx.WorkspaceModel.FindAll(l.ctx)
+		wsIds := []string{"default"}
+		for _, ws := range workspaces {
+			wsIds = append(wsIds, ws.Id.Hex())
+		}
+		for _, ws := range wsIds {
+			tm := l.svcCtx.GetMainTaskModel(ws)
+			t, err := tm.FindById(l.ctx, req.Id)
+			if err == nil && t != nil {
+				task = t
+				taskModel = tm
+				wsId = ws
+				break
+			}
+		}
+		if task == nil {
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
+	} else {
+		taskModel = l.svcCtx.GetMainTaskModel(wsId)
+		var err error
+		task, err = taskModel.FindById(l.ctx, req.Id)
+		if err != nil {
+			return &types.BaseResp{Code: 400, Msg: "任务不存在"}, nil
+		}
 	}
 
 	// 检查状态：STARTED, PAUSED, PENDING, CREATED 或空状态可以停止
