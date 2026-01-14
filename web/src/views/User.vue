@@ -1,26 +1,26 @@
-<template>
+﻿<template>
   <div class="user-page">
     <el-card class="action-card">
       <el-button type="primary" @click="showCreateDialog">
-        <el-icon><Plus /></el-icon>新建用户
+        <el-icon><Plus /></el-icon>{{ $t('user.newUser') }}
       </el-button>
     </el-card>
 
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe max-height="500">
-        <el-table-column prop="username" label="用户名" min-width="150" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="username" :label="$t('user.userName')" min-width="150" />
+        <el-table-column prop="status" :label="$t('common.status')" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 'enable' ? 'success' : 'danger'">
-              {{ row.status === 'enable' ? '启用' : '禁用' }}
+              {{ row.status === 'enable' ? $t('common.enabled') : $t('common.disabled') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column :label="$t('common.operation')" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="showEditDialog(row)">编辑</el-button>
-            <el-button type="warning" link size="small" @click="showResetPasswordDialog(row)">重置密码</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="showEditDialog(row)">{{ $t('common.edit') }}</el-button>
+            <el-button type="warning" link size="small" @click="showResetPasswordDialog(row)">{{ $t('user.resetPassword') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -29,38 +29,38 @@
     <!-- 新建/编辑用户对话框 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+        <el-form-item :label="$t('user.userName')" prop="username">
+          <el-input v-model="form.username" :placeholder="$t('user.pleaseEnterUsername')" />
         </el-form-item>
-        <el-form-item v-if="!form.id" label="密码" prop="password">
-          <el-input v-model="form.password" type="password" placeholder="请输入密码" />
+        <el-form-item v-if="!form.id" :label="$t('user.password')" prop="password">
+          <el-input v-model="form.password" type="password" :placeholder="$t('user.pleaseEnterPassword')" />
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="form.status" placeholder="请选择状态">
-            <el-option label="启用" value="enable" />
-            <el-option label="禁用" value="disable" />
+        <el-form-item :label="$t('common.status')" prop="status">
+          <el-select v-model="form.status" :placeholder="$t('user.pleaseSelectStatus')">
+            <el-option :label="$t('common.enabled')" value="enable" />
+            <el-option :label="$t('common.disabled')" value="disable" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
+        <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 重置密码对话框 -->
-    <el-dialog v-model="resetPasswordVisible" title="重置密码" width="400px">
+    <el-dialog v-model="resetPasswordVisible" :title="$t('user.resetPassword')" width="400px">
       <el-form ref="resetFormRef" :model="resetForm" :rules="resetRules" label-width="80px">
-        <el-form-item label="新密码" prop="newPassword">
-          <el-input v-model="resetForm.newPassword" type="password" placeholder="请输入新密码" />
+        <el-form-item :label="$t('user.newPassword')" prop="newPassword">
+          <el-input v-model="resetForm.newPassword" type="password" :placeholder="$t('user.pleaseEnterNewPassword')" />
         </el-form-item>
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input v-model="resetForm.confirmPassword" type="password" placeholder="请再次输入新密码" />
+        <el-form-item :label="$t('user.confirmPassword')" prop="confirmPassword">
+          <el-input v-model="resetForm.confirmPassword" type="password" :placeholder="$t('user.pleaseConfirmPassword')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="resetPasswordVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleResetPassword" :loading="resetting">确定</el-button>
+        <el-button @click="resetPasswordVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleResetPassword" :loading="resetting">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -68,9 +68,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserList, createUser, updateUser, deleteUser, resetUserPassword } from '@/api/auth'
 
+const { t } = useI18n()
 const loading = ref(false)
 const tableData = ref([])
 const dialogVisible = ref(false)
@@ -94,20 +96,20 @@ const resetForm = ref({
 const formRef = ref()
 const resetFormRef = ref()
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
-}
+const rules = computed(() => ({
+  username: [{ required: true, message: t('user.pleaseEnterUsername'), trigger: 'blur' }],
+  password: [{ required: true, message: t('user.pleaseEnterPassword'), trigger: 'blur' }],
+  status: [{ required: true, message: t('user.pleaseSelectStatus'), trigger: 'change' }]
+}))
 
-const resetRules = {
-  newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
+const resetRules = computed(() => ({
+  newPassword: [{ required: true, message: t('user.pleaseEnterNewPassword'), trigger: 'blur' }],
   confirmPassword: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { required: true, message: t('user.pleaseConfirmPassword'), trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
         if (value !== resetForm.value.newPassword) {
-          callback(new Error('两次输入的密码不一致'))
+          callback(new Error(t('user.passwordMismatch')))
         } else {
           callback()
         }
@@ -115,9 +117,9 @@ const resetRules = {
       trigger: 'blur'
     }
   ]
-}
+}))
 
-const dialogTitle = computed(() => form.value.id ? '编辑用户' : '新建用户')
+const dialogTitle = computed(() => form.value.id ? t('user.editUser') : t('user.newUser'))
 
 onMounted(() => loadData())
 
@@ -157,11 +159,11 @@ async function handleSubmit() {
     const res = await api(form.value)
     
     if (res.code === 0) {
-      ElMessage.success(res.msg || '操作成功')
+      ElMessage.success(res.msg || t('common.operationSuccess'))
       dialogVisible.value = false
       loadData()
     } else {
-      ElMessage.error(res.msg || '操作失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } catch (error) {
     console.error('表单验证失败:', error)
@@ -172,18 +174,18 @@ async function handleSubmit() {
 
 async function handleDelete(row) {
   try {
-    await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('user.confirmDeleteUser'), t('common.tip'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
       type: 'warning'
     })
     
     const res = await deleteUser({ id: row.id })
     if (res.code === 0) {
-      ElMessage.success(res.msg || '删除成功')
+      ElMessage.success(res.msg || t('common.deleteSuccess'))
       loadData()
     } else {
-      ElMessage.error(res.msg || '删除失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } catch (error) {
     // 用户取消删除
@@ -203,10 +205,10 @@ async function handleResetPassword() {
     })
     
     if (res.code === 0) {
-      ElMessage.success(res.msg || '密码重置成功')
+      ElMessage.success(res.msg || t('user.passwordResetSuccess'))
       resetPasswordVisible.value = false
     } else {
-      ElMessage.error(res.msg || '密码重置失败')
+      ElMessage.error(res.msg || t('user.passwordResetFailed'))
     }
   } catch (error) {
     console.error('表单验证失败:', error)
@@ -216,8 +218,9 @@ async function handleResetPassword() {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .user-page {
   .action-card { margin-bottom: 20px; }
 }
 </style>
+

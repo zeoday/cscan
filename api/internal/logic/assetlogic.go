@@ -632,19 +632,27 @@ func NewAssetClearLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AssetC
 }
 
 func (l *AssetClearLogic) AssetClear(workspaceId string) (resp *types.BaseResp, err error) {
-	assetModel := l.svcCtx.GetAssetModel(workspaceId)
+	var totalDeleted int64
 	
-	// 清空资产表
-	deleted, err := assetModel.Clear(l.ctx)
-	if err != nil {
-		return &types.BaseResp{Code: 500, Msg: "清空资产失败: " + err.Error()}, nil
+	// 获取需要清空的工作空间列表
+	wsIds := common.GetWorkspaceIds(l.ctx, l.svcCtx, workspaceId)
+	
+	// 清空所有相关工作空间的资产
+	for _, wsId := range wsIds {
+		assetModel := l.svcCtx.GetAssetModel(wsId)
+		deleted, err := assetModel.Clear(l.ctx)
+		if err != nil {
+			l.Logger.Errorf("清空工作空间 %s 资产失败: %v", wsId, err)
+			continue
+		}
+		totalDeleted += deleted
+		
+		// 清空对应的资产历史表
+		historyModel := l.svcCtx.GetAssetHistoryModel(wsId)
+		historyModel.Clear(l.ctx)
 	}
 	
-	// 清空资产历史表
-	historyModel := l.svcCtx.GetAssetHistoryModel(workspaceId)
-	historyModel.Clear(l.ctx)
-	
-	return &types.BaseResp{Code: 0, Msg: "成功清空 " + strconv.FormatInt(deleted, 10) + " 条资产"}, nil
+	return &types.BaseResp{Code: 0, Msg: "成功清空 " + strconv.FormatInt(totalDeleted, 10) + " 条资产"}, nil
 }
 
 

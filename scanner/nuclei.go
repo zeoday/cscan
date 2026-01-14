@@ -407,17 +407,17 @@ func (s *NucleiScanner) executeNucleiScan(ctx, engineCtx context.Context, ne *nu
 				foundCount++
 				if taskLogger != nil {
 					if event.MatcherName != "" {
-						taskLogger("INFO", "  [%d/%d] ✓ %s:%s [%s]", scannedCount, templateCount, event.TemplateID, event.MatcherName, event.Info.SeverityHolder.Severity.String())
+						taskLogger("INFO", "  [%d] ✓ %s:%s [%s]", scannedCount, event.TemplateID, event.MatcherName, event.Info.SeverityHolder.Severity.String())
 					} else {
-						taskLogger("INFO", "  [%d/%d] ✓ %s [%s]", scannedCount, templateCount, event.TemplateID, event.Info.SeverityHolder.Severity.String())
+						taskLogger("INFO", "  [%d] ✓ %s [%s]", scannedCount, event.TemplateID, event.Info.SeverityHolder.Severity.String())
 					}
 				}
 				if vul := s.convertResult(event); vul != nil {
 					vuls = append(vuls, vul)
 				}
 			}
-		} else if taskLogger != nil && (scannedCount%50 == 0 || scannedCount == templateCount) {
-			taskLogger("INFO", "  [%d/%d] Scanning... %d vuls found", scannedCount, templateCount, foundCount)
+		} else if taskLogger != nil && scannedCount%50 == 0 {
+			taskLogger("INFO", "  [%d] Scanning... %d vuls found", scannedCount, foundCount)
 		}
 	})
 
@@ -444,13 +444,11 @@ func (s *NucleiScanner) handleScanResult(err error, engineCtx context.Context, t
 		}
 	}
 
-	// 输出统计
+	// 输出统计 - 使用实际执行的模板数作为完成数
+	// 注意：scannedCount 是回调触发次数，可能小于 templateCount
+	// 因为某些模板可能因协议不匹配、条件不满足或超时而被跳过
 	if taskLogger != nil {
-		if scannedCount < templateCount {
-			taskLogger("INFO", "  Completed: %d/%d templates (incomplete), %d vuls, %ds", scannedCount, templateCount, foundCount, elapsed)
-		} else {
-			taskLogger("INFO", "  Completed: %d templates, %d vuls, %ds", scannedCount, foundCount, elapsed)
-		}
+		taskLogger("INFO", "  Completed: %d templates, %d vuls, %ds", scannedCount, foundCount, elapsed)
 	}
 }
 
@@ -557,7 +555,6 @@ func (s *NucleiScanner) ScanBatch(ctx context.Context, targets []string, opts *N
 	// 统计变量
 	scannedCount := 0
 	foundCount := 0
-	totalTasks := len(targets) * len(loadedTemplates)
 
 	// 监听父context取消
 	done := make(chan struct{})
@@ -585,7 +582,7 @@ func (s *NucleiScanner) ScanBatch(ctx context.Context, targets []string, opts *N
 				seen[vulKey] = true
 				foundCount++
 
-				taskLog("INFO", "[%d/%d] ✓ %s - %s [%s]", scannedCount, totalTasks, event.Host, event.TemplateID, event.Info.SeverityHolder.Severity.String())
+				taskLog("INFO", "[%d] ✓ %s - %s [%s]", scannedCount, event.Host, event.TemplateID, event.Info.SeverityHolder.Severity.String())
 
 				vul := s.convertResult(event)
 				if vul != nil {
@@ -597,9 +594,9 @@ func (s *NucleiScanner) ScanBatch(ctx context.Context, targets []string, opts *N
 				}
 			}
 		} else {
-			// 每100个任务或完成时显示进度
-			if scannedCount%100 == 0 || scannedCount == totalTasks {
-				taskLog("INFO", "[%d/%d] Scanning... %d vuls found", scannedCount, totalTasks, foundCount)
+			// 每100个任务显示进度
+			if scannedCount%100 == 0 {
+				taskLog("INFO", "[%d] Scanning... %d vuls found", scannedCount, foundCount)
 			}
 		}
 	})
@@ -679,19 +676,9 @@ func (s *NucleiScanner) buildNucleiOptions(opts *NucleiOptions, customTemplatePa
 		logx.Errorf("No templates provided! POC scan requires templates from database.")
 	}
 
-	// 模板过滤器 - 当使用数据库模板时，模板已经是筛选过的，跳过tag过滤
-	filters := nuclei.TemplateFilters{}
-	hasFilters := false
-
-	// severity过滤仍然生效
-	if opts.Severity != "" {
-		filters.Severity = opts.Severity
-		hasFilters = true
-	}
-
-	if hasFilters {
-		nucleiOpts = append(nucleiOpts, nuclei.WithTemplateFilters(filters))
-	}
+	// 注意：不再设置 severity 过滤器
+	// 模板已经在数据库查询时按 severity 过滤过了，Nuclei 引擎不应该再次过滤
+	// 这样可以确保 "Loaded X POC templates" 和 "Loaded X templates" 数量一致
 
 	// 并发配置
 	if opts.Concurrency > 0 {

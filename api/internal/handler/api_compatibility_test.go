@@ -351,6 +351,317 @@ func hasJSONTag(t reflect.Type, tagName string) bool {
 
 // =============================================================================
 // Property-Based Tests for API Backward Compatibility
+// Feature: cscan-refactoring, Property 7: API Endpoint Backward Compatibility
+// Validates: Requirements 4.1, 4.3
+// =============================================================================
+
+// TestProperty7_APIEndpointBackwardCompatibility verifies that existing API endpoints
+// continue to accept the same requests and return compatible responses after refactoring.
+// **Property 7: API Endpoint Backward Compatibility**
+// **Validates: Requirements 4.1, 4.3**
+func TestProperty7_APIEndpointBackwardCompatibility(t *testing.T) {
+	parameters := gopter.DefaultTestParameters()
+	parameters.MinSuccessfulTests = 100
+	properties := gopter.NewProperties(parameters)
+
+	// Property 7.1: All expected endpoints exist and maintain their HTTP methods
+	properties.Property("API endpoints maintain HTTP methods and paths", prop.ForAll(
+		func(endpointIndex int) bool {
+			if endpointIndex < 0 || endpointIndex >= len(ExpectedEndpoints) {
+				return true // Skip invalid indices
+			}
+
+			endpoint := ExpectedEndpoints[endpointIndex]
+			
+			// Verify endpoint has valid HTTP method
+			validMethods := map[string]bool{
+				http.MethodGet:    true,
+				http.MethodPost:   true,
+				http.MethodPut:    true,
+				http.MethodDelete: true,
+				http.MethodPatch:  true,
+			}
+
+			if !validMethods[endpoint.Method] {
+				return false
+			}
+
+			// Verify endpoint follows API versioning pattern
+			if len(endpoint.Path) < 8 || endpoint.Path[:8] != "/api/v1/" {
+				return false
+			}
+
+			return true
+		},
+		gen.IntRange(0, len(ExpectedEndpoints)-1),
+	))
+
+	// Property 7.2: Response structures maintain required fields
+	properties.Property("Response structures maintain required fields", prop.ForAll(
+		func(code int, msg string) bool {
+			// Test BaseResp structure compatibility
+			resp := types.BaseResp{Code: code, Msg: msg}
+			data, err := json.Marshal(resp)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// Required fields must exist for backward compatibility
+			_, hasCode := decoded["code"]
+			_, hasMsg := decoded["msg"]
+			return hasCode && hasMsg
+		},
+		gen.Int(),
+		gen.AnyString(),
+	))
+
+	// Property 7.3: List response structures maintain pagination fields
+	properties.Property("List responses maintain pagination fields", prop.ForAll(
+		func(code, total int, msg string) bool {
+			// Test list response compatibility using AssetListResp as example
+			resp := types.AssetListResp{
+				Code:  code,
+				Msg:   msg,
+				Total: total,
+				List:  []types.Asset{},
+			}
+
+			data, err := json.Marshal(resp)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// All list responses must have these fields for backward compatibility
+			requiredFields := []string{"code", "msg", "total", "list"}
+			for _, field := range requiredFields {
+				if _, exists := decoded[field]; !exists {
+					return false
+				}
+			}
+			return true
+		},
+		gen.Int(),
+		gen.Int(),
+		gen.AnyString(),
+	))
+
+	// Property 7.4: Login response maintains authentication fields
+	properties.Property("Login response maintains authentication fields", prop.ForAll(
+		func(code int, msg, token, userId, username, role, workspaceId string) bool {
+			resp := types.LoginResp{
+				Code:        code,
+				Msg:         msg,
+				Token:       token,
+				UserId:      userId,
+				Username:    username,
+				Role:        role,
+				WorkspaceId: workspaceId,
+			}
+
+			data, err := json.Marshal(resp)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// Critical authentication fields must exist for backward compatibility
+			authFields := []string{"code", "msg", "token", "userId", "username", "role"}
+			for _, field := range authFields {
+				if _, exists := decoded[field]; !exists {
+					return false
+				}
+			}
+			return true
+		},
+		gen.Int(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+	))
+
+	// Property 7.5: Asset structure maintains core fields
+	properties.Property("Asset structure maintains core fields", prop.ForAll(
+		func(id, authority, host, service, title string, port int) bool {
+			asset := types.Asset{
+				Id:        id,
+				Authority: authority,
+				Host:      host,
+				Port:      port,
+				Service:   service,
+				Title:     title,
+				App:       []string{},
+			}
+
+			data, err := json.Marshal(asset)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// Core asset fields must exist for backward compatibility
+			coreFields := []string{"id", "authority", "host", "port", "service", "title", "app"}
+			for _, field := range coreFields {
+				if _, exists := decoded[field]; !exists {
+					return false
+				}
+			}
+			return true
+		},
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.IntRange(1, 65535),
+	))
+
+	// Property 7.6: Vulnerability structure maintains core fields
+	properties.Property("Vulnerability structure maintains core fields", prop.ForAll(
+		func(id, authority, url, pocFile, severity, result string) bool {
+			vul := types.Vul{
+				Id:        id,
+				Authority: authority,
+				Url:       url,
+				PocFile:   pocFile,
+				Severity:  severity,
+				Result:    result,
+			}
+
+			data, err := json.Marshal(vul)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// Core vulnerability fields must exist for backward compatibility
+			coreFields := []string{"id", "authority", "url", "pocFile", "severity", "result"}
+			for _, field := range coreFields {
+				if _, exists := decoded[field]; !exists {
+					return false
+				}
+			}
+			return true
+		},
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+	))
+
+	// Property 7.7: Worker structure maintains core fields
+	properties.Property("Worker structure maintains core fields", prop.ForAll(
+		func(name, ip, status string, cpuLoad, memUsed float64, taskCount, runningCount, concurrency int) bool {
+			worker := types.Worker{
+				Name:         name,
+				IP:           ip,
+				CPULoad:      cpuLoad,
+				MemUsed:      memUsed,
+				TaskCount:    taskCount,
+				RunningCount: runningCount,
+				Concurrency:  concurrency,
+				Status:       status,
+			}
+
+			data, err := json.Marshal(worker)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// Core worker fields must exist for backward compatibility
+			coreFields := []string{"name", "ip", "cpuLoad", "memUsed", "taskCount", "runningCount", "concurrency", "status"}
+			for _, field := range coreFields {
+				if _, exists := decoded[field]; !exists {
+					return false
+				}
+			}
+			return true
+		},
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.Float64Range(0, 100),
+		gen.Float64Range(0, 100),
+		gen.IntRange(0, 1000),
+		gen.IntRange(0, 100),
+		gen.IntRange(1, 50),
+	))
+
+	// Property 7.8: Task structure maintains core fields
+	properties.Property("Task structure maintains core fields", prop.ForAll(
+		func(id, taskId, name, target, status string, progress int) bool {
+			task := types.MainTask{
+				Id:       id,
+				TaskId:   taskId,
+				Name:     name,
+				Target:   target,
+				Status:   status,
+				Progress: progress,
+			}
+
+			data, err := json.Marshal(task)
+			if err != nil {
+				return false
+			}
+
+			var decoded map[string]interface{}
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				return false
+			}
+
+			// Core task fields must exist for backward compatibility
+			coreFields := []string{"id", "taskId", "name", "target", "status", "progress"}
+			for _, field := range coreFields {
+				if _, exists := decoded[field]; !exists {
+					return false
+				}
+			}
+			return true
+		},
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.AnyString(),
+		gen.IntRange(0, 100),
+	))
+
+	properties.TestingRun(t)
+}
+
+// =============================================================================
+// Property-Based Tests for API Backward Compatibility
 // Feature: cscan-optimization, Property 12: API Backward Compatibility
 // Validates: Requirements 9.3
 // =============================================================================

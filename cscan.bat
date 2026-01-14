@@ -20,16 +20,43 @@ if %errorlevel% neq 0 (
 )
 
 :get_versions
-REM Get local version from container image tag
-for /f "tokens=*" %%i in ('docker inspect --format "{{.Config.Image}}" cscan_api 2^>nul') do set "IMAGE=%%i"
-if defined IMAGE (
-    for /f "tokens=2 delims=:" %%a in ("!IMAGE!") do set "LOCAL_VERSION=%%a"
+REM Get local version from VERSION file if exists, or check if containers are running
+if exist "VERSION" (
+    for /f "tokens=*" %%i in (VERSION) do set "LOCAL_VERSION=%%i"
+) else (
+    set "LOCAL_VERSION=unknown"
 )
-if "!LOCAL_VERSION!"=="" set "LOCAL_VERSION=Not Installed"
 
-REM Get remote version from GitHub
-for /f "tokens=*" %%i in ('curl -s --connect-timeout 5 "%GITHUB_RAW%/VERSION" 2^>nul') do set "REMOTE_VERSION=%%i"
-if "!REMOTE_VERSION!"=="" set "REMOTE_VERSION=unknown"
+REM Check if containers are running to determine installation status
+docker inspect cscan_api >nul 2>&1
+if %errorlevel% neq 0 (
+    set "LOCAL_VERSION=Not Installed"
+)
+
+REM Get remote version from GitHub with better error handling
+set "REMOTE_VERSION=unknown"
+curl.exe -s --connect-timeout 10 --max-time 15 "%GITHUB_RAW%/VERSION" > temp_version.txt 2>nul
+if exist temp_version.txt (
+    for /f "tokens=*" %%i in (temp_version.txt) do (
+        set "REMOTE_VERSION=%%i"
+        goto :version_found
+    )
+)
+:version_found
+if exist temp_version.txt del temp_version.txt >nul 2>&1
+
+REM If curl failed, try with powershell as fallback
+if "!REMOTE_VERSION!"=="unknown" (
+    powershell -Command "try { (Invoke-WebRequest -Uri '%GITHUB_RAW%/VERSION' -TimeoutSec 10 -UseBasicParsing).Content.Trim() } catch { 'unknown' }" > temp_version2.txt 2>nul
+    if exist temp_version2.txt (
+        for /f "tokens=*" %%i in (temp_version2.txt) do set "REMOTE_VERSION=%%i"
+        del temp_version2.txt >nul 2>&1
+    )
+)
+
+REM Trim whitespace from versions
+for /f "tokens=* delims= " %%a in ("!LOCAL_VERSION!") do set "LOCAL_VERSION=%%a"
+for /f "tokens=* delims= " %%a in ("!REMOTE_VERSION!") do set "REMOTE_VERSION=%%a"
 
 goto :main_menu
 
@@ -44,7 +71,22 @@ echo   Local Version:  %LOCAL_VERSION%
 echo   Latest Version: %REMOTE_VERSION%
 
 REM Check if update available
-if not "%LOCAL_VERSION%"=="%REMOTE_VERSION%" (
+set "LOCAL_VER_CLEAN=%LOCAL_VERSION%"
+set "REMOTE_VER_CLEAN=%REMOTE_VERSION%"
+
+REM Remove leading and trailing spaces
+for /f "tokens=*" %%a in ("!LOCAL_VER_CLEAN!") do set "LOCAL_VER_CLEAN=%%a"
+for /f "tokens=*" %%a in ("!REMOTE_VER_CLEAN!") do set "REMOTE_VER_CLEAN=%%a"
+
+REM Remove 'V' prefix for comparison if present
+if "!LOCAL_VER_CLEAN:~0,1!"=="V" set "LOCAL_VER_CLEAN=!LOCAL_VER_CLEAN:~1!"
+if "!REMOTE_VER_CLEAN:~0,1!"=="V" set "REMOTE_VER_CLEAN=!REMOTE_VER_CLEAN:~1!"
+
+REM Remove any remaining spaces
+for /f "tokens=*" %%a in ("!LOCAL_VER_CLEAN!") do set "LOCAL_VER_CLEAN=%%a"
+for /f "tokens=*" %%a in ("!REMOTE_VER_CLEAN!") do set "REMOTE_VER_CLEAN=%%a"
+
+if not "!LOCAL_VER_CLEAN!"=="!REMOTE_VER_CLEAN!" (
     if not "%LOCAL_VERSION%"=="Not Installed" (
         if not "%REMOTE_VERSION%"=="unknown" (
             echo   [NEW VERSION AVAILABLE]
@@ -98,10 +140,27 @@ if "%LOCAL_VERSION%"=="Not Installed" (
 
 if "%REMOTE_VERSION%"=="unknown" (
     echo [CSCAN] Unable to check remote version
+    echo [CSCAN] Please check your internet connection
     goto :pause_return
 )
 
-if "%LOCAL_VERSION%"=="%REMOTE_VERSION%" (
+REM Clean versions for comparison
+set "LOCAL_VER_CLEAN=%LOCAL_VERSION%"
+set "REMOTE_VER_CLEAN=%REMOTE_VERSION%"
+
+REM Remove leading and trailing spaces
+for /f "tokens=*" %%a in ("!LOCAL_VER_CLEAN!") do set "LOCAL_VER_CLEAN=%%a"
+for /f "tokens=*" %%a in ("!REMOTE_VER_CLEAN!") do set "REMOTE_VER_CLEAN=%%a"
+
+REM Remove 'V' prefix if present
+if "!LOCAL_VER_CLEAN:~0,1!"=="V" set "LOCAL_VER_CLEAN=!LOCAL_VER_CLEAN:~1!"
+if "!REMOTE_VER_CLEAN:~0,1!"=="V" set "REMOTE_VER_CLEAN=!REMOTE_VER_CLEAN:~1!"
+
+REM Remove any remaining spaces
+for /f "tokens=*" %%a in ("!LOCAL_VER_CLEAN!") do set "LOCAL_VER_CLEAN=%%a"
+for /f "tokens=*" %%a in ("!REMOTE_VER_CLEAN!") do set "REMOTE_VER_CLEAN=%%a"
+
+if "!LOCAL_VER_CLEAN!"=="!REMOTE_VER_CLEAN!" (
     echo [CSCAN] You are running the latest version
 ) else (
     echo [CSCAN] New version available: %REMOTE_VERSION%
@@ -136,6 +195,12 @@ if %errorlevel% neq 0 (
     goto :pause_return
 )
 
+REM Create VERSION file if remote version was fetched successfully
+if not "%REMOTE_VERSION%"=="unknown" (
+    echo %REMOTE_VERSION% > VERSION
+    echo [CSCAN] Created local version file: %REMOTE_VERSION%
+)
+
 echo.
 echo ========================================
 echo [CSCAN] Installation successful!
@@ -161,7 +226,23 @@ if "%LOCAL_VERSION%"=="Not Installed" (
     goto :pause_return
 )
 
-if "%LOCAL_VERSION%"=="%REMOTE_VERSION%" (
+REM Clean versions for comparison
+set "LOCAL_VER_CLEAN=%LOCAL_VERSION%"
+set "REMOTE_VER_CLEAN=%REMOTE_VERSION%"
+
+REM Remove leading and trailing spaces
+for /f "tokens=*" %%a in ("!LOCAL_VER_CLEAN!") do set "LOCAL_VER_CLEAN=%%a"
+for /f "tokens=*" %%a in ("!REMOTE_VER_CLEAN!") do set "REMOTE_VER_CLEAN=%%a"
+
+REM Remove 'V' prefix if present
+if "!LOCAL_VER_CLEAN:~0,1!"=="V" set "LOCAL_VER_CLEAN=!LOCAL_VER_CLEAN:~1!"
+if "!REMOTE_VER_CLEAN:~0,1!"=="V" set "REMOTE_VER_CLEAN=!REMOTE_VER_CLEAN:~1!"
+
+REM Remove any remaining spaces
+for /f "tokens=*" %%a in ("!LOCAL_VER_CLEAN!") do set "LOCAL_VER_CLEAN=%%a"
+for /f "tokens=*" %%a in ("!REMOTE_VER_CLEAN!") do set "REMOTE_VER_CLEAN=%%a"
+
+if "!LOCAL_VER_CLEAN!"=="!REMOTE_VER_CLEAN!" (
     echo [CSCAN] Already running the latest version
     set /p "force=Force re-pull images? (Y/N): "
     if /i not "!force!"=="Y" goto :pause_return
@@ -189,6 +270,12 @@ if %errorlevel% neq 0 (
 
 echo [CSCAN] Cleaning old CSCAN images...
 for /f "tokens=*" %%i in ('docker images --filter "dangling=true" --filter "reference=registry.cn-hangzhou.aliyuncs.com/txf7/cscan-*" -q 2^>nul') do docker rmi %%i 2>nul
+
+REM Update local VERSION file if remote version was fetched successfully
+if not "%REMOTE_VERSION%"=="unknown" (
+    echo %REMOTE_VERSION% > VERSION
+    echo [CSCAN] Updated local version to %REMOTE_VERSION%
+)
 
 echo.
 echo [CSCAN] Upgrade completed!

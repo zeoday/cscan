@@ -202,6 +202,12 @@ func (e *DomainScanExecutor) executeBruteforce(ctx *TaskContext, config *schedul
 		WildcardFilter: config.RemoveWildcard,
 		ResolveDNS:     config.ResolveDNS,
 		Concurrent:     w.config.Concurrency * 10,
+		// 引擎配置
+		Engine:         config.BruteforceEngine,
+		Bandwidth:      config.Bandwidth,
+		Retry:          config.Retry,
+		WildcardMode:   config.WildcardMode,
+		// 增强功能配置
 		RecursiveBrute: config.RecursiveBrute,
 		RecursiveDepth: 2,
 		WildcardDetect: config.WildcardDetect,
@@ -809,14 +815,17 @@ func (e *DirScanExecutor) Execute(ctx *TaskContext) (*PhaseResult, error) {
 
 	// 检查控制信号
 	if ctx.Ctx.Err() != nil || w.checkTaskControl(ctx.Ctx, task.TaskId) == "STOP" {
-		return &PhaseResult{Stopped: true, Assets: dirScanAssets}, nil
+		// 注意：不返回 dirScanAssets，因为目录扫描结果不应该被添加到主资产列表
+		return &PhaseResult{Stopped: true}, nil
 	}
 
 	if len(dirScanAssets) > 0 {
 		w.taskLog(task.TaskId, LevelInfo, "Dir scan completed: found %d paths", len(dirScanAssets))
 	}
 
-	return &PhaseResult{Assets: dirScanAssets}, nil
+	// 注意：返回空的 Assets，目录扫描结果（URL路径）不应该被当作 POC 扫描的目标
+	// 目录扫描结果已在 executeDirScan 中通过 saveDirScanResults 保存到数据库
+	return &PhaseResult{}, nil
 }
 
 // RegisterDefaultExecutors 注册默认阶段执行器

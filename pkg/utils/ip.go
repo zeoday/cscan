@@ -48,6 +48,39 @@ func IsPublicIP(ip string) bool {
 	return !IsPrivateIP(ip) && !parsedIP.IsLoopback() && !parsedIP.IsUnspecified()
 }
 
+// IsLoopbackIP 判断是否为回环地址（127.0.0.0/8 或 ::1）
+// 解析到回环地址的域名应该被过滤，防止扫描本地服务
+func IsLoopbackIP(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+	return parsedIP.IsLoopback()
+}
+
+// ContainsLoopbackIP 检查IP列表中是否包含回环地址
+func ContainsLoopbackIP(ips []string) bool {
+	for _, ip := range ips {
+		if IsLoopbackIP(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// AllLoopbackIPs 检查IP列表是否全部为回环地址
+func AllLoopbackIPs(ips []string) bool {
+	if len(ips) == 0 {
+		return false
+	}
+	for _, ip := range ips {
+		if !IsLoopbackIP(ip) {
+			return false
+		}
+	}
+	return true
+}
+
 // IsIPv4 判断是否为IPv4地址
 func IsIPv4(ip string) bool {
 	parsedIP := net.ParseIP(ip)

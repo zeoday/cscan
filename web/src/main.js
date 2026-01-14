@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import enUs from 'element-plus/dist/locale/en.mjs'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 // 引入 Element Plus 官方暗黑模式样式
@@ -9,8 +10,9 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 
 import App from './App.vue'
 import router from './router'
+import { setupI18n, i18n } from './i18n'
 
-import './styles/index.scss'
+import './styles/index.css'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -22,12 +24,26 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 app.use(pinia)
 app.use(router)
-app.use(ElementPlus, { locale: zhCn })
+
+// 设置国际化
+setupI18n(app)
+
+// 根据当前语言设置 Element Plus 语言
+const currentLocale = i18n.global.locale.value
+const elementLocale = currentLocale === 'zh-CN' ? zhCn : enUs
+app.use(ElementPlus, { locale: elementLocale })
+
+// 监听语言变化，更新 Element Plus 语言
+import { watch } from 'vue'
+watch(() => i18n.global.locale.value, (newLocale) => {
+  // 这里可以动态更新 Element Plus 的语言，但需要重新创建应用实例
+  // 简单的方式是刷新页面或者在组件中处理
+})
 
 // 初始化主题
 import { useThemeStore } from './stores/theme'
 const themeStore = useThemeStore()
-// 触发主题初始化
-themeStore.isDark
+themeStore.initTheme()
+themeStore.watchSystemTheme()
 
 app.mount('#app')

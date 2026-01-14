@@ -27,6 +27,7 @@ func NewIncrSubTaskDoneLogic(ctx context.Context, svcCtx *svc.ServiceContext) *I
 }
 
 // 递增子任务完成数（模块级别）
+// 使用原子操作防止并发导致计数超过上限
 func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.IncrSubTaskDoneResp, error) {
 	l.Logger.Infof("IncrSubTaskDone: taskId=%s, mainTaskId=%s, phase=%s", in.TaskId, in.MainTaskId, in.Phase)
 
@@ -40,55 +41,52 @@ func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.I
 	// 获取任务模型
 	taskModel := l.svcCtx.GetMainTaskModel(in.WorkspaceId)
 
-	// 递增 sub_task_done
-	if err := taskModel.IncrSubTaskDone(l.ctx, in.MainTaskId); err != nil {
-		l.Logger.Errorf("IncrSubTaskDone: failed to incr, mainTaskId=%s, error=%v", in.MainTaskId, err)
+	// 使用原子操作递增 sub_task_done，防止超过上限
+	task, incremented, err := taskModel.IncrSubTaskDoneAtomic(l.ctx, in.MainTaskId)
+	if err != nil {
+		l.Logger.Errorf("IncrSubTaskDone: failed to incr atomic, mainTaskId=%s, error=%v", in.MainTaskId, err)
 		return &pb.IncrSubTaskDoneResp{
 			Success: false,
 			Message: err.Error(),
 		}, nil
 	}
 
-	// 获取最新的任务状态
-	task, err := taskModel.FindById(l.ctx, in.MainTaskId)
-	if err != nil {
-		l.Logger.Errorf("IncrSubTaskDone: failed to find task, mainTaskId=%s, error=%v", in.MainTaskId, err)
-		return &pb.IncrSubTaskDoneResp{
-			Success: true,
-			Message: "incremented but failed to get task status",
-		}, nil
+	if !incremented {
+		// 已达上限，记录警告但不视为错误
+		l.Logger.Infof("IncrSubTaskDone: already at limit, mainTaskId=%s, done=%d, total=%d",
+			in.MainTaskId, task.SubTaskDone, task.SubTaskCount)
 	}
 
+	// 判断是否全部完成
 	allDone := task.SubTaskDone >= task.SubTaskCount
-	l.Logger.Infof("IncrSubTaskDone: mainTaskId=%s, phase=%s, done=%d, total=%d, allDone=%v",
-		in.MainTaskId, in.Phase, task.SubTaskDone, task.SubTaskCount, allDone)
+	l.Logger.Infof("IncrSubTaskDone: mainTaskId=%s, phase=%s, done=%d, total=%d, allDone=%v, incremented=%v",
+		in.MainTaskId, in.Phase, task.SubTaskDone, task.SubTaskCount, allDone, incremented)
 
-	// 计算进度百分比
-	progress := 0
-	if task.SubTaskCount > 0 {
-		progress = task.SubTaskDone * 100 / task.SubTaskCount
-	}
+	// 计算进度百分比，确保不超过100
+	progress := calculateProgress(task.SubTaskDone, task.SubTaskCount)
 
-	// 更新进度到数据库
+	// 更新进度和当前阶段
 	update := bson.M{
 		"progress":      progress,
 		"current_phase": in.Phase,
-	}
-
-	// 如果全部完成，更新状态
-	if allDone {
-		update["status"] = "SUCCESS"
-		update["progress"] = 100
-		update["end_time"] = time.Now()
 	}
 
 	if err := taskModel.Update(l.ctx, in.MainTaskId, update); err != nil {
 		l.Logger.Errorf("IncrSubTaskDone: failed to update progress, mainTaskId=%s, error=%v", in.MainTaskId, err)
 	}
 
-	// 如果全部完成，发送通知
+	// 如果全部完成，使用原子操作更新状态
 	if allDone {
-		l.sendTaskNotification(in.WorkspaceId, in.MainTaskId, "SUCCESS")
+		updated, err := taskModel.MarkTaskCompleted(l.ctx, in.MainTaskId)
+		if err != nil {
+			l.Logger.Errorf("IncrSubTaskDone: failed to mark completed, mainTaskId=%s, error=%v", in.MainTaskId, err)
+		} else if updated {
+			l.Logger.Infof("IncrSubTaskDone: task marked as completed, mainTaskId=%s", in.MainTaskId)
+			// 只有成功更新状态时才发送通知（避免重复通知）
+			l.sendTaskNotification(in.WorkspaceId, in.MainTaskId, "SUCCESS")
+		} else {
+			l.Logger.Infof("IncrSubTaskDone: task already completed, mainTaskId=%s", in.MainTaskId)
+		}
 	}
 
 	return &pb.IncrSubTaskDoneResp{
@@ -98,6 +96,18 @@ func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.I
 		SubTaskCount: int32(task.SubTaskCount),
 		AllDone:      allDone,
 	}, nil
+}
+
+// calculateProgress 计算进度百分比，确保不超过100
+func calculateProgress(done, total int) int {
+	if total <= 0 {
+		return 0
+	}
+	progress := done * 100 / total
+	if progress > 100 {
+		progress = 100
+	}
+	return progress
 }
 
 // sendTaskNotification 发送任务完成通知

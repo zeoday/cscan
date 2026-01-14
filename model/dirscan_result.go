@@ -121,12 +121,31 @@ func (m *DirScanResultModel) Upsert(ctx context.Context, doc *DirScanResult) err
 
 // FindByFilter 根据条件查询
 func (m *DirScanResultModel) FindByFilter(ctx context.Context, filter bson.M, page, pageSize int) ([]DirScanResult, error) {
+	return m.FindByFilterWithSort(ctx, filter, page, pageSize, "", "")
+}
+
+// FindByFilterWithSort 根据条件查询并支持排序
+func (m *DirScanResultModel) FindByFilterWithSort(ctx context.Context, filter bson.M, page, pageSize int, sortField string, sortOrder string) ([]DirScanResult, error) {
 	opts := options.Find()
 	if page > 0 && pageSize > 0 {
 		opts.SetSkip(int64((page - 1) * pageSize))
 		opts.SetLimit(int64(pageSize))
 	}
-	opts.SetSort(bson.D{{Key: "create_time", Value: -1}})
+
+	// 处理排序
+	sortValue := -1 // 默认降序
+	if sortOrder == "asc" {
+		sortValue = 1
+	}
+
+	switch sortField {
+	case "statusCode":
+		opts.SetSort(bson.D{{Key: "status_code", Value: sortValue}, {Key: "create_time", Value: -1}})
+	case "contentLength":
+		opts.SetSort(bson.D{{Key: "content_length", Value: sortValue}, {Key: "create_time", Value: -1}})
+	default:
+		opts.SetSort(bson.D{{Key: "create_time", Value: -1}})
+	}
 
 	cursor, err := m.coll.Find(ctx, filter, opts)
 	if err != nil {

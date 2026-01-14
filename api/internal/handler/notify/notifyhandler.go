@@ -92,3 +92,36 @@ func NotifyProviderListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 	}
 }
+
+
+// HighRiskFilterConfigGetHandler 获取高危过滤配置
+func HighRiskFilterConfigGetHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logic.NewHighRiskFilterConfigGetLogic(r.Context(), svcCtx)
+		resp, err := l.HighRiskFilterConfigGet()
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+		} else {
+			httpx.OkJsonCtx(r.Context(), w, resp)
+		}
+	}
+}
+
+// HighRiskFilterConfigSaveHandler 保存高危过滤配置
+func HighRiskFilterConfigSaveHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HighRiskFilterConfigSaveReq
+		if err := httpx.Parse(r, &req); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
+		l := logic.NewHighRiskFilterConfigSaveLogic(r.Context(), svcCtx)
+		resp, err := l.HighRiskFilterConfigSave(&req)
+		if err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+		} else {
+			httpx.OkJsonCtx(r.Context(), w, resp)
+		}
+	}
+}

@@ -974,3 +974,25 @@ func (c *WorkerHTTPClient) SaveDirScanResult(ctx context.Context, req *DirScanRe
 
 	return &resp, nil
 }
+
+// BlacklistRulesResp 黑名单规则响应
+type BlacklistRulesResp struct {
+	Code  int      `json:"code"`
+	Msg   string   `json:"msg"`
+	Rules []string `json:"rules"`
+}
+
+// GetBlacklistRules 获取黑名单规则
+func (c *WorkerHTTPClient) GetBlacklistRules(ctx context.Context) (*BlacklistRulesResp, error) {
+	respBody, err := c.doRequest(ctx, http.MethodPost, "/api/v1/worker/config/blacklist", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp BlacklistRulesResp
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal response failed: %w", err)
+	}
+
+	return &resp, nil
+}

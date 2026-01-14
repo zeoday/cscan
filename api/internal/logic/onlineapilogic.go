@@ -129,14 +129,23 @@ func (l *OnlineAPILogic) Import(req *types.OnlineImportReq, workspaceId string) 
 	count := 0
 	for _, a := range req.Assets {
 		apps := parseApps(a.Product)
+		
+		// 构建正确的Authority格式 (host:port)
+		host := a.IP
+		if host == "" {
+			host = a.Host
+		}
+		authority := fmt.Sprintf("%s:%d", host, a.Port)
+		
 		asset := &model.Asset{
-			Authority: a.Host,
-			Host:      a.IP,
+			Authority: authority,
+			Host:      host,
 			Port:      a.Port,
 			Service:   a.Protocol,
 			Title:     a.Title,
 			App:       apps,
 			Source:    "onlineapi",
+			IsHTTP:    a.Protocol == "http" || a.Protocol == "https",
 		}
 		if err := assetModel.Upsert(l.ctx, asset); err == nil {
 			count++
@@ -264,14 +273,23 @@ PageLoop:
 		// 导入当前页的资产
 		for _, a := range results {
 			apps := parseApps(a.Product)
+			
+			// 构建正确的Authority格式 (host:port)
+			host := a.IP
+			if host == "" {
+				host = a.Host
+			}
+			authority := fmt.Sprintf("%s:%d", host, a.Port)
+			
 			asset := &model.Asset{
-				Authority: a.Host,
-				Host:      a.IP,
+				Authority: authority,
+				Host:      host,
 				Port:      a.Port,
 				Service:   a.Protocol,
 				Title:     a.Title,
 				App:       apps,
 				Source:    "onlineapi",
+				IsHTTP:    a.Protocol == "http" || a.Protocol == "https",
 			}
 			if err := assetModel.Upsert(l.ctx, asset); err == nil {
 				totalImport++

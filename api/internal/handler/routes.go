@@ -5,6 +5,7 @@ import (
 
 	"cscan/api/internal/handler/ai"
 	"cscan/api/internal/handler/asset"
+	"cscan/api/internal/handler/blacklist"
 	"cscan/api/internal/handler/dirscan"
 	"cscan/api/internal/handler/fingerprint"
 	"cscan/api/internal/handler/notify"
@@ -74,6 +75,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/poc", Handler: worker.WorkerConfigPocHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/dirscandict", Handler: worker.WorkerConfigDirScanDictHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/worker/config/subdomaindict", Handler: worker.WorkerConfigSubdomainDictHandler(svcCtx)},
+		// 黑名单规则（供Worker使用）
+		{Method: http.MethodPost, Path: "/api/v1/worker/config/blacklist", Handler: blacklist.BlacklistRulesHandler(svcCtx)},
 	}
 
 	// 为Worker路由包装认证中间件
@@ -159,6 +162,15 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/task/logs", Handler: task.GetTaskLogsHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/api/v1/task/logs/stream", Handler: task.TaskLogsStreamHandler(svcCtx)},
 
+		// 定时任务管理
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/list", Handler: task.CronTaskListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/save", Handler: task.CronTaskSaveHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/toggle", Handler: task.CronTaskToggleHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/delete", Handler: task.CronTaskDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/batchDelete", Handler: task.CronTaskBatchDeleteHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/runNow", Handler: task.CronTaskRunNowHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/cron/validate", Handler: task.ValidateCronSpecHandler(svcCtx)},
+
 		// 漏洞管理
 		{Method: http.MethodPost, Path: "/api/v1/vul/list", Handler: vul.VulListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/vul/detail", Handler: vul.VulDetailHandler(svcCtx)},
@@ -237,6 +249,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/httpservice/mapping/list", Handler: fingerprint.HttpServiceMappingListV2Handler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/httpservice/mapping/save", Handler: fingerprint.HttpServiceMappingSaveV2Handler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/httpservice/mapping/delete", Handler: fingerprint.HttpServiceMappingDeleteV2Handler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/httpservice/export", Handler: fingerprint.HttpServiceExportHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/httpservice/import", Handler: fingerprint.HttpServiceImportHandler(svcCtx)},
 
 		// 主动扫描指纹
 		{Method: http.MethodPost, Path: "/api/v1/fingerprint/active/list", Handler: fingerprint.ActiveFingerprintListHandler(svcCtx)},
@@ -288,6 +302,16 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/notify/config/delete", Handler: notify.NotifyConfigDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/notify/config/test", Handler: notify.NotifyConfigTestHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/notify/providers", Handler: notify.NotifyProviderListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/notify/highrisk/config/get", Handler: notify.HighRiskFilterConfigGetHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/notify/highrisk/config/save", Handler: notify.HighRiskFilterConfigSaveHandler(svcCtx)},
+
+		// 资产指纹和端口统计
+		{Method: http.MethodPost, Path: "/api/v1/asset/fingerprints/list", Handler: asset.AssetFingerprintsListHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/asset/ports/stats", Handler: asset.AssetPortsStatsHandler(svcCtx)},
+
+		// 全局黑名单
+		{Method: http.MethodPost, Path: "/api/v1/blacklist/config/get", Handler: blacklist.BlacklistConfigGetHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/blacklist/config/save", Handler: blacklist.BlacklistConfigSaveHandler(svcCtx)},
 	}
 
 	// 为每个路由包装认证中间件

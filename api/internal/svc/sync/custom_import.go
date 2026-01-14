@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -353,6 +354,8 @@ type SyncMethods struct {
 	customImport         *CustomImportService
 	dirscanDictModel     *model.DirScanDictModel
 	subdomainDictModel   *model.SubdomainDictModel
+	httpServiceModel     *model.HttpServiceModel
+	blacklistModel       *model.BlacklistConfigModel
 }
 
 func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.FingerprintModel, pocModel *model.CustomPocModel, afpModel *model.ActiveFingerprintModel, dirscanDictModel *model.DirScanDictModel, subdomainDictModel *model.SubdomainDictModel) *SyncMethods {
@@ -363,6 +366,16 @@ func NewSyncMethods(nucleiModel *model.NucleiTemplateModel, fpModel *model.Finge
 		dirscanDictModel:   dirscanDictModel,
 		subdomainDictModel: subdomainDictModel,
 	}
+}
+
+// SetHttpServiceModel 设置HTTP服务模型（用于启动时导入）
+func (s *SyncMethods) SetHttpServiceModel(model *model.HttpServiceModel) {
+	s.httpServiceModel = model
+}
+
+// SetBlacklistModel 设置黑名单模型（用于启动时导入）
+func (s *SyncMethods) SetBlacklistModel(model *model.BlacklistConfigModel) {
+	s.blacklistModel = model
 }
 
 func (s *SyncMethods) SyncNucleiTemplates() {
@@ -379,6 +392,10 @@ func (s *SyncMethods) ImportCustomPocAndFingerprints() {
 	s.initBuiltinDirScanDicts(context.Background())
 	// 初始化内置子域名字典
 	s.initBuiltinSubdomainDicts(context.Background())
+	// 导入HTTP服务映射配置
+	s.importHttpServiceMappings(context.Background())
+	// 导入默认黑名单规则
+	s.initBuiltinBlacklist(context.Background())
 }
 
 func (s *SyncMethods) RefreshTemplateCache() {
@@ -556,4 +573,344 @@ func (s *SyncMethods) initBuiltinSubdomainDicts(ctx context.Context) {
 	}
 
 	logx.Infof("[SyncMethods] Builtin subdomain dicts initialized: %d imported, %d skipped", totalImported, totalSkipped)
+}
+
+
+// importHttpServiceMappings 从 poc/custom-http 目录导入HTTP服务映射配置
+func (s *SyncMethods) importHttpServiceMappings(ctx context.Context) {
+	if s.httpServiceModel == nil {
+		logx.Info("[SyncMethods] HttpServiceModel is nil, skipping HTTP service mappings import")
+		return
+	}
+
+	// 确定配置目录路径
+	configDir := "/app/poc/custom-http"
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		configDir = "poc/custom-http"
+	}
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		logx.Info("[SyncMethods] custom-http directory not found, skipping HTTP service mappings import")
+		return
+	}
+
+	logx.Infof("[SyncMethods] Importing HTTP service mappings from: %s", configDir)
+
+	totalImported := 0
+	totalSkipped := 0
+
+	err := filepath.Walk(configDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+
+		// 只处理 .txt 文件
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext != ".txt" {
+			return nil
+		}
+
+		// 读取文件内容
+		data, err := os.ReadFile(path)
+		if err != nil {
+			logx.Errorf("[SyncMethods] Failed to read HTTP service config file %s: %v", path, err)
+			return nil
+		}
+
+		content := string(data)
+		if strings.TrimSpace(content) == "" {
+			return nil
+		}
+
+		// 解析并导入
+		imported, skipped := s.parseAndImportHttpServiceConfig(ctx, content)
+		totalImported += imported
+		totalSkipped += skipped
+
+		return nil
+	})
+
+	if err != nil {
+		logx.Errorf("[SyncMethods] Walk HTTP service config directory error: %v", err)
+	}
+
+	logx.Infof("[SyncMethods] HTTP service mappings import completed: %d imported, %d skipped", totalImported, totalSkipped)
+}
+
+// parseAndImportHttpServiceConfig 解析并导入HTTP服务映射配置
+func (s *SyncMethods) parseAndImportHttpServiceConfig(ctx context.Context, content string) (imported, skipped int) {
+	lines := strings.Split(content, "\n")
+
+	var httpPorts, httpsPorts, nonHttpPorts []int
+	currentSection := ""
+
+	// 获取现有的服务映射，用于去重
+	existingMappings, _ := s.httpServiceModel.GetMappings(ctx)
+	existingServiceNames := make(map[string]bool)
+	for _, m := range existingMappings {
+		existingServiceNames[strings.ToLower(m.ServiceName)] = true
+	}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// 跳过空行和注释
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// 检测section
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			currentSection = strings.ToLower(line[1 : len(line)-1])
+			continue
+		}
+
+		switch currentSection {
+		case "http_ports":
+			if port := parsePortLine(line); port > 0 {
+				httpPorts = append(httpPorts, port)
+			}
+		case "https_ports":
+			if port := parsePortLine(line); port > 0 {
+				httpsPorts = append(httpsPorts, port)
+			}
+		case "non_http_ports":
+			if port := parsePortLine(line); port > 0 {
+				nonHttpPorts = append(nonHttpPorts, port)
+			}
+		case "service_mapping":
+			// 解析服务映射: serviceName=http/non_http [disabled] # description
+			mapping := parseServiceMappingLine(line)
+			if mapping.ServiceName == "" {
+				continue
+			}
+
+			// 检查是否已存在（去重）
+			if existingServiceNames[strings.ToLower(mapping.ServiceName)] {
+				skipped++
+				continue
+			}
+
+			doc := &model.HttpServiceMapping{
+				ServiceName: strings.ToLower(mapping.ServiceName),
+				IsHttp:      mapping.IsHttp,
+				Description: mapping.Description,
+				Enabled:     mapping.Enabled,
+			}
+			if err := s.httpServiceModel.SaveMapping(ctx, doc); err != nil {
+				logx.Debugf("[SyncMethods] Save HTTP service mapping '%s' error: %v", mapping.ServiceName, err)
+				skipped++
+			} else {
+				imported++
+				existingServiceNames[strings.ToLower(mapping.ServiceName)] = true
+			}
+		}
+	}
+
+	// 保存端口配置（如果有新的端口，合并到现有配置）
+	if len(httpPorts) > 0 || len(httpsPorts) > 0 || len(nonHttpPorts) > 0 {
+		existingConfig, _ := s.httpServiceModel.GetConfig(ctx)
+		if existingConfig != nil {
+			// 合并端口（去重）
+			httpPorts = mergeUniquePorts(existingConfig.HttpPorts, httpPorts)
+			httpsPorts = mergeUniquePorts(existingConfig.HttpsPorts, httpsPorts)
+			nonHttpPorts = mergeUniquePorts(existingConfig.NonHttpPorts, nonHttpPorts)
+		}
+
+		config := &model.HttpServiceConfig{
+			HttpPorts:    httpPorts,
+			HttpsPorts:   httpsPorts,
+			NonHttpPorts: nonHttpPorts,
+		}
+		if err := s.httpServiceModel.SaveConfig(ctx, config); err != nil {
+			logx.Errorf("[SyncMethods] Save HTTP service config error: %v", err)
+		}
+	}
+
+	return imported, skipped
+}
+
+// parsePortLine 解析端口行
+func parsePortLine(line string) int {
+	// 去除注释
+	if idx := strings.Index(line, "#"); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
+	var port int
+	_, err := fmt.Sscanf(line, "%d", &port)
+	if err != nil || port <= 0 || port > 65535 {
+		return 0
+	}
+	return port
+}
+
+// parseServiceMappingLine 解析服务映射行
+func parseServiceMappingLine(line string) struct {
+	ServiceName string
+	IsHttp      bool
+	Description string
+	Enabled     bool
+} {
+	result := struct {
+		ServiceName string
+		IsHttp      bool
+		Description string
+		Enabled     bool
+	}{Enabled: true}
+
+	// 提取描述（# 后面的内容）
+	if idx := strings.Index(line, "#"); idx >= 0 {
+		result.Description = strings.TrimSpace(line[idx+1:])
+		line = strings.TrimSpace(line[:idx])
+	}
+
+	// 检查是否禁用
+	if strings.Contains(line, "[disabled]") {
+		result.Enabled = false
+		line = strings.Replace(line, "[disabled]", "", 1)
+		line = strings.TrimSpace(line)
+	}
+
+	// 解析 serviceName=http/non_http
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return result
+	}
+
+	result.ServiceName = strings.TrimSpace(parts[0])
+	httpType := strings.ToLower(strings.TrimSpace(parts[1]))
+	result.IsHttp = (httpType == "http" || httpType == "true" || httpType == "1")
+
+	return result
+}
+
+// mergeUniquePorts 合并端口列表并去重
+func mergeUniquePorts(existing, newPorts []int) []int {
+	portSet := make(map[int]bool)
+	for _, p := range existing {
+		portSet[p] = true
+	}
+	for _, p := range newPorts {
+		portSet[p] = true
+	}
+	result := make([]int, 0, len(portSet))
+	for p := range portSet {
+		result = append(result, p)
+	}
+	return result
+}
+
+// initBuiltinBlacklist 初始化内置黑名单规则
+// 从 poc/custom-blacklist 目录读取默认黑名单，合并到现有黑名单（不重复导入）
+func (s *SyncMethods) initBuiltinBlacklist(ctx context.Context) {
+	if s.blacklistModel == nil {
+		logx.Info("[SyncMethods] BlacklistModel is nil, skipping builtin blacklist import")
+		return
+	}
+
+	// 确定黑名单目录路径
+	blacklistDir := "/app/poc/custom-blacklist"
+	if _, err := os.Stat(blacklistDir); os.IsNotExist(err) {
+		blacklistDir = "poc/custom-blacklist"
+	}
+	if _, err := os.Stat(blacklistDir); os.IsNotExist(err) {
+		logx.Info("[SyncMethods] custom-blacklist directory not found, skipping builtin blacklist import")
+		return
+	}
+
+	logx.Infof("[SyncMethods] Importing builtin blacklist from: %s", blacklistDir)
+
+	// 获取现有黑名单规则
+	existingConfig, err := s.blacklistModel.Get(ctx)
+	if err != nil {
+		logx.Errorf("[SyncMethods] Failed to get existing blacklist: %v", err)
+		return
+	}
+
+	// 解析现有规则到集合（用于去重）
+	existingRules := make(map[string]bool)
+	if existingConfig != nil && existingConfig.Rules != "" {
+		for _, rule := range model.ParseBlacklistRules(existingConfig.Rules) {
+			existingRules[strings.ToLower(rule)] = true
+		}
+	}
+
+	// 收集新规则
+	var newRules []string
+	totalImported := 0
+	totalSkipped := 0
+
+	err = filepath.Walk(blacklistDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+
+		// 只处理 .txt 文件
+		if !strings.HasSuffix(strings.ToLower(path), ".txt") {
+			return nil
+		}
+
+		// 读取文件内容
+		data, err := os.ReadFile(path)
+		if err != nil {
+			logx.Errorf("[SyncMethods] Failed to read blacklist file %s: %v", path, err)
+			return nil
+		}
+
+		content := string(data)
+		lines := strings.Split(content, "\n")
+
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			// 跳过空行和注释
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			// 检查是否已存在（去重，忽略大小写）
+			ruleLower := strings.ToLower(line)
+			if existingRules[ruleLower] {
+				totalSkipped++
+				continue
+			}
+
+			// 添加新规则
+			newRules = append(newRules, line)
+			existingRules[ruleLower] = true
+			totalImported++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		logx.Errorf("[SyncMethods] Walk blacklist directory error: %v", err)
+	}
+
+	// 如果有新规则，合并并保存
+	if len(newRules) > 0 {
+		// 合并规则
+		var allRules string
+		if existingConfig != nil && existingConfig.Rules != "" {
+			allRules = existingConfig.Rules + "\n" + strings.Join(newRules, "\n")
+		} else {
+			allRules = strings.Join(newRules, "\n")
+		}
+
+		// 保存更新后的黑名单
+		config := &model.BlacklistConfig{
+			Rules:  allRules,
+			Status: "enable",
+		}
+		if existingConfig != nil && !existingConfig.Id.IsZero() {
+			config.Id = existingConfig.Id
+		}
+
+		if err := s.blacklistModel.Save(ctx, config); err != nil {
+			logx.Errorf("[SyncMethods] Failed to save blacklist: %v", err)
+		} else {
+			logx.Infof("[SyncMethods] Builtin blacklist imported: %d new rules, %d skipped (already exist)", totalImported, totalSkipped)
+		}
+	} else {
+		logx.Infof("[SyncMethods] Builtin blacklist: no new rules to import (%d already exist)", totalSkipped)
+	}
 }

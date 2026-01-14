@@ -480,8 +480,6 @@ type MainTaskCreateReq struct {
 	ProfileId   string   `json:"profileId,optional"` // 可选，兼容旧版
 	Config      string   `json:"config,optional"`    // 直接传递配置JSON
 	OrgId       string   `json:"orgId,optional"`
-	IsCron      bool     `json:"isCron,optional"`
-	CronRule    string   `json:"cronRule,optional"`
 	Workers     []string `json:"workers,optional"`     // 指定执行任务的 Worker 列表
 	WorkspaceId string   `json:"workspaceId,optional"` // 任务所属工作空间ID
 }
@@ -1371,6 +1369,31 @@ type HttpServiceMappingDeleteReq struct {
 	Id string `json:"id"`
 }
 
+// HttpServiceExportReq 导出HTTP服务映射请求
+type HttpServiceExportReq struct {
+	Format string `json:"format,optional"` // 导出格式: txt (默认)
+}
+
+// HttpServiceExportResp 导出HTTP服务映射响应
+type HttpServiceExportResp struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Content string `json:"content"` // 导出内容
+}
+
+// HttpServiceImportReq 导入HTTP服务映射请求
+type HttpServiceImportReq struct {
+	Content string `json:"content"` // 导入内容
+}
+
+// HttpServiceImportResp 导入HTTP服务映射响应
+type HttpServiceImportResp struct {
+	Code     int    `json:"code"`
+	Msg      string `json:"msg"`
+	Imported int    `json:"imported"` // 导入数量
+	Skipped  int    `json:"skipped"`  // 跳过数量（重复）
+}
+
 
 // ==================== 报告管理 ====================
 type ReportDetailReq struct {
@@ -1906,4 +1929,87 @@ type NotifyProviderListResp struct {
 	Code int              `json:"code"`
 	Msg  string           `json:"msg"`
 	List []NotifyProvider `json:"list"`
+}
+
+// ==================== 全局黑名单 ====================
+
+// BlacklistConfig 黑名单配置
+type BlacklistConfig struct {
+	Rules      string `json:"rules"`      // 黑名单规则，每行一条
+	Status     string `json:"status"`     // enable/disable
+	UpdateTime string `json:"updateTime"` // 更新时间
+}
+
+// BlacklistConfigResp 黑名单配置响应
+type BlacklistConfigResp struct {
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data *BlacklistConfig `json:"data,omitempty"`
+}
+
+// BlacklistConfigSaveReq 保存黑名单配置请求
+type BlacklistConfigSaveReq struct {
+	Rules  string `json:"rules"`            // 黑名单规则，每行一条
+	Status string `json:"status,optional"`  // enable/disable，默认enable
+}
+
+// BlacklistRulesResp 黑名单规则列表响应（供Worker使用）
+type BlacklistRulesResp struct {
+	Code  int      `json:"code"`
+	Msg   string   `json:"msg"`
+	Rules []string `json:"rules"` // 解析后的规则列表
+}
+
+// ==================== 高危过滤全局配置 ====================
+
+// HighRiskFilterConfig 高危过滤全局配置
+type HighRiskFilterConfig struct {
+	Enabled               bool     `json:"enabled"`               // 是否启用高危过滤
+	HighRiskFingerprints  []string `json:"highRiskFingerprints"`  // 高危指纹列表
+	HighRiskPorts         []int    `json:"highRiskPorts"`         // 高危端口列表
+	HighRiskPocSeverities []string `json:"highRiskPocSeverities"` // 高危POC严重级别
+	UpdateTime            string   `json:"updateTime"`            // 更新时间
+}
+
+// HighRiskFilterConfigResp 高危过滤配置响应
+type HighRiskFilterConfigResp struct {
+	Code   int                   `json:"code"`
+	Msg    string                `json:"msg"`
+	Config *HighRiskFilterConfig `json:"config,omitempty"`
+}
+
+// HighRiskFilterConfigSaveReq 保存高危过滤配置请求
+type HighRiskFilterConfigSaveReq struct {
+	Enabled               bool     `json:"enabled"`
+	HighRiskFingerprints  []string `json:"highRiskFingerprints,optional"`
+	HighRiskPorts         []int    `json:"highRiskPorts,optional"`
+	HighRiskPocSeverities []string `json:"highRiskPocSeverities,optional"`
+}
+
+// ==================== 资产指纹和端口统计 ====================
+
+// AssetFingerprintsListReq 资产指纹列表请求
+type AssetFingerprintsListReq struct {
+	Limit int `json:"limit,default=500"`
+}
+
+// AssetFingerprintsListResp 资产指纹列表响应
+type AssetFingerprintsListResp struct {
+	Code int      `json:"code"`
+	Msg  string   `json:"msg"`
+	List []string `json:"list"`
+}
+
+// AssetPortsStatsResp 资产端口统计响应
+type AssetPortsStatsResp struct {
+	Code int             `json:"code"`
+	Msg  string          `json:"msg"`
+	List []PortStatItem  `json:"list"`
+}
+
+// PortStatItem 端口统计项
+type PortStatItem struct {
+	Port    int    `json:"port"`
+	Service string `json:"service"`
+	Count   int64  `json:"count"`
 }

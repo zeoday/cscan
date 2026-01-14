@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <router-view />
 </template>
 
@@ -12,3 +12,4 @@ html, body, #app {
   padding: 0;
 }
 </style>
+

@@ -1,338 +1,311 @@
-<template>
+﻿<template>
   <div class="settings-page">
-    <el-card>
+    <!-- 在线API配置 -->
+    <el-card v-if="activeTab === 'onlineapi'">
       <template #header>
         <div class="card-header">
-          <span>系统配置</span>
+          <span>{{ $t('navigation.onlineApiConfig') }}</span>
         </div>
       </template>
+      <el-alert type="info" :closable="false" style="margin-bottom: 20px">
+        <template #title>{{ $t('settings.onlineApiTip') }}</template>
+      </el-alert>
       
-      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs" @tab-change="handleSettingsTabChange">
-        <!-- 在线API配置 -->
-        <el-tab-pane label="在线API配置" name="onlineapi">
-          <div class="tab-content">
-            <el-alert type="info" :closable="false" style="margin-bottom: 20px">
-              <template #title>配置在线搜索API密钥，用于Fofa、Hunter、Quake等平台的资产搜索</template>
-            </el-alert>
-            
-            <el-tabs v-model="apiConfigTab" type="card">
-              <el-tab-pane label="Fofa" name="fofa">
-                <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
-                  <el-form-item label="API版本">
-                    <el-radio-group v-model="apiConfigs.fofa.version">
-                      <el-radio value="v1">v1 (fofa.info)</el-radio>
-                      <el-radio value="v5">v5 (v5.fofa.info)</el-radio>
-                    </el-radio-group>
-                  </el-form-item>
-                  <el-form-item label="API Key">
-                    <el-input v-model="apiConfigs.fofa.key" placeholder="Fofa API Key" show-password />
-                  </el-form-item>
-                  <el-form-item>
-                    <el-button type="primary" @click="saveApiConfig('fofa')">保存</el-button>
-                    <el-button type="success" @click="openApiUrl(apiConfigs.fofa.version === 'v5' ? 'https://v5.fofa.info/userInfo' : 'https://fofa.info/userInfo')">申请API</el-button>
-                  </el-form-item>
-                </el-form>
-              </el-tab-pane>
-              <el-tab-pane label="Hunter" name="hunter">
-                <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
-                  <el-form-item label="API Key">
-                    <el-input v-model="apiConfigs.hunter.key" placeholder="Hunter API Key" show-password />
-                  </el-form-item>
-                  <el-form-item>
-                    <el-button type="primary" @click="saveApiConfig('hunter')">保存</el-button>
-                    <el-button type="success" @click="openApiUrl('https://hunter.qianxin.com/home/myInfo')">申请API</el-button>
-                  </el-form-item>
-                </el-form>
-              </el-tab-pane>
-              <el-tab-pane label="Quake" name="quake">
-                <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
-                  <el-form-item label="API Key">
-                    <el-input v-model="apiConfigs.quake.key" placeholder="Quake API Key" show-password />
-                  </el-form-item>
-                  <el-form-item>
-                    <el-button type="primary" @click="saveApiConfig('quake')">保存</el-button>
-                    <el-button type="success" @click="openApiUrl('https://quake.360.net/quake/#/personal?tab=message')">申请API</el-button>
-                  </el-form-item>
-                </el-form>
-              </el-tab-pane>
-            </el-tabs>
-          </div>
+      <el-tabs v-model="apiConfigTab" type="card">
+        <el-tab-pane label="Fofa" name="fofa">
+          <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
+            <el-form-item :label="$t('settings.apiVersion')">
+              <el-radio-group v-model="apiConfigs.fofa.version">
+                <el-radio value="v1">v1 (fofa.info)</el-radio>
+                <el-radio value="v5">v5 (v5.fofa.info)</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item :label="$t('settings.apiKey')">
+              <el-input v-model="apiConfigs.fofa.key" placeholder="Fofa API Key" show-password />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="saveApiConfig('fofa')">{{ $t('common.save') }}</el-button>
+              <el-button type="success" @click="openApiUrl(apiConfigs.fofa.version === 'v5' ? 'https://v5.fofa.info/userInfo' : 'https://fofa.info/userInfo')">{{ $t('settings.applyApi') }}</el-button>
+            </el-form-item>
+          </el-form>
         </el-tab-pane>
-
-        <!-- Subfinder数据源配置 -->
-        <el-tab-pane label="子域名扫描配置" name="subfinder">
-          <div class="tab-content">
-            <el-alert type="info" :closable="false" style="margin-bottom: 20px">
-              <template #title>Subfinder用于子域名枚举，配置API密钥可以获取更多数据源的结果。点击数据源名称可跳转到官网获取API密钥。</template>
-            </el-alert>
-            
-            <el-table :data="subfinderProviders" v-loading="subfinderLoading" max-height="500" stripe>
-              <el-table-column prop="name" label="数据源" width="130">
-                <template #default="{ row }">
-                  <span>{{ row.name }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column prop="description" label="描述" width="180" show-overflow-tooltip />
-              <el-table-column prop="keyFormat" label="密钥格式" width="140" />
-              <el-table-column label="API密钥" min-width="200">
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row.keyInput"
-                    :placeholder="row.maskedKey || row.keyFormat"
-                    size="small"
-                    clearable
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="状态" width="70">
-                <template #default="{ row }">
-                  <el-switch v-model="row.enabled" size="small" />
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="140">
-                <template #default="{ row }">
-                  <el-button type="primary" link size="small" @click="saveSubfinderProvider(row)">保存</el-button>
-                  <el-button type="success" link size="small" @click="openApiUrl(row.url)">申请API</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+        <el-tab-pane label="Hunter" name="hunter">
+          <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
+            <el-form-item :label="$t('settings.apiKey')">
+              <el-input v-model="apiConfigs.hunter.key" placeholder="Hunter API Key" show-password />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="saveApiConfig('hunter')">{{ $t('common.save') }}</el-button>
+              <el-button type="success" @click="openApiUrl('https://hunter.qianxin.com/home/myInfo')">{{ $t('settings.applyApi') }}</el-button>
+            </el-form-item>
+          </el-form>
         </el-tab-pane>
-
-        <!-- 工作空间 -->
-        <el-tab-pane label="工作空间" name="workspace">
-          <div class="tab-content">
-            <div class="tab-action-bar">
-              <el-button type="primary" @click="showWorkspaceDialog()">
-                <el-icon><Plus /></el-icon>新建工作空间
-              </el-button>
-            </div>
-            <el-table :data="workspaceList" v-loading="workspaceLoading" stripe max-height="500">
-              <el-table-column prop="name" label="名称" min-width="150" />
-              <el-table-column prop="description" label="描述" min-width="250" />
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === 'enable' ? 'success' : 'danger'">
-                    {{ row.status === 'enable' ? '启用' : '禁用' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="createTime" label="创建时间" width="160" />
-              <el-table-column label="操作" width="150" fixed="right">
-                <template #default="{ row }">
-                  <el-button type="primary" link size="small" @click="showWorkspaceDialog(row)">编辑</el-button>
-                  <el-button type="danger" link size="small" @click="handleDeleteWorkspace(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </el-tab-pane>
-
-        <!-- 组织管理 -->
-        <el-tab-pane label="组织管理" name="organization">
-          <div class="tab-content">
-            <div class="tab-action-bar">
-              <el-button type="primary" @click="showOrgDialog()">
-                <el-icon><Plus /></el-icon>新建组织
-              </el-button>
-            </div>
-            <el-table :data="orgList" v-loading="orgLoading" stripe max-height="500">
-              <el-table-column prop="name" label="组织名称" min-width="150" />
-              <el-table-column prop="description" label="描述" min-width="250" />
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="{ row }">
-                  <el-switch
-                    v-model="row.status"
-                    active-value="enable"
-                    inactive-value="disable"
-                    @change="handleOrgStatusChange(row)"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column prop="createTime" label="创建时间" width="160" />
-              <el-table-column label="操作" width="150" fixed="right">
-                <template #default="{ row }">
-                  <el-button type="primary" link size="small" @click="showOrgDialog(row)">编辑</el-button>
-                  <el-button type="danger" link size="small" @click="handleDeleteOrg(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </el-tab-pane>
-
-        <!-- 通知配置 -->
-        <el-tab-pane label="通知配置" name="notify">
-          <div class="tab-content">
-            <el-alert type="info" :closable="false" style="margin-bottom: 20px">
-              <template #title>配置任务完成通知，支持邮件、飞书、钉钉、企微、Slack、Discord、Telegram、Teams、Gotify、Webhook等渠道。可配置高危过滤，仅在检测到高危项时通知。</template>
-            </el-alert>
-            
-            <div class="tab-action-bar">
-              <el-button type="primary" @click="showNotifyDialog()">
-                <el-icon><Plus /></el-icon>添加通知渠道
-              </el-button>
-            </div>
-            
-            <el-table :data="notifyConfigList" v-loading="notifyLoading" stripe max-height="500">
-              <el-table-column prop="name" label="名称" min-width="120" />
-              <el-table-column label="渠道" width="140">
-                <template #default="{ row }">
-                  <el-tag>{{ getProviderName(row.provider) }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="高危过滤" width="100">
-                <template #default="{ row }">
-                  <el-tag v-if="row.highRiskFilter && row.highRiskFilter.enabled" type="warning" size="small">已启用</el-tag>
-                  <el-tag v-else type="info" size="small">全部通知</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="{ row }">
-                  <el-switch
-                    v-model="row.status"
-                    active-value="enable"
-                    inactive-value="disable"
-                    @change="handleNotifyStatusChange(row)"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column prop="updateTime" label="更新时间" width="160" />
-              <el-table-column label="操作" width="200" fixed="right">
-                <template #default="{ row }">
-                  <el-button type="primary" link size="small" @click="showNotifyDialog(row)">编辑</el-button>
-                  <el-button type="success" link size="small" @click="handleTestNotify(row)" :loading="row.testing">测试</el-button>
-                  <el-button type="danger" link size="small" @click="handleDeleteNotify(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </el-tab-pane>
-
-
-        <!-- 用户管理 -->
-        <el-tab-pane label="用户管理" name="user">
-          <div class="tab-content">
-            <div class="tab-action-bar">
-              <el-button type="primary" @click="showUserDialog()">
-                <el-icon><Plus /></el-icon>新建用户
-              </el-button>
-            </div>
-            <el-table :data="userList" v-loading="userLoading" stripe max-height="500">
-              <el-table-column prop="username" label="用户名" min-width="150" />
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === 'enable' ? 'success' : 'danger'">
-                    {{ row.status === 'enable' ? '启用' : '禁用' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="200" fixed="right">
-                <template #default="{ row }">
-                  <el-button type="primary" link size="small" @click="showUserDialog(row)">编辑</el-button>
-                  <el-button type="warning" link size="small" @click="showResetPasswordDialog(row)">重置密码</el-button>
-                  <el-button type="danger" link size="small" @click="handleDeleteUser(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+        <el-tab-pane label="Quake" name="quake">
+          <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
+            <el-form-item :label="$t('settings.apiKey')">
+              <el-input v-model="apiConfigs.quake.key" placeholder="Quake API Key" show-password />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="saveApiConfig('quake')">{{ $t('common.save') }}</el-button>
+              <el-button type="success" @click="openApiUrl('https://quake.360.net/quake/#/personal?tab=message')">{{ $t('settings.applyApi') }}</el-button>
+            </el-form-item>
+          </el-form>
         </el-tab-pane>
       </el-tabs>
     </el-card>
 
+    <!-- Subfinder数据源配置 -->
+    <el-card v-else-if="activeTab === 'subfinder'">
+      <template #header>
+        <div class="card-header">
+          <span>{{ $t('navigation.subdomainConfig') }}</span>
+        </div>
+      </template>
+      <el-alert type="info" :closable="false" style="margin-bottom: 20px">
+        <template #title>{{ $t('settings.subfinderTip') }}</template>
+      </el-alert>
+      
+      <el-table :data="subfinderProviders" v-loading="subfinderLoading" max-height="500" stripe>
+        <el-table-column prop="name" :label="$t('settings.dataSource')" width="130" />
+        <el-table-column prop="description" :label="$t('common.description')" width="180" show-overflow-tooltip />
+        <el-table-column prop="keyFormat" :label="$t('settings.keyFormat')" width="140" />
+        <el-table-column :label="$t('settings.apiKeyColumn')" min-width="200">
+          <template #default="{ row }">
+            <el-input v-model="row.keyInput" :placeholder="row.maskedKey || row.keyFormat" size="small" clearable />
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('common.status')" width="70">
+          <template #default="{ row }">
+            <el-switch v-model="row.enabled" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('common.operation')" width="140">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="saveSubfinderProvider(row)">{{ $t('common.save') }}</el-button>
+            <el-button type="success" link size="small" @click="openApiUrl(row.url)">{{ $t('settings.applyApi') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 工作空间 -->
+    <el-card v-else-if="activeTab === 'workspace'">
+      <template #header>
+        <div class="card-header">
+          <span>{{ $t('navigation.workspaceManagement') }}</span>
+          <el-button type="primary" size="small" @click="showWorkspaceDialog()">
+            <el-icon><Plus /></el-icon>{{ $t('workspace.newWorkspace') }}
+          </el-button>
+        </div>
+      </template>
+      <el-table :data="workspaceList" v-loading="workspaceLoading" stripe max-height="500">
+        <el-table-column prop="name" :label="$t('common.name')" min-width="150" />
+        <el-table-column prop="description" :label="$t('common.description')" min-width="250" />
+        <el-table-column prop="status" :label="$t('common.status')" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'enable' ? 'success' : 'danger'">
+              {{ row.status === 'enable' ? $t('common.enabled') : $t('common.disabled') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" :label="$t('common.createTime')" width="160" />
+        <el-table-column :label="$t('common.operation')" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="showWorkspaceDialog(row)">{{ $t('common.edit') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDeleteWorkspace(row)">{{ $t('common.delete') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 组织管理 -->
+    <el-card v-else-if="activeTab === 'organization'">
+      <template #header>
+        <div class="card-header">
+          <span>{{ $t('navigation.organizationManagement') }}</span>
+          <el-button type="primary" size="small" @click="showOrgDialog()">
+            <el-icon><Plus /></el-icon>{{ $t('organization.newOrganization') }}
+          </el-button>
+        </div>
+      </template>
+      <el-table :data="orgList" v-loading="orgLoading" stripe max-height="500">
+        <el-table-column prop="name" :label="$t('organization.organizationName')" min-width="150" />
+        <el-table-column prop="description" :label="$t('common.description')" min-width="250" />
+        <el-table-column prop="status" :label="$t('common.status')" width="100">
+          <template #default="{ row }">
+            <el-switch v-model="row.status" active-value="enable" inactive-value="disable" @change="handleOrgStatusChange(row)" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" :label="$t('common.createTime')" width="160" />
+        <el-table-column :label="$t('common.operation')" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="showOrgDialog(row)">{{ $t('common.edit') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDeleteOrg(row)">{{ $t('common.delete') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 通知配置 -->
+    <el-card v-else-if="activeTab === 'notify'">
+      <template #header>
+        <div class="card-header">
+          <span>{{ $t('navigation.notifyConfig') }}</span>
+          <el-button type="primary" size="small" @click="showNotifyDialog()">
+            <el-icon><Plus /></el-icon>{{ $t('settings.addNotifyChannel') }}
+          </el-button>
+        </div>
+      </template>
+      <el-alert type="info" :closable="false" style="margin-bottom: 20px">
+        <template #title>{{ $t('settings.notifyTip') }}</template>
+      </el-alert>
+      
+      <el-table :data="notifyConfigList" v-loading="notifyLoading" stripe max-height="500">
+        <el-table-column prop="name" :label="$t('common.name')" min-width="120" />
+        <el-table-column :label="$t('settings.channel')" width="140">
+          <template #default="{ row }">
+            <el-tag>{{ getProviderName(row.provider) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" :label="$t('common.status')" width="100">
+          <template #default="{ row }">
+            <el-switch v-model="row.status" active-value="enable" inactive-value="disable" @change="handleNotifyStatusChange(row)" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateTime" :label="$t('common.updateTime')" width="160" />
+        <el-table-column :label="$t('common.operation')" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="showNotifyDialog(row)">{{ $t('common.edit') }}</el-button>
+            <el-button type="success" link size="small" @click="handleTestNotify(row)" :loading="row.testing">{{ $t('settings.test') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDeleteNotify(row)">{{ $t('common.delete') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 用户管理 -->
+    <el-card v-else-if="activeTab === 'user'">
+      <template #header>
+        <div class="card-header">
+          <span>{{ $t('navigation.userManagement') }}</span>
+          <el-button type="primary" size="small" @click="showUserDialog()">
+            <el-icon><Plus /></el-icon>{{ $t('user.newUser') }}
+          </el-button>
+        </div>
+      </template>
+      <el-table :data="userList" v-loading="userLoading" stripe max-height="500">
+        <el-table-column prop="username" :label="$t('user.userName')" min-width="150" />
+        <el-table-column prop="status" :label="$t('common.status')" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'enable' ? 'success' : 'danger'">
+              {{ row.status === 'enable' ? $t('common.enabled') : $t('common.disabled') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('common.operation')" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="showUserDialog(row)">{{ $t('common.edit') }}</el-button>
+            <el-button type="warning" link size="small" @click="showResetPasswordDialog(row)">{{ $t('user.resetPassword') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDeleteUser(row)">{{ $t('common.delete') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 工作空间对话框 -->
-    <el-dialog v-model="workspaceDialogVisible" :title="workspaceForm.id ? '编辑工作空间' : '新建工作空间'" width="500px">
+    <el-dialog v-model="workspaceDialogVisible" :title="workspaceForm.id ? $t('workspace.editWorkspace') : $t('workspace.newWorkspace')" width="500px">
       <el-form ref="workspaceFormRef" :model="workspaceForm" :rules="workspaceRules" label-width="80px">
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="workspaceForm.name" placeholder="请输入名称" />
+        <el-form-item :label="$t('common.name')" prop="name">
+          <el-input v-model="workspaceForm.name" :placeholder="$t('workspace.pleaseEnterName')" />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="workspaceForm.description" type="textarea" :rows="3" placeholder="请输入描述" />
+        <el-form-item :label="$t('common.description')">
+          <el-input v-model="workspaceForm.description" type="textarea" :rows="3" :placeholder="$t('workspace.pleaseEnterDescription')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="workspaceDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="workspaceSubmitting" @click="handleWorkspaceSubmit">确定</el-button>
+        <el-button @click="workspaceDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="workspaceSubmitting" @click="handleWorkspaceSubmit">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 用户对话框 -->
-    <el-dialog v-model="userDialogVisible" :title="userForm.id ? '编辑用户' : '新建用户'" width="500px">
+    <el-dialog v-model="userDialogVisible" :title="userForm.id ? $t('user.editUser') : $t('user.newUser')" width="500px">
       <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="80px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="userForm.username" placeholder="请输入用户名" />
+        <el-form-item :label="$t('user.userName')" prop="username">
+          <el-input v-model="userForm.username" :placeholder="$t('user.pleaseEnterUsername')" />
         </el-form-item>
-        <el-form-item v-if="!userForm.id" label="密码" prop="password">
-          <el-input v-model="userForm.password" type="password" placeholder="请输入密码" />
+        <el-form-item v-if="!userForm.id" :label="$t('user.password')" prop="password">
+          <el-input v-model="userForm.password" type="password" :placeholder="$t('user.pleaseEnterPassword')" />
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="userForm.status" placeholder="请选择状态">
-            <el-option label="启用" value="enable" />
-            <el-option label="禁用" value="disable" />
+        <el-form-item :label="$t('common.status')" prop="status">
+          <el-select v-model="userForm.status" :placeholder="$t('user.pleaseSelectStatus')">
+            <el-option :label="$t('common.enabled')" value="enable" />
+            <el-option :label="$t('common.disabled')" value="disable" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="userDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="userSubmitting" @click="handleUserSubmit">确定</el-button>
+        <el-button @click="userDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="userSubmitting" @click="handleUserSubmit">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 重置密码对话框 -->
-    <el-dialog v-model="resetPasswordVisible" title="重置密码" width="400px">
+    <el-dialog v-model="resetPasswordVisible" :title="$t('user.resetPassword')" width="400px">
       <el-form ref="resetFormRef" :model="resetForm" :rules="resetRules" label-width="80px">
-        <el-form-item label="新密码" prop="newPassword">
-          <el-input v-model="resetForm.newPassword" type="password" placeholder="请输入新密码" />
+        <el-form-item :label="$t('user.newPassword')" prop="newPassword">
+          <el-input v-model="resetForm.newPassword" type="password" :placeholder="$t('user.pleaseEnterNewPassword')" />
         </el-form-item>
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input v-model="resetForm.confirmPassword" type="password" placeholder="请再次输入新密码" />
+        <el-form-item :label="$t('user.confirmPassword')" prop="confirmPassword">
+          <el-input v-model="resetForm.confirmPassword" type="password" :placeholder="$t('user.pleaseConfirmPassword')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="resetPasswordVisible = false">取消</el-button>
-        <el-button type="primary" :loading="resetting" @click="handleResetPassword">确定</el-button>
+        <el-button @click="resetPasswordVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="resetting" @click="handleResetPassword">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 组织对话框 -->
-    <el-dialog v-model="orgDialogVisible" :title="orgForm.id ? '编辑组织' : '新建组织'" width="500px">
+    <el-dialog v-model="orgDialogVisible" :title="orgForm.id ? $t('organization.editOrganization') : $t('organization.newOrganization')" width="500px">
       <el-form ref="orgFormRef" :model="orgForm" :rules="orgRules" label-width="80px">
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="orgForm.name" placeholder="请输入组织名称" />
+        <el-form-item :label="$t('common.name')" prop="name">
+          <el-input v-model="orgForm.name" :placeholder="$t('organization.pleaseEnterOrgName')" />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="orgForm.description" type="textarea" :rows="3" placeholder="请输入描述" />
+        <el-form-item :label="$t('common.description')">
+          <el-input v-model="orgForm.description" type="textarea" :rows="3" :placeholder="$t('organization.pleaseEnterDescription')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="orgDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="orgSubmitting" @click="handleOrgSubmit">确定</el-button>
+        <el-button @click="orgDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="orgSubmitting" @click="handleOrgSubmit">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 通知配置对话框 -->
-    <el-dialog v-model="notifyDialogVisible" :title="notifyForm.id ? '编辑通知配置' : '添加通知渠道'" width="700px">
+    <el-dialog v-model="notifyDialogVisible" :title="notifyForm.id ? $t('settings.editNotifyConfig') : $t('settings.addNotifyChannelTitle')" width="700px">
       <el-form ref="notifyFormRef" :model="notifyForm" :rules="notifyRules" label-width="120px">
-        <el-form-item label="渠道类型" prop="provider">
-          <el-select v-model="notifyForm.provider" placeholder="请选择通知渠道" @change="handleProviderChange" :disabled="!!notifyForm.id">
+        <el-form-item :label="$t('settings.channelType')" prop="provider">
+          <el-select v-model="notifyForm.provider" :placeholder="$t('settings.selectNotifyChannel')" @change="handleProviderChange" :disabled="!!notifyForm.id">
             <el-option v-for="p in notifyProviders" :key="p.id" :label="p.name" :value="p.id">
               <span>{{ p.name }}</span>
-              <span style="color: #999; font-size: 12px; margin-left: 8px">{{ p.description }}</span>
+              <span class="option-desc">{{ p.description }}</span>
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="配置名称" prop="name">
-          <el-input v-model="notifyForm.name" placeholder="请输入配置名称" />
+        <el-form-item :label="$t('settings.configName')" prop="name">
+          <el-input v-model="notifyForm.name" :placeholder="$t('settings.enterConfigName')" />
         </el-form-item>
         
         <!-- 动态配置字段 -->
         <template v-if="currentProviderFields.length > 0">
-          <el-divider content-position="left">渠道配置</el-divider>
+          <el-divider content-position="left">{{ $t('settings.channelConfig') }}</el-divider>
           <el-form-item 
             v-for="field in currentProviderFields" 
             :key="field.name" 
             :label="field.label"
             :prop="'configData.' + field.name"
-            :rules="field.required ? [{ required: true, message: '请输入' + field.label, trigger: 'blur' }] : []"
+            :rules="field.required ? [{ required: true, message: t('settings.pleaseEnterInput') + field.label, trigger: 'blur' }] : []"
           >
             <el-input 
               v-if="field.type === 'text'" 
@@ -365,86 +338,28 @@
             <el-select 
               v-else-if="field.type === 'select'" 
               v-model="notifyForm.configData[field.name]" 
-              :placeholder="field.placeholder || '请选择'"
+              :placeholder="field.placeholder || $t('common.pleaseSelect')"
               clearable
             >
-              <el-option v-for="opt in field.options" :key="opt" :label="opt || '默认'" :value="opt" />
+              <el-option v-for="opt in field.options" :key="opt" :label="opt || $t('common.default')" :value="opt" />
             </el-select>
           </el-form-item>
         </template>
         
-        <!-- 高危过滤配置 -->
-        <el-divider content-position="left">高危过滤配置</el-divider>
-        <el-form-item label="启用高危过滤">
-          <el-switch v-model="notifyForm.highRiskFilter.enabled" />
-          <span style="color: #909399; font-size: 12px; margin-left: 10px">
-            关闭时全部通知，开启后仅在检测到配置的高危项时通知
-          </span>
-        </el-form-item>
-        
-        <template v-if="notifyForm.highRiskFilter.enabled">
-          <el-form-item label="高危指纹">
-            <el-select 
-              v-model="notifyForm.highRiskFilter.highRiskFingerprints" 
-              multiple 
-              filterable 
-              allow-create
-              default-first-option
-              placeholder="选择或输入高危指纹名称"
-              style="width: 100%"
-            >
-              <el-option v-for="fp in commonFingerprints" :key="fp" :label="fp" :value="fp" />
-            </el-select>
-            <div style="color: #909399; font-size: 12px; margin-top: 4px">
-              常见高危指纹: Weblogic, Struts2, Shiro, Fastjson, Log4j, Spring等
-            </div>
-          </el-form-item>
-          
-          <el-form-item label="高危端口">
-            <el-select 
-              v-model="notifyForm.highRiskFilter.highRiskPorts" 
-              multiple 
-              filterable 
-              allow-create
-              default-first-option
-              placeholder="选择或输入高危端口"
-              style="width: 100%"
-              :reserve-keyword="false"
-            >
-              <el-option v-for="port in commonHighRiskPorts" :key="port.value" :label="port.label" :value="port.value" />
-            </el-select>
-            <div style="color: #909399; font-size: 12px; margin-top: 4px">
-              常见高危端口: 22(SSH), 3389(RDP), 6379(Redis), 27017(MongoDB)等
-            </div>
-          </el-form-item>
-          
-          <el-form-item label="高危POC级别">
-            <el-checkbox-group v-model="notifyForm.highRiskFilter.highRiskPocSeverities">
-              <el-checkbox label="critical">严重 (Critical)</el-checkbox>
-              <el-checkbox label="high">高危 (High)</el-checkbox>
-              <el-checkbox label="medium">中危 (Medium)</el-checkbox>
-              <el-checkbox label="low">低危 (Low)</el-checkbox>
-            </el-checkbox-group>
-            <div style="color: #909399; font-size: 12px; margin-top: 4px">
-              选择需要通知的漏洞严重级别
-            </div>
-          </el-form-item>
-        </template>
-        
-        <el-divider content-position="left">消息模板（可选）</el-divider>
-        <el-form-item label="自定义模板">
+        <el-divider content-position="left">{{ $t('settings.messageTemplate') }}</el-divider>
+        <el-form-item :label="$t('settings.customTemplate')">
           <el-input 
             v-model="notifyForm.messageTemplate" 
             type="textarea" 
             :rows="4" 
-            placeholder="留空使用默认模板。支持变量: {{.TaskName}}, {{.Status}}, {{.AssetCount}}, {{.VulCount}}, {{.Duration}}" 
+            :placeholder="$t('settings.templatePlaceholder')" 
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="notifyDialogVisible = false">取消</el-button>
-        <el-button type="success" @click="handleTestNotifyForm" :loading="notifyTesting">测试</el-button>
-        <el-button type="primary" :loading="notifySubmitting" @click="handleNotifySubmit">保存</el-button>
+        <el-button @click="notifyDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="success" @click="handleTestNotifyForm" :loading="notifyTesting">{{ $t('settings.test') }}</el-button>
+        <el-button type="primary" :loading="notifySubmitting" @click="handleNotifySubmit">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -452,14 +367,17 @@
 
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import request from '@/api/request'
 import { getSubfinderProviderList, getSubfinderProviderInfo, saveSubfinderProvider as saveSubfinderProviderApi } from '@/api/subfinder'
 import { getUserList, createUser, updateUser, deleteUser, resetUserPassword } from '@/api/auth'
 import { getNotifyProviders, getNotifyConfigList, saveNotifyConfig, deleteNotifyConfig, testNotifyConfig } from '@/api/notify'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -467,24 +385,10 @@ const router = useRouter()
 // 有效的tab名称
 const validTabs = ['onlineapi', 'subfinder', 'workspace', 'organization', 'notify', 'user']
 
-// 从URL获取初始tab
-const getInitialTab = () => {
+// 从URL获取当前tab
+const activeTab = computed(() => {
   const tab = route.query.tab
   return validTabs.includes(tab) ? tab : 'onlineapi'
-}
-
-const activeTab = ref(getInitialTab())
-
-// Tab切换时更新URL
-function handleSettingsTabChange(tabName) {
-  router.replace({ query: { ...route.query, tab: tabName } })
-}
-
-// 监听路由变化，更新activeTab
-watch(() => route.query.tab, (newTab) => {
-  if (validTabs.includes(newTab) && newTab !== activeTab.value) {
-    activeTab.value = newTab
-  }
 })
 const apiConfigTab = ref('fofa')
 const subfinderLoading = ref(false)
@@ -503,7 +407,9 @@ const workspaceDialogVisible = ref(false)
 const workspaceSubmitting = ref(false)
 const workspaceFormRef = ref()
 const workspaceForm = reactive({ id: '', name: '', description: '' })
-const workspaceRules = { name: [{ required: true, message: '请输入名称', trigger: 'blur' }] }
+const workspaceRules = computed(() => ({
+  name: [{ required: true, message: t('workspace.pleaseEnterName'), trigger: 'blur' }]
+}))
 
 // 用户管理相关
 const userLoading = ref(false)
@@ -512,25 +418,25 @@ const userDialogVisible = ref(false)
 const userSubmitting = ref(false)
 const userFormRef = ref()
 const userForm = ref({ id: '', username: '', password: '', status: 'enable' })
-const userRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
-}
+const userRules = computed(() => ({
+  username: [{ required: true, message: t('user.pleaseEnterUsername'), trigger: 'blur' }],
+  password: [{ required: true, message: t('user.pleaseEnterPassword'), trigger: 'blur' }],
+  status: [{ required: true, message: t('user.pleaseSelectStatus'), trigger: 'change' }]
+}))
 
 // 重置密码相关
 const resetPasswordVisible = ref(false)
 const resetting = ref(false)
 const resetFormRef = ref()
 const resetForm = ref({ id: '', newPassword: '', confirmPassword: '' })
-const resetRules = {
-  newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
+const resetRules = computed(() => ({
+  newPassword: [{ required: true, message: t('user.pleaseEnterNewPassword'), trigger: 'blur' }],
   confirmPassword: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { required: true, message: t('user.pleaseConfirmPassword'), trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
         if (value !== resetForm.value.newPassword) {
-          callback(new Error('两次输入的密码不一致'))
+          callback(new Error(t('user.passwordMismatch')))
         } else {
           callback()
         }
@@ -538,7 +444,7 @@ const resetRules = {
       trigger: 'blur'
     }
   ]
-}
+}))
 
 // 组织管理相关
 const orgLoading = ref(false)
@@ -547,7 +453,9 @@ const orgDialogVisible = ref(false)
 const orgSubmitting = ref(false)
 const orgFormRef = ref()
 const orgForm = reactive({ id: '', name: '', description: '' })
-const orgRules = { name: [{ required: true, message: '请输入组织名称', trigger: 'blur' }] }
+const orgRules = computed(() => ({
+  name: [{ required: true, message: t('organization.pleaseEnterOrgName'), trigger: 'blur' }]
+}))
 
 // 通知配置相关
 const notifyLoading = ref(false)
@@ -563,74 +471,40 @@ const notifyForm = ref({
   provider: '', 
   configData: {}, 
   messageTemplate: '', 
-  status: 'enable',
-  highRiskFilter: {
-    enabled: false,
-    highRiskFingerprints: [],
-    highRiskPorts: [],
-    highRiskPocSeverities: []
-  }
+  status: 'enable'
 })
-const notifyRules = {
-  provider: [{ required: true, message: '请选择通知渠道', trigger: 'change' }],
-  name: [{ required: true, message: '请输入配置名称', trigger: 'blur' }]
-}
+const notifyRules = computed(() => ({
+  provider: [{ required: true, message: t('settings.selectNotifyChannel'), trigger: 'change' }],
+  name: [{ required: true, message: t('settings.enterConfigName'), trigger: 'blur' }]
+}))
 const currentProviderFields = ref([])
 
-// 常见高危指纹列表
-const commonFingerprints = ref([
-  'Weblogic', 'Struts2', 'Shiro', 'Fastjson', 'Log4j', 'Spring', 'SpringBoot',
-  'Tomcat', 'JBoss', 'Jenkins', 'Elasticsearch', 'Solr', 'Zabbix', 'Grafana',
-  'phpMyAdmin', 'ThinkPHP', 'Laravel', 'Drupal', 'WordPress', 'Joomla',
-  'Redis', 'MongoDB', 'MySQL', 'PostgreSQL', 'Oracle', 'MSSQL',
-  'Nacos', 'Dubbo', 'RocketMQ', 'Kafka', 'RabbitMQ', 'ActiveMQ',
-  'Harbor', 'Kubernetes', 'Docker', 'Rancher', 'Portainer'
-])
-
-// 常见高危端口列表
-const commonHighRiskPorts = ref([
-  { label: '22 (SSH)', value: 22 },
-  { label: '23 (Telnet)', value: 23 },
-  { label: '445 (SMB)', value: 445 },
-  { label: '1433 (MSSQL)', value: 1433 },
-  { label: '1521 (Oracle)', value: 1521 },
-  { label: '3306 (MySQL)', value: 3306 },
-  { label: '3389 (RDP)', value: 3389 },
-  { label: '5432 (PostgreSQL)', value: 5432 },
-  { label: '5900 (VNC)', value: 5900 },
-  { label: '6379 (Redis)', value: 6379 },
-  { label: '7001 (Weblogic)', value: 7001 },
-  { label: '8080 (Tomcat)', value: 8080 },
-  { label: '8443 (HTTPS-Alt)', value: 8443 },
-  { label: '8848 (Nacos)', value: 8848 },
-  { label: '9000 (PHP-FPM)', value: 9000 },
-  { label: '9200 (Elasticsearch)', value: 9200 },
-  { label: '11211 (Memcached)', value: 11211 },
-  { label: '27017 (MongoDB)', value: 27017 }
-])
-
 onMounted(() => {
-  // 如果URL没有tab参数，添加默认的tab参数
-  if (!route.query.tab) {
-    router.replace({ query: { ...route.query, tab: activeTab.value } })
-  }
-  loadApiConfigs()
-  loadSubfinderProviders()
+  // 根据当前tab加载对应数据
+  loadDataByTab(activeTab.value)
 })
 
-// 监听tab切换，按需加载数据
+// 监听tab变化，加载对应数据
 watch(activeTab, (val) => {
-  if (val === 'workspace' && workspaceList.value.length === 0) {
+  loadDataByTab(val)
+})
+
+function loadDataByTab(tab) {
+  if (tab === 'onlineapi') {
+    loadApiConfigs()
+  } else if (tab === 'subfinder') {
+    loadSubfinderProviders()
+  } else if (tab === 'workspace') {
     loadWorkspaceList()
-  } else if (val === 'user' && userList.value.length === 0) {
+  } else if (tab === 'user') {
     loadUserList()
-  } else if (val === 'organization' && orgList.value.length === 0) {
+  } else if (tab === 'organization') {
     loadOrgList()
-  } else if (val === 'notify' && notifyProviders.value.length === 0) {
+  } else if (tab === 'notify') {
     loadNotifyProviders()
     loadNotifyConfigList()
   }
-})
+}
 
 // 在线API配置
 async function loadApiConfigs() {
@@ -655,15 +529,15 @@ async function saveApiConfig(platform) {
     key: config.key,
     secret: config.secret
   }
-  // Fofa需要传递版本信息
+  // Fofa需要传递版本信?
   if (platform === 'fofa') {
     data.version = config.version
   }
   const res = await request.post('/onlineapi/config/save', data)
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('common.operationSuccess'))
   } else {
-    ElMessage.error(res.msg || '保存失败')
+    ElMessage.error(res.msg || t('common.operationFailed'))
   }
 }
 
@@ -702,7 +576,7 @@ async function loadSubfinderProviders() {
 
 async function saveSubfinderProvider(row) {
   if (!row.keyInput && !row.configured) {
-    ElMessage.warning('请输入API密钥')
+    ElMessage.warning(t('settings.pleaseEnterInput') + t('settings.apiKey'))
     return
   }
 
@@ -715,12 +589,12 @@ async function saveSubfinderProvider(row) {
 
   const res = await saveSubfinderProviderApi(data)
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('common.operationSuccess'))
     row.configured = true
     row.keyInput = ''
     await loadSubfinderProviders()
   } else {
-    ElMessage.error(res.msg || '保存失败')
+    ElMessage.error(res.msg || t('common.operationFailed'))
   }
 }
 
@@ -754,7 +628,7 @@ async function handleWorkspaceSubmit() {
   try {
     const res = await request.post('/workspace/save', workspaceForm)
     if (res.code === 0) {
-      ElMessage.success(workspaceForm.id ? '更新成功' : '创建成功')
+      ElMessage.success(workspaceForm.id ? t('common.updateSuccess') : t('common.createSuccess'))
       workspaceDialogVisible.value = false
       loadWorkspaceList()
     } else {
@@ -766,10 +640,10 @@ async function handleWorkspaceSubmit() {
 }
 
 async function handleDeleteWorkspace(row) {
-  await ElMessageBox.confirm('确定删除该工作空间吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('workspace.confirmDeleteWorkspace'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/workspace/delete', { id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     loadWorkspaceList()
   }
 }
@@ -802,11 +676,11 @@ async function handleUserSubmit() {
     const api = userForm.value.id ? updateUser : createUser
     const res = await api(userForm.value)
     if (res.code === 0) {
-      ElMessage.success(res.msg || '操作成功')
+      ElMessage.success(res.msg || t('common.operationSuccess'))
       userDialogVisible.value = false
       loadUserList()
     } else {
-      ElMessage.error(res.msg || '操作失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } catch (error) {
     console.error('表单验证失败:', error)
@@ -817,13 +691,13 @@ async function handleUserSubmit() {
 
 async function handleDeleteUser(row) {
   try {
-    await ElMessageBox.confirm('确定要删除该用户吗？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('user.confirmDeleteUser'), t('common.tip'), { type: 'warning' })
     const res = await deleteUser({ id: row.id })
     if (res.code === 0) {
-      ElMessage.success(res.msg || '删除成功')
+      ElMessage.success(res.msg || t('common.deleteSuccess'))
       loadUserList()
     } else {
-      ElMessage.error(res.msg || '删除失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } catch (error) {}
 }
@@ -843,10 +717,10 @@ async function handleResetPassword() {
       newPassword: resetForm.value.newPassword
     })
     if (res.code === 0) {
-      ElMessage.success(res.msg || '密码重置成功')
+      ElMessage.success(res.msg || t('user.passwordResetSuccess'))
       resetPasswordVisible.value = false
     } else {
-      ElMessage.error(res.msg || '密码重置失败')
+      ElMessage.error(res.msg || t('user.passwordResetFailed'))
     }
   } catch (error) {
     console.error('表单验证失败:', error)
@@ -883,7 +757,7 @@ async function handleOrgSubmit() {
     const res = await request.post('/organization/save', orgForm)
     const data = res.data || res
     if (data.code === 0) {
-      ElMessage.success(orgForm.id ? '更新成功' : '创建成功')
+      ElMessage.success(orgForm.id ? t('common.updateSuccess') : t('common.createSuccess'))
       orgDialogVisible.value = false
       loadOrgList()
     } else {
@@ -895,11 +769,11 @@ async function handleOrgSubmit() {
 }
 
 async function handleDeleteOrg(row) {
-  await ElMessageBox.confirm('确定删除该组织吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('organization.confirmDeleteOrg'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/organization/delete', { id: row.id })
   const data = res.data || res
   if (data.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     loadOrgList()
   }
 }
@@ -911,10 +785,10 @@ async function handleOrgStatusChange(row) {
   })
   const data = res.data || res
   if (data.code === 0) {
-    ElMessage.success('状态更新成功')
+    ElMessage.success(t('common.statusUpdateSuccess'))
   } else {
     row.status = row.status === 'enable' ? 'disable' : 'enable'
-    ElMessage.error(data.msg || '状态更新失败')
+    ElMessage.error(data.msg || t('common.statusUpdateFailed'))
   }
 }
 
@@ -926,7 +800,7 @@ async function loadNotifyProviders() {
       notifyProviders.value = res.list || []
     }
   } catch (error) {
-    console.error('加载通知提供者失败:', error)
+    console.error('加载通知提供者失败', error)
   }
 }
 
@@ -963,26 +837,13 @@ function showNotifyDialog(row = null) {
     } catch (e) {
       configData = {}
     }
-    // 处理高危过滤配置
-    const highRiskFilter = row.highRiskFilter || {
-      enabled: false,
-      highRiskFingerprints: [],
-      highRiskPorts: [],
-      highRiskPocSeverities: []
-    }
     notifyForm.value = {
       id: row.id,
       name: row.name,
       provider: row.provider,
       configData: configData,
       messageTemplate: row.messageTemplate || '',
-      status: row.status,
-      highRiskFilter: {
-        enabled: highRiskFilter.enabled || false,
-        highRiskFingerprints: highRiskFilter.highRiskFingerprints || [],
-        highRiskPorts: highRiskFilter.highRiskPorts || [],
-        highRiskPocSeverities: highRiskFilter.highRiskPocSeverities || []
-      }
+      status: row.status
     }
     // 加载对应provider的字段
     const provider = notifyProviders.value.find(p => p.id === row.provider)
@@ -995,13 +856,7 @@ function showNotifyDialog(row = null) {
       provider: '', 
       configData: {}, 
       messageTemplate: '', 
-      status: 'enable',
-      highRiskFilter: {
-        enabled: false,
-        highRiskFingerprints: [],
-        highRiskPorts: [],
-        highRiskPocSeverities: []
-      }
+      status: 'enable'
     }
     currentProviderFields.value = []
   }
@@ -1020,17 +875,16 @@ async function handleNotifySubmit() {
       provider: notifyForm.value.provider,
       config: JSON.stringify(notifyForm.value.configData),
       messageTemplate: notifyForm.value.messageTemplate,
-      status: notifyForm.value.status,
-      highRiskFilter: notifyForm.value.highRiskFilter
+      status: notifyForm.value.status
     }
     
     const res = await saveNotifyConfig(data)
     if (res.code === 0) {
-      ElMessage.success(res.msg || '保存成功')
+      ElMessage.success(res.msg || t('common.operationSuccess'))
       notifyDialogVisible.value = false
       loadNotifyConfigList()
     } else {
-      ElMessage.error(res.msg || '保存失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } catch (error) {
     console.error('表单验证失败:', error)
@@ -1046,15 +900,14 @@ async function handleNotifyStatusChange(row) {
     provider: row.provider,
     config: row.config,
     messageTemplate: row.messageTemplate,
-    status: row.status,
-    highRiskFilter: row.highRiskFilter
+    status: row.status
   }
   const res = await saveNotifyConfig(data)
   if (res.code === 0) {
-    ElMessage.success('状态更新成功')
+    ElMessage.success(t('common.statusUpdateSuccess'))
   } else {
     row.status = row.status === 'enable' ? 'disable' : 'enable'
-    ElMessage.error(res.msg || '状态更新失败')
+    ElMessage.error(res.msg || t('common.statusUpdateFailed'))
   }
 }
 
@@ -1067,9 +920,9 @@ async function handleTestNotify(row) {
       messageTemplate: row.messageTemplate
     })
     if (res.code === 0) {
-      ElMessage.success(res.msg || '测试成功，请检查是否收到通知')
+      ElMessage.success(res.msg || t('settings.testSuccess'))
     } else {
-      ElMessage.error(res.msg || '测试失败')
+      ElMessage.error(res.msg || t('settings.testFailed'))
     }
   } finally {
     row.testing = false
@@ -1078,7 +931,7 @@ async function handleTestNotify(row) {
 
 async function handleTestNotifyForm() {
   if (!notifyForm.value.provider) {
-    ElMessage.warning('请先选择通知渠道')
+    ElMessage.warning(t('settings.selectChannelFirst'))
     return
   }
   notifyTesting.value = true
@@ -1089,9 +942,9 @@ async function handleTestNotifyForm() {
       messageTemplate: notifyForm.value.messageTemplate
     })
     if (res.code === 0) {
-      ElMessage.success(res.msg || '测试成功，请检查是否收到通知')
+      ElMessage.success(res.msg || t('settings.testSuccess'))
     } else {
-      ElMessage.error(res.msg || '测试失败')
+      ElMessage.error(res.msg || t('settings.testFailed'))
     }
   } finally {
     notifyTesting.value = false
@@ -1100,40 +953,32 @@ async function handleTestNotifyForm() {
 
 async function handleDeleteNotify(row) {
   try {
-    await ElMessageBox.confirm('确定要删除该通知配置吗？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('settings.confirmDeleteNotify'), t('common.tip'), { type: 'warning' })
     const res = await deleteNotifyConfig(row.id)
     if (res.code === 0) {
-      ElMessage.success(res.msg || '删除成功')
+      ElMessage.success(res.msg || t('common.deleteSuccess'))
       loadNotifyConfigList()
     } else {
-      ElMessage.error(res.msg || '删除失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } catch (error) {}
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .settings-page {
   .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-size: 16px;
     font-weight: 500;
   }
 
-  .settings-tabs {
-    min-height: 500px;
-
-    :deep(.el-tabs__item) {
-      height: 50px;
-      line-height: 50px;
-    }
-  }
-
-  .tab-content {
-    padding: 0 20px;
-  }
-
-  .tab-action-bar {
-    margin-bottom: 16px;
+  .option-desc {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    margin-left: 8px;
   }
 }
 </style>

@@ -1,27 +1,27 @@
-<template>
+﻿<template>
   <div class="domain-view">
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :inline="true" class="search-form">
-        <el-form-item label="域名">
-          <el-input v-model="searchForm.domain" placeholder="域名" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('domain.domain')">
+          <el-input v-model="searchForm.domain" :placeholder="$t('domain.domain')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="根域名">
-          <el-input v-model="searchForm.rootDomain" placeholder="根域名" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('domain.rootDomain')">
+          <el-input v-model="searchForm.rootDomain" :placeholder="$t('domain.rootDomain')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
         <el-form-item label="IP">
-          <el-input v-model="searchForm.ip" placeholder="解析IP" clearable @keyup.enter="handleSearch" />
+          <el-input v-model="searchForm.ip" :placeholder="$t('domain.resolveIP')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="组织">
-          <el-select v-model="searchForm.orgId" placeholder="全部组织" clearable style="width: 140px">
-            <el-option label="全部组织" value="" />
+        <el-form-item :label="$t('domain.organization')">
+          <el-select v-model="searchForm.orgId" :placeholder="$t('common.allOrganizations')" clearable style="width: 140px">
+            <el-option :label="$t('common.allOrganizations')" value="" />
             <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-          <el-button type="danger" plain @click="handleClear">清空数据</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
+          <el-button type="danger" plain @click="handleClear">{{ $t('asset.clearData') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -31,25 +31,25 @@
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.total }}</div>
-          <div class="stat-label">域名总数</div>
+          <div class="stat-label">{{ $t('domain.totalDomains') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.rootDomainCount }}</div>
-          <div class="stat-label">根域名数</div>
+          <div class="stat-label">{{ $t('domain.rootDomainCount') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.resolvedCount }}</div>
-          <div class="stat-label">已解析</div>
+          <div class="stat-label">{{ $t('domain.resolvedCount') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.newCount }}</div>
-          <div class="stat-label">新增域名</div>
+          <div class="stat-label">{{ $t('domain.newDomains') }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -57,19 +57,20 @@
     <!-- 数据表格 -->
     <el-card class="table-card">
       <div class="table-header">
-        <span class="total-info">共 {{ pagination.total }} 个域名</span>
+        <span class="total-info">{{ $t('domain.totalDomainsCount', { count: pagination.total }) }}</span>
         <div class="table-actions">
           <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            批量删除 ({{ selectedRows.length }})
+            {{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
           <el-dropdown style="margin-left: 10px" @command="handleExport">
             <el-button type="success" size="small">
-              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              {{ $t('common.export') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="selected-domain" :disabled="selectedRows.length === 0">导出选中域名 ({{ selectedRows.length }})</el-dropdown-item>
-                <el-dropdown-item divided command="all-domain">导出全部域名</el-dropdown-item>
+                <el-dropdown-item command="selected-domain" :disabled="selectedRows.length === 0">{{ $t('domain.exportSelectedDomains', { count: selectedRows.length }) }}</el-dropdown-item>
+                <el-dropdown-item divided command="all-domain">{{ $t('domain.exportAllDomains') }}</el-dropdown-item>
+                <el-dropdown-item command="csv">{{ $t('common.exportCsv') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -78,43 +79,43 @@
       
       <el-table :data="tableData" v-loading="loading" max-height="500" stripe @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
-        <el-table-column label="域名" min-width="250">
+        <el-table-column :label="$t('domain.domain')" min-width="250">
           <template #default="{ row }">
             <div class="domain-cell">
               <span class="domain-name">{{ row.domain }}</span>
-              <el-tag v-if="row.isNew" type="success" size="small" effect="dark" class="new-tag">新</el-tag>
+              <el-tag v-if="row.isNew" type="success" size="small" effect="dark" class="new-tag">{{ $t('common.new') }}</el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="根域名" width="160">
+          <el-table-column :label="$t('domain.rootDomain')" width="160">
           <template #default="{ row }">{{ row.rootDomain || '-' }}</template>
         </el-table-column>
-        <el-table-column label="解析IP" min-width="200">
+        <el-table-column :label="$t('domain.resolveIP')" min-width="200">
           <template #default="{ row }">
             <div v-if="row.ips && row.ips.length > 0">
               <el-tag v-for="ip in row.ips.slice(0, 3)" :key="ip" size="small" type="info" style="margin-right: 4px">{{ ip }}</el-tag>
               <span v-if="row.ips.length > 3" class="more-ips">+{{ row.ips.length - 3 }}</span>
             </div>
-            <span v-else class="no-resolve">未解析</span>
+              <span v-else class="no-resolve">{{ $t('domain.notResolved') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="CNAME" width="180">
+        <el-table-column :label="$t('domain.cname')" width="180">
           <template #default="{ row }">{{ row.cname || '-' }}</template>
         </el-table-column>
-        <el-table-column label="来源" width="100">
+        <el-table-column :label="$t('domain.source')" width="100">
           <template #default="{ row }">
             <el-tag size="small">{{ row.source || 'subfinder' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="组织" width="120">
-          <template #default="{ row }">{{ row.orgName || '默认组织' }}</template>
+        <el-table-column :label="$t('domain.organization')" width="120">
+          <template #default="{ row }">{{ row.orgName || $t('common.defaultOrganization') }}</template>
         </el-table-column>
-        <el-table-column label="发现时间" width="160">
+        <el-table-column :label="$t('domain.discoveryTime')" width="160">
           <template #default="{ row }">{{ row.createTime }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column :label="$t('common.operation')" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -135,11 +136,13 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { clearAsset } from '@/api/asset'
 
+const { t } = useI18n()
 const emit = defineEmits(['data-changed'])
 
 const loading = ref(false)
@@ -198,25 +201,39 @@ function handleReset() {
 
 function handleSelectionChange(rows) { selectedRows.value = rows }
 
-async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该域名吗？', '提示', { type: 'warning' })
-  const res = await request.post('/asset/domain/delete', { id: row.id })
-  if (res.code === 0) { ElMessage.success('删除成功'); loadData(); loadStat() }
-}
+  async function handleDelete(row) {
+    await ElMessageBox.confirm(t('domain.confirmDeleteDomain'), t('common.tip'), { type: 'warning' })
+    const res = await request.post('/asset/domain/delete', { id: row.id })
+    if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); loadData(); loadStat() }
+  }
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 个域名吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('domain.confirmBatchDelete', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ids = selectedRows.value.map(row => row.id)
   const res = await request.post('/asset/domain/batchDelete', { ids })
-  if (res.code === 0) { ElMessage.success('删除成功'); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
+  if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
 }
 
 async function handleClear() {
-  await ElMessageBox.confirm('确定清空所有资产数据吗？此操作不可恢复！', '警告', { type: 'error', confirmButtonText: '确定清空', cancelButtonText: '取消' })
-  const res = await clearAsset()
-  if (res.code === 0) { ElMessage.success(res.msg || '清空成功'); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
-  else { ElMessage.error(res.msg || '清空失败') }
+  try {
+    await ElMessageBox.confirm(t('asset.confirmClearAll'), t('common.warning'), { type: 'error', confirmButtonText: t('asset.confirmClearBtn'), cancelButtonText: t('common.cancel') })
+    const res = await clearAsset()
+    if (res.code === 0) { 
+      ElMessage.success(res.msg || t('asset.clearSuccess'))
+      selectedRows.value = []
+      loadData()
+      loadStat()
+      emit('data-changed') 
+    } else { 
+      ElMessage.error(res.msg || t('asset.clearFailed')) 
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('清空资产失败:', e)
+      ElMessage.error(t('asset.clearFailed'))
+    }
+  }
 }
 
 // 导出功能
@@ -226,13 +243,14 @@ async function handleExport(command) {
   
   if (command === 'selected-domain') {
     if (selectedRows.value.length === 0) {
-      ElMessage.warning('请先选择要导出的域名')
+      ElMessage.warning(t('domain.pleaseSelectDomains'))
       return
     }
     data = selectedRows.value
     filename = 'domains_selected.txt'
-  } else {
-    ElMessage.info('正在获取全部数据...')
+  } else if (command === 'csv') {
+    // CSV导出所有字段
+    ElMessage.info(t('asset.gettingAllData'))
     try {
       const res = await request.post('/asset/domain/list', {
         ...searchForm, page: 1, pageSize: 10000
@@ -240,18 +258,69 @@ async function handleExport(command) {
       if (res.code === 0) {
         data = res.list || []
       } else {
-        ElMessage.error('获取数据失败')
+        ElMessage.error(t('asset.getDataFailed'))
         return
       }
     } catch (e) {
-      ElMessage.error('获取数据失败')
+      ElMessage.error(t('asset.getDataFailed'))
+      return
+    }
+    
+    if (data.length === 0) {
+      ElMessage.warning(t('asset.noDataToExport'))
+      return
+    }
+    
+    const headers = ['Domain', 'RootDomain', 'IPs', 'CNAME', 'Source', 'Organization', 'CreateTime']
+    const csvRows = [headers.join(',')]
+    
+    for (const row of data) {
+      const values = [
+        escapeCsvField(row.domain || ''),
+        escapeCsvField(row.rootDomain || ''),
+        escapeCsvField((row.ips || []).join(';')),
+        escapeCsvField(row.cname || ''),
+        escapeCsvField(row.source || ''),
+        escapeCsvField(row.orgName || ''),
+        escapeCsvField(row.createTime || '')
+      ]
+      csvRows.push(values.join(','))
+    }
+    
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `domains_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('asset.exportSuccess', { count: data.length }))
+    return
+  } else {
+    ElMessage.info(t('asset.gettingAllData'))
+    try {
+      const res = await request.post('/asset/domain/list', {
+        ...searchForm, page: 1, pageSize: 10000
+      })
+      if (res.code === 0) {
+        data = res.list || []
+      } else {
+        ElMessage.error(t('asset.getDataFailed'))
+        return
+      }
+    } catch (e) {
+      ElMessage.error(t('asset.getDataFailed'))
       return
     }
     filename = 'domains_all.txt'
   }
   
   if (data.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('asset.noDataToExport'))
     return
   }
   
@@ -265,7 +334,7 @@ async function handleExport(command) {
   }
   
   if (exportData.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('asset.noDataToExport'))
     return
   }
   
@@ -279,7 +348,17 @@ async function handleExport(command) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   
-  ElMessage.success(`成功导出 ${exportData.length} 条数据`)
+  ElMessage.success(t('asset.exportSuccess', { count: exportData.length }))
+}
+
+// CSV字段转义
+function escapeCsvField(field) {
+  if (field == null) return ''
+  const str = String(field)
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"'
+  }
+  return str
 }
 
 function refresh() { loadData(); loadStat() }
@@ -287,7 +366,7 @@ function refresh() { loadData(); loadStat() }
 defineExpose({ refresh })
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .domain-view {
   .search-card { margin-bottom: 16px; }
   .stat-row {
@@ -310,3 +389,4 @@ defineExpose({ refresh })
   .pagination { margin-top: 16px; justify-content: flex-end; }
 }
 </style>
+

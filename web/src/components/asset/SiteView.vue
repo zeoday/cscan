@@ -1,30 +1,30 @@
-<template>
+﻿<template>
   <div class="site-view">
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :inline="true" class="search-form">
-        <el-form-item label="站点">
-          <el-input v-model="searchForm.site" placeholder="URL/域名" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('site.site')">
+          <el-input v-model="searchForm.site" :placeholder="$t('site.sitePlaceholder')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="标题">
-          <el-input v-model="searchForm.title" placeholder="网页标题" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('site.title')">
+          <el-input v-model="searchForm.title" :placeholder="$t('site.titlePlaceholder')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="应用">
-          <el-input v-model="searchForm.app" placeholder="指纹/应用" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('site.app')">
+          <el-input v-model="searchForm.app" :placeholder="$t('site.appPlaceholder')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="状态码">
+        <el-form-item :label="$t('site.statusCode')">
           <el-input v-model="searchForm.httpStatus" placeholder="200/404..." clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="组织">
-          <el-select v-model="searchForm.orgId" placeholder="全部组织" clearable style="width: 140px">
-            <el-option label="全部组织" value="" />
+        <el-form-item :label="$t('site.organization')">
+          <el-select v-model="searchForm.orgId" :placeholder="$t('common.allOrganizations')" clearable style="width: 140px">
+            <el-option :label="$t('common.allOrganizations')" value="" />
             <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-          <el-button type="danger" plain @click="handleClear">清空数据</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
+          <el-button type="danger" plain @click="handleClear">{{ $t('asset.clearData') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -34,25 +34,25 @@
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.total }}</div>
-          <div class="stat-label">站点总数</div>
+          <div class="stat-label">{{ $t('site.totalSites') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.httpCount }}</div>
-          <div class="stat-label">HTTP站点</div>
+          <div class="stat-label">{{ $t('site.httpSites') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.httpsCount }}</div>
-          <div class="stat-label">HTTPS站点</div>
+          <div class="stat-label">{{ $t('site.httpsSites') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.newCount }}</div>
-          <div class="stat-label">新增站点</div>
+          <div class="stat-label">{{ $t('site.newSites') }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -60,19 +60,20 @@
     <!-- 数据表格 -->
     <el-card class="table-card">
       <div class="table-header">
-        <span class="total-info">共 {{ pagination.total }} 个站点</span>
+        <span class="total-info">{{ $t('site.totalSitesCount', { count: pagination.total }) }}</span>
         <div class="table-actions">
           <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            批量删除 ({{ selectedRows.length }})
+            {{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
           <el-dropdown style="margin-left: 10px" @command="handleExport">
             <el-button type="success" size="small">
-              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              {{ $t('common.export') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="selected-site" :disabled="selectedRows.length === 0">导出选中站点 ({{ selectedRows.length }})</el-dropdown-item>
-                <el-dropdown-item divided command="all-site">导出全部站点</el-dropdown-item>
+                <el-dropdown-item command="selected-site" :disabled="selectedRows.length === 0">{{ $t('site.exportSelectedSites', { count: selectedRows.length }) }}</el-dropdown-item>
+                <el-dropdown-item divided command="all-site">{{ $t('site.exportAllSites') }}</el-dropdown-item>
+                <el-dropdown-item command="csv">{{ $t('common.exportCsv') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -81,22 +82,22 @@
       
       <el-table :data="tableData" v-loading="loading" stripe max-height="500" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
-        <el-table-column label="站点" min-width="280">
+        <el-table-column :label="$t('site.site')" min-width="280">
           <template #default="{ row }">
             <div class="site-cell">
               <a :href="row.site" target="_blank" class="site-link">{{ row.site }}</a>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="标题" min-width="200" show-overflow-tooltip>
+        <el-table-column :label="$t('site.title')" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.title || '-' }}</template>
         </el-table-column>
-        <el-table-column label="状态码" width="80" align="center">
+        <el-table-column :label="$t('site.statusCode')" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.httpStatus)" size="small">{{ row.httpStatus || '-' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="应用指纹" min-width="180">
+        <el-table-column :label="$t('site.fingerprint')" min-width="180">
           <template #default="{ row }">
             <el-tag v-for="app in (row.app || []).slice(0, 3)" :key="app" size="small" type="success" style="margin: 2px">
               {{ app }}
@@ -104,7 +105,7 @@
             <span v-if="(row.app || []).length > 3" class="more-apps">+{{ (row.app || []).length - 3 }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="截图" width="100" align="center">
+        <el-table-column :label="$t('site.screenshot')" width="100" align="center">
           <template #default="{ row }">
             <el-image 
               v-if="row.screenshot" 
@@ -120,13 +121,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="更新时间" width="160">
+        <el-table-column :label="$t('common.updateTime')" width="160">
           <template #default="{ row }">{{ row.updateTime }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column :label="$t('common.operation')" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="showDetail(row)">{{ $t('common.detail') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -144,27 +145,27 @@
     </el-card>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="站点详情" width="700px">
+    <el-dialog v-model="detailVisible" :title="$t('site.siteDetail')" width="700px">
       <el-descriptions :column="2" border v-if="currentSite">
-        <el-descriptions-item label="站点地址" :span="2">
+        <el-descriptions-item :label="$t('site.siteAddress')" :span="2">
           <a :href="currentSite.site" target="_blank" class="site-link">{{ currentSite.site }}</a>
         </el-descriptions-item>
-        <el-descriptions-item label="标题" :span="2">{{ currentSite.title || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="状态码">
+        <el-descriptions-item :label="$t('site.title')" :span="2">{{ currentSite.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.statusCode')">
           <el-tag :type="getStatusType(currentSite.httpStatus)" size="small">{{ currentSite.httpStatus || '-' }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="Server">{{ currentSite.server || '-' }}</el-descriptions-item>
         <el-descriptions-item label="IP">{{ currentSite.ip || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="位置">{{ currentSite.location || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="组织">{{ currentSite.orgName || '默认组织' }}</el-descriptions-item>
-        <el-descriptions-item label="更新时间">{{ currentSite.updateTime }}</el-descriptions-item>
-        <el-descriptions-item label="应用指纹" :span="2">
+        <el-descriptions-item :label="$t('site.location')">{{ currentSite.location || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.organization')">{{ currentSite.orgName || $t('common.defaultOrganization') }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('common.updateTime')">{{ currentSite.updateTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.fingerprint')" :span="2">
           <el-tag v-for="app in (currentSite.app || [])" :key="app" size="small" type="success" style="margin: 2px">
             {{ app }}
           </el-tag>
           <span v-if="!(currentSite.app || []).length">-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="截图" :span="2" v-if="currentSite.screenshot">
+        <el-descriptions-item :label="$t('site.screenshot')" :span="2" v-if="currentSite.screenshot">
           <el-image 
             :src="getScreenshotUrl(currentSite.screenshot)" 
             :preview-src-list="[getScreenshotUrl(currentSite.screenshot)]"
@@ -177,7 +178,7 @@
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
-        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button @click="detailVisible = false">{{ $t('common.close') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -185,11 +186,13 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { clearAsset } from '@/api/asset'
 
+const { t } = useI18n()
 const emit = defineEmits(['data-changed'])
 
 const loading = ref(false)
@@ -252,16 +255,16 @@ function handleSelectionChange(rows) { selectedRows.value = rows }
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 个站点吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('site.confirmBatchDelete', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ids = selectedRows.value.map(row => row.id)
   const res = await request.post('/asset/site/batchDelete', { ids })
-  if (res.code === 0) { ElMessage.success('删除成功'); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
+  if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该站点吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('site.confirmDeleteSite'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/asset/site/batchDelete', { ids: [row.id] })
-  if (res.code === 0) { ElMessage.success('删除成功'); loadData(); loadStat(); emit('data-changed') }
+  if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); loadData(); loadStat(); emit('data-changed') }
 }
 
 function showDetail(row) {
@@ -270,10 +273,24 @@ function showDetail(row) {
 }
 
 async function handleClear() {
-  await ElMessageBox.confirm('确定清空所有资产数据吗？此操作不可恢复！', '警告', { type: 'error', confirmButtonText: '确定清空', cancelButtonText: '取消' })
-  const res = await clearAsset()
-  if (res.code === 0) { ElMessage.success(res.msg || '清空成功'); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
-  else { ElMessage.error(res.msg || '清空失败') }
+  try {
+    await ElMessageBox.confirm(t('asset.confirmClearAll'), t('common.warning'), { type: 'error', confirmButtonText: t('asset.confirmClearBtn'), cancelButtonText: t('common.cancel') })
+    const res = await clearAsset()
+    if (res.code === 0) { 
+      ElMessage.success(res.msg || t('asset.clearSuccess'))
+      selectedRows.value = []
+      loadData()
+      loadStat()
+      emit('data-changed') 
+    } else { 
+      ElMessage.error(res.msg || t('asset.clearFailed')) 
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('清空资产失败:', e)
+      ElMessage.error(t('asset.clearFailed'))
+    }
+  }
 }
 
 // 导出功能
@@ -283,13 +300,14 @@ async function handleExport(command) {
   
   if (command === 'selected-site') {
     if (selectedRows.value.length === 0) {
-      ElMessage.warning('请先选择要导出的站点')
+      ElMessage.warning(t('site.pleaseSelectSites'))
       return
     }
     data = selectedRows.value
     filename = 'sites_selected.txt'
-  } else {
-    ElMessage.info('正在获取全部数据...')
+  } else if (command === 'csv') {
+    // CSV导出所有字段
+    ElMessage.info(t('asset.gettingAllData'))
     try {
       const res = await request.post('/asset/site/list', {
         ...searchForm, page: 1, pageSize: 10000
@@ -297,18 +315,71 @@ async function handleExport(command) {
       if (res.code === 0) {
         data = res.list || []
       } else {
-        ElMessage.error('获取数据失败')
+        ElMessage.error(t('asset.getDataFailed'))
         return
       }
     } catch (e) {
-      ElMessage.error('获取数据失败')
+      ElMessage.error(t('asset.getDataFailed'))
+      return
+    }
+    
+    if (data.length === 0) {
+      ElMessage.warning(t('asset.noDataToExport'))
+      return
+    }
+    
+    const headers = ['Site', 'Title', 'StatusCode', 'Server', 'IP', 'Location', 'Apps', 'Organization', 'UpdateTime']
+    const csvRows = [headers.join(',')]
+    
+    for (const row of data) {
+      const values = [
+        escapeCsvField(row.site || ''),
+        escapeCsvField(row.title || ''),
+        row.httpStatus || '',
+        escapeCsvField(row.server || ''),
+        escapeCsvField(row.ip || ''),
+        escapeCsvField(row.location || ''),
+        escapeCsvField((row.app || []).join(';')),
+        escapeCsvField(row.orgName || ''),
+        escapeCsvField(row.updateTime || '')
+      ]
+      csvRows.push(values.join(','))
+    }
+    
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `sites_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('asset.exportSuccess', { count: data.length }))
+    return
+  } else {
+    ElMessage.info(t('asset.gettingAllData'))
+    try {
+      const res = await request.post('/asset/site/list', {
+        ...searchForm, page: 1, pageSize: 10000
+      })
+      if (res.code === 0) {
+        data = res.list || []
+      } else {
+        ElMessage.error(t('asset.getDataFailed'))
+        return
+      }
+    } catch (e) {
+      ElMessage.error(t('asset.getDataFailed'))
       return
     }
     filename = 'sites_all.txt'
   }
   
   if (data.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('asset.noDataToExport'))
     return
   }
   
@@ -322,7 +393,7 @@ async function handleExport(command) {
   }
   
   if (exportData.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('asset.noDataToExport'))
     return
   }
   
@@ -336,7 +407,17 @@ async function handleExport(command) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   
-  ElMessage.success(`成功导出 ${exportData.length} 条数据`)
+  ElMessage.success(t('asset.exportSuccess', { count: exportData.length }))
+}
+
+// CSV字段转义
+function escapeCsvField(field) {
+  if (field == null) return ''
+  const str = String(field)
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"'
+  }
+  return str
 }
 
 function getStatusType(status) {
@@ -361,7 +442,7 @@ function refresh() { loadData(); loadStat() }
 defineExpose({ refresh })
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .site-view {
   .search-card { margin-bottom: 16px; }
   .stat-row {
@@ -381,3 +462,4 @@ defineExpose({ refresh })
   .pagination { margin-top: 16px; justify-content: flex-end; }
 }
 </style>
+

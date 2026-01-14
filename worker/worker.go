@@ -14,6 +14,7 @@ import (
 
 	"cscan/model"
 	"cscan/pkg/mapping"
+	"cscan/pkg/utils"
 	"cscan/scanner"
 	"cscan/scheduler"
 
@@ -947,6 +948,24 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		}
 	}
 
+	// 应用全局黑名单过滤
+	blacklistMatcher := w.getBlacklistMatcher(ctx, task.TaskId)
+	if blacklistMatcher != nil && !blacklistMatcher.IsEmpty() {
+		originalCount := len(targets)
+		blacklistedTargets := blacklistMatcher.GetBlacklistedTargets(targets)
+		targets = blacklistMatcher.FilterTargets(targets)
+		if len(blacklistedTargets) > 0 {
+			w.taskLog(task.TaskId, LevelInfo, "Blacklist: filtered %d/%d targets", len(blacklistedTargets), originalCount)
+			for _, t := range blacklistedTargets {
+				w.taskLog(task.TaskId, LevelDebug, "Blacklist: skipped target: %s", t)
+			}
+		}
+		if len(targets) == 0 {
+			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusSuccess, "All targets filtered by blacklist")
+			return
+		}
+	}
+
 	// 输出任务开始日志
 	w.taskLog(task.TaskId, LevelInfo, "Starting: %s", strings.Join(enabledPhases, " → "))
 	w.taskLog(task.TaskId, LevelInfo, "Targets (%d): %s", len(targets), strings.Join(targets, ", "))
@@ -1112,6 +1131,11 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 						WildcardFilter: config.DomainScan.RemoveWildcard,
 						ResolveDNS:     config.DomainScan.ResolveDNS,
 						Concurrent:     w.config.Concurrency * 10,
+						// 引擎配置
+						Engine:         config.DomainScan.BruteforceEngine,
+						Bandwidth:      config.DomainScan.Bandwidth,
+						Retry:          config.DomainScan.Retry,
+						WildcardMode:   config.DomainScan.WildcardMode,
 						// 增强功能配置
 						RecursiveBrute: config.DomainScan.RecursiveBrute,
 						RecursiveDepth: 2,
@@ -1184,10 +1208,27 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			}
 		}
 
-		// 转换为切片并保存
+		// 转换为切片
 		var mergedAssets []*scanner.Asset
 		for _, asset := range allAssetMap {
 			mergedAssets = append(mergedAssets, asset)
+		}
+
+		// 应用黑名单过滤子域名结果
+		if blacklistMatcher != nil && !blacklistMatcher.IsEmpty() {
+			mergedAssets = w.filterAssetsByBlacklist(mergedAssets, blacklistMatcher, task.TaskId)
+		}
+
+		// 应用端口扫描排除目标过滤子域名解析的IP
+		if config.PortScan != nil && config.PortScan.ExcludeHosts != "" {
+			excludeMatcher := utils.NewExcludeHostsMatcher(config.PortScan.ExcludeHosts)
+			if excludeMatcher != nil && !excludeMatcher.IsEmpty() {
+				originalCount := len(mergedAssets)
+				mergedAssets = w.filterAssetsByExcludeHosts(mergedAssets, excludeMatcher, task.TaskId)
+				if filteredCount := originalCount - len(mergedAssets); filteredCount > 0 {
+					w.taskLog(task.TaskId, LevelInfo, "ExcludeHosts: filtered %d subdomains by resolved IP", filteredCount)
+				}
+			}
 		}
 
 		// 检查是否被暂停或取消
@@ -1568,11 +1609,10 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 			// 执行目录扫描
 			dirScanAssets := w.executeDirScan(ctx, task, allAssets, config.DirScan, orgId)
 			if len(dirScanAssets) > 0 {
-				// 将目录扫描发现的资产添加到总资产列表
-				allAssets = append(allAssets, dirScanAssets...)
+				// 注意：目录扫描结果不添加到 allAssets，避免影响后续 POC 扫描
+				// 目录扫描结果是 URL 路径，不是独立的扫描目标
 				w.taskLog(task.TaskId, LevelInfo, "Dir scan completed: found %d paths", len(dirScanAssets))
-				// 保存目录扫描结果
-				w.saveAssetResult(ctx, task.WorkspaceId, task.MainTaskId, orgId, dirScanAssets)
+				// 目录扫描结果已在 executeDirScan 中通过 saveDirScanResults 保存到数据库
 			}
 			completedPhases["dirscan"] = true
 			w.incrSubTaskDone(ctx, task, "目录扫描")
@@ -3775,3 +3815,111 @@ func (w *Worker) loadHttpServiceMappingsLegacy() {
 }
 
 // NOTE: subscribeControlCommand 和 handleControlCommand 已移除，将在 Task 6 中通过 WebSocket 实现
+
+// getBlacklistMatcher 获取黑名单匹配器
+func (w *Worker) getBlacklistMatcher(ctx context.Context, taskId string) *utils.BlacklistMatcher {
+	// 从服务器获取黑名单规则
+	resp, err := w.httpClient.GetBlacklistRules(ctx)
+	if err != nil {
+		w.taskLog(taskId, LevelWarn, "Failed to get blacklist rules: %v", err)
+		return nil
+	}
+
+	if resp.Code != 0 {
+		w.taskLog(taskId, LevelWarn, "Get blacklist rules failed: %s", resp.Msg)
+		return nil
+	}
+
+	if len(resp.Rules) == 0 {
+		return nil
+	}
+
+	matcher := utils.NewBlacklistMatcher(resp.Rules)
+	w.taskLog(taskId, LevelDebug, "Loaded %d blacklist rules", matcher.RuleCount())
+	return matcher
+}
+
+// filterAssetsByBlacklist 使用黑名单过滤资产
+func (w *Worker) filterAssetsByBlacklist(assets []*scanner.Asset, matcher *utils.BlacklistMatcher, taskId string) []*scanner.Asset {
+	if matcher == nil || matcher.IsEmpty() || len(assets) == 0 {
+		return assets
+	}
+
+	var filtered []*scanner.Asset
+	var skippedCount int
+
+	for _, asset := range assets {
+		// 检查主机名/域名
+		if matcher.IsDomainBlacklisted(asset.Host) {
+			skippedCount++
+			continue
+		}
+
+		// 检查IP地址
+		isBlacklisted := false
+		for _, ipInfo := range asset.IPV4 {
+			if matcher.IsIPBlacklisted(ipInfo.IP) {
+				isBlacklisted = true
+				break
+			}
+		}
+		if isBlacklisted {
+			skippedCount++
+			continue
+		}
+
+		// 检查Authority（可能包含端口）
+		if matcher.IsBlacklisted(asset.Authority) {
+			skippedCount++
+			continue
+		}
+
+		filtered = append(filtered, asset)
+	}
+
+	if skippedCount > 0 {
+		w.taskLog(taskId, LevelInfo, "Blacklist: filtered %d assets", skippedCount)
+	}
+
+	return filtered
+}
+
+// filterAssetsByExcludeHosts 使用排除目标过滤资产（检查解析的IP）
+// 与黑名单过滤类似，但专门用于端口扫描的排除目标配置
+func (w *Worker) filterAssetsByExcludeHosts(assets []*scanner.Asset, matcher *utils.BlacklistMatcher, taskId string) []*scanner.Asset {
+	if matcher == nil || matcher.IsEmpty() || len(assets) == 0 {
+		return assets
+	}
+
+	var filtered []*scanner.Asset
+	var skippedHosts []string
+
+	for _, asset := range assets {
+		// 检查主机名/域名本身是否在排除列表
+		if matcher.IsBlacklisted(asset.Host) {
+			skippedHosts = append(skippedHosts, asset.Host)
+			continue
+		}
+
+		// 检查该资产解析出的所有IPv4地址
+		isExcluded := false
+		for _, ipInfo := range asset.IPV4 {
+			if matcher.IsIPBlacklisted(ipInfo.IP) {
+				isExcluded = true
+				skippedHosts = append(skippedHosts, fmt.Sprintf("%s(%s)", asset.Host, ipInfo.IP))
+				break
+			}
+		}
+		if isExcluded {
+			continue
+		}
+
+		filtered = append(filtered, asset)
+	}
+
+	if len(skippedHosts) > 0 {
+		w.taskLog(taskId, LevelDebug, "ExcludeHosts: skipped targets: %v", skippedHosts)
+	}
+
+	return filtered
+}

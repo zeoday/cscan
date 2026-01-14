@@ -106,7 +106,7 @@ cscan-worker.exe -k <install_key> -s http://<api_host>:8888
 | 层级 | 技术 |
 |------|------|
 | 后端 | Go-Zero |
-| 前端 | Vue 3.4 + Element Plus + Vite |
+| 前端 | Vue 3.4 + Element Plus + Vite + sass|
 | 存储 | MongoDB 6 + Redis 7 |
 | 扫描 | Naabu / Masscan / Nmap / Subfinder / Httpx / Nuclei |
 

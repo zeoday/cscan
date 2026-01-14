@@ -9,25 +9,25 @@
         </div>
         <div class="action-section">
           <el-button type="primary" @click="handleExport" :loading="exporting">
-            <el-icon><Download /></el-icon>导出Excel
+            <el-icon><Download /></el-icon>{{ $t('report.exportExcel') }}
           </el-button>
           <el-button @click="goBack">
-            <el-icon><Back /></el-icon>返回
+            <el-icon><Back /></el-icon>{{ $t('report.back') }}
           </el-button>
         </div>
       </div>
       <el-descriptions :column="5" border class="task-info">
-        <el-descriptions-item label="扫描目标">
+        <el-descriptions-item :label="$t('report.scanTarget')">
           <div class="target-text">{{ reportData.target }}</div>
         </el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ reportData.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="资产数量">
+        <el-descriptions-item :label="$t('common.createTime')">{{ reportData.createTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('report.assetCount')">
           <span class="stat-number">{{ reportData.assetCount }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="漏洞数量">
+        <el-descriptions-item :label="$t('report.vulCount')">
           <span class="stat-number danger">{{ reportData.vulCount }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="目录扫描">
+        <el-descriptions-item :label="$t('report.dirScanCount')">
           <span class="stat-number info">{{ reportData.dirScanCount || 0 }}</span>
         </el-descriptions-item>
       </el-descriptions>
@@ -36,12 +36,12 @@
     <!-- Tab页切换展示 -->
     <el-tabs v-model="activeTab" type="border-card" class="report-tabs" v-if="reportData">
       <!-- 概览Tab -->
-      <el-tab-pane label="概览" name="overview">
+      <el-tab-pane :label="$t('report.overview')" name="overview">
         <el-row :gutter="20" class="stats-row">
           <!-- 漏洞统计 -->
           <el-col :span="6">
             <el-card class="stat-card">
-              <template #header>漏洞等级分布</template>
+              <template #header>{{ $t('report.vulLevelDistribution') }}</template>
               <div class="vul-stats">
                 <div class="vul-item critical">
                   <span class="label">Critical</span>
@@ -69,7 +69,7 @@
           <!-- 端口统计 -->
           <el-col :span="6">
             <el-card class="stat-card">
-              <template #header>Top 端口</template>
+              <template #header>{{ $t('report.topPorts') }}</template>
               <div class="top-list">
                 <div v-for="item in topPorts" :key="item.name" class="top-item">
                   <span class="name">{{ item.name }}</span>
@@ -81,7 +81,7 @@
           <!-- 服务统计 -->
           <el-col :span="6">
             <el-card class="stat-card">
-              <template #header>Top 服务</template>
+              <template #header>{{ $t('report.topServices') }}</template>
               <div class="top-list">
                 <div v-for="item in topServices" :key="item.name" class="top-item">
                   <span class="name">{{ item.name || '-' }}</span>
@@ -93,7 +93,7 @@
           <!-- 应用统计 -->
           <el-col :span="6">
             <el-card class="stat-card">
-              <template #header>Top 应用</template>
+              <template #header>{{ $t('report.topApps') }}</template>
               <div class="top-list">
                 <div v-for="item in topApps" :key="item.name" class="top-item">
                   <span class="name">{{ item.name }}</span>
@@ -109,7 +109,7 @@
           <el-col :span="4">
             <el-card class="stat-card-small">
               <div class="stat-value">{{ reportData.dirScanStat?.total || 0 }}</div>
-              <div class="stat-label">目录扫描总数</div>
+              <div class="stat-label">{{ $t('report.dirScanTotal') }}</div>
             </el-card>
           </el-col>
           <el-col :span="4">
@@ -140,13 +140,13 @@
       </el-tab-pane>
 
       <!-- 资产列表Tab -->
-      <el-tab-pane label="资产列表" name="assets">
+      <el-tab-pane :label="$t('report.assetList')" name="assets">
         <div class="tab-header">
-          <span class="total-info">共 {{ reportData.assets?.length || 0 }} 条记录</span>
-          <el-input v-model="assetSearch" placeholder="搜索资产..." style="width: 250px" clearable />
+          <span class="total-info">{{ $t('common.total') }} {{ reportData.assets?.length || 0 }} {{ $t('report.records') }}</span>
+          <el-input v-model="assetSearch" :placeholder="$t('report.searchAsset')" style="width: 250px" clearable />
         </div>
         <el-table :data="filteredAssets" stripe max-height="500">
-          <el-table-column prop="authority" label="地址" min-width="200" show-overflow-tooltip>
+          <el-table-column prop="authority" :label="$t('report.address')" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
               <div class="asset-cell">
                 <span class="authority">{{ row.authority }}</span>
@@ -156,9 +156,9 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="service" label="服务" width="100" />
-          <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-          <el-table-column label="应用" min-width="200">
+          <el-table-column prop="service" :label="$t('report.service')" width="100" />
+          <el-table-column prop="title" :label="$t('report.pageTitle')" min-width="200" show-overflow-tooltip />
+          <el-table-column :label="$t('report.app')" min-width="200">
             <template #default="{ row }">
               <div class="app-tags">
                 <el-tooltip v-for="app in (row.app || [])" :key="app" :content="getAppSource(app)" placement="top">
@@ -168,7 +168,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="server" label="Server" width="120" show-overflow-tooltip />
-          <el-table-column label="截图" width="100">
+          <el-table-column :label="$t('report.screenshot')" width="100">
             <template #default="{ row }">
               <el-image v-if="row.screenshot" :src="getScreenshotUrl(row.screenshot)" 
                 :preview-src-list="[getScreenshotUrl(row.screenshot)]" :z-index="9999" :preview-teleported="true"
@@ -182,33 +182,33 @@
       </el-tab-pane>
 
       <!-- 漏洞列表Tab -->
-      <el-tab-pane label="漏洞列表" name="vuls" v-if="reportData.vuls?.length > 0">
+      <el-tab-pane :label="$t('report.vulList')" name="vuls" v-if="reportData.vuls?.length > 0">
         <div class="tab-header">
-          <span class="total-info">共 {{ reportData.vuls?.length || 0 }} 条记录</span>
-          <el-input v-model="vulSearch" placeholder="搜索漏洞..." style="width: 250px" clearable />
+          <span class="total-info">{{ $t('common.total') }} {{ reportData.vuls?.length || 0 }} {{ $t('report.records') }}</span>
+          <el-input v-model="vulSearch" :placeholder="$t('report.searchVul')" style="width: 250px" clearable />
         </div>
         <el-table :data="filteredVuls" stripe max-height="500">
-          <el-table-column prop="severity" label="等级" width="100">
+          <el-table-column prop="severity" :label="$t('report.level')" width="100">
             <template #default="{ row }">
               <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="authority" label="目标" width="180" show-overflow-tooltip />
+          <el-table-column prop="authority" :label="$t('report.target')" width="180" show-overflow-tooltip />
           <el-table-column prop="url" label="URL" min-width="250" show-overflow-tooltip />
           <el-table-column prop="pocFile" label="POC" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="result" label="结果" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="createTime" label="发现时间" width="160" />
+          <el-table-column prop="result" :label="$t('report.result')" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="createTime" :label="$t('report.discoveryTime')" width="160" />
         </el-table>
       </el-tab-pane>
 
       <!-- 目录扫描Tab -->
-      <el-tab-pane label="目录扫描" name="dirscan" v-if="reportData.dirScanCount > 0">
+      <el-tab-pane :label="$t('report.dirScan')" name="dirscan" v-if="reportData.dirScanCount > 0">
         <div class="tab-header">
-          <span class="total-info">共 {{ Object.keys(groupedDirScans).length }} 个目标，{{ reportData.dirScans?.length || 0 }} 条记录</span>
+          <span class="total-info">{{ $t('common.total') }} {{ Object.keys(groupedDirScans).length }} {{ $t('report.targets') }}，{{ reportData.dirScans?.length || 0 }} {{ $t('report.records') }}</span>
           <div class="tab-actions">
-            <el-button size="small" @click="expandAllDirScan">全部展开</el-button>
-            <el-button size="small" @click="collapseAllDirScan">全部收起</el-button>
-            <el-button type="success" size="small" @click="exportDirScanUrls">导出URL</el-button>
+            <el-button size="small" @click="expandAllDirScan">{{ $t('report.expandAll') }}</el-button>
+            <el-button size="small" @click="collapseAllDirScan">{{ $t('report.collapseAll') }}</el-button>
+            <el-button type="success" size="small" @click="exportDirScanUrls">{{ $t('report.exportUrl') }}</el-button>
           </div>
         </div>
         <el-collapse v-model="dirScanActiveNames" class="target-collapse">
@@ -225,43 +225,43 @@
                   <a :href="row.url" target="_blank" rel="noopener" class="url-link">{{ row.url }}</a>
                 </template>
               </el-table-column>
-              <el-table-column prop="path" label="路径" min-width="120" show-overflow-tooltip />
-              <el-table-column prop="statusCode" label="状态码" width="90">
+              <el-table-column prop="path" :label="$t('report.path')" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="statusCode" :label="$t('report.statusCode')" width="90">
                 <template #default="{ row }">
                   <el-tag :type="getDirScanStatusType(row.statusCode)" size="small">{{ row.statusCode }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="contentLength" label="大小" width="90">
+              <el-table-column prop="contentLength" :label="$t('report.size')" width="90">
                 <template #default="{ row }">{{ formatSize(row.contentLength) }}</template>
               </el-table-column>
-              <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip />
-              <el-table-column prop="createTime" label="发现时间" width="150" />
+              <el-table-column prop="title" :label="$t('report.pageTitle')" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="createTime" :label="$t('report.discoveryTime')" width="150" />
             </el-table>
           </el-collapse-item>
         </el-collapse>
-        <el-empty v-if="Object.keys(groupedDirScans).length === 0" description="暂无目录扫描数据" />
+        <el-empty v-if="Object.keys(groupedDirScans).length === 0" :description="$t('report.noDirScanData')" />
       </el-tab-pane>
     </el-tabs>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
       <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-      <p>加载报告中...</p>
+      <p>{{ $t('report.loadingReport') }}</p>
     </div>
     
     <!-- 无数据状态 -->
     <div v-if="!loading && reportData && reportData.assetCount === 0 && reportData.vulCount === 0 && reportData.dirScanCount === 0" class="empty-container">
-      <el-empty description="暂无扫描结果">
+      <el-empty :description="$t('report.noScanResult')">
         <template #description>
-          <p>该任务暂无扫描结果</p>
-          <p style="color: #909399; font-size: 12px;">可能原因：任务未完成、目标无开放端口、或扫描配置问题</p>
+          <p>{{ $t('report.noScanResult') }}</p>
+          <p class="empty-hint">{{ $t('report.noScanResultReason') }}</p>
         </template>
       </el-empty>
     </div>
     
     <!-- 任务不存在 -->
     <div v-if="!loading && !reportData" class="empty-container">
-      <el-empty description="任务不存在或加载失败" />
+      <el-empty :description="$t('report.taskNotExist')" />
     </div>
   </div>
 </template>
@@ -269,10 +269,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Download, Back, Loading, Picture } from '@element-plus/icons-vue'
 import { getReportDetail, exportReport } from '@/api/report'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
@@ -328,7 +330,7 @@ onMounted(() => {
   if (taskId) {
     loadReport(taskId)
   } else {
-    ElMessage.error('缺少任务ID')
+    ElMessage.error(t('report.missingTaskId'))
     router.push('/task')
   }
 })
@@ -343,10 +345,10 @@ async function loadReport(taskId) {
       const keys = Object.keys(groupedDirScans.value)
       if (keys.length > 0) dirScanActiveNames.value = [keys[0]]
     } else {
-      ElMessage.error(res.msg || '加载报告失败')
+      ElMessage.error(res.msg || t('report.loadReportFailed'))
     }
   } catch (e) {
-    ElMessage.error('加载报告失败')
+    ElMessage.error(t('report.loadReportFailed'))
   } finally {
     loading.value = false
   }
@@ -364,9 +366,9 @@ async function handleExport() {
     link.download = `report_${reportData.value.taskName}_${new Date().toISOString().slice(0,10)}.xlsx`
     link.click()
     window.URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
+    ElMessage.success(t('report.exportSuccess'))
   } catch (e) {
-    ElMessage.error('导出失败')
+    ElMessage.error(t('report.exportFailed'))
   } finally {
     exporting.value = false
   }
@@ -380,7 +382,7 @@ function collapseAllDirScan() { dirScanActiveNames.value = [] }
 function exportDirScanUrls() {
   const dirScans = reportData.value?.dirScans || []
   if (dirScans.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('report.noDataToExport'))
     return
   }
   const seen = new Set()
@@ -400,7 +402,7 @@ function exportDirScanUrls() {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
-  ElMessage.success(`成功导出 ${exportData.length} 条数据`)
+  ElMessage.success(t('report.exportSuccessCount', { count: exportData.length }))
 }
 
 function getStatusType(status) {
@@ -541,11 +543,11 @@ function getScreenshotUrl(screenshot) {
           padding: 8px 12px;
           margin-bottom: 5px;
           border-radius: 4px;
-          &.critical { background: rgba(245, 108, 108, 0.1); .count { color: #f56c6c; } }
-          &.high { background: rgba(230, 162, 60, 0.1); .count { color: #e6a23c; } }
-          &.medium { background: rgba(64, 158, 255, 0.1); .count { color: #409eff; } }
-          &.low { background: rgba(103, 194, 58, 0.1); .count { color: #67c23a; } }
-          &.info { background: rgba(144, 147, 153, 0.1); .count { color: #909399; } }
+          &.critical { background: var(--el-color-danger-light-9); .count { color: var(--el-color-danger); } }
+          &.high { background: var(--el-color-warning-light-9); .count { color: var(--el-color-warning); } }
+          &.medium { background: var(--el-color-primary-light-9); .count { color: var(--el-color-primary); } }
+          &.low { background: var(--el-color-success-light-9); .count { color: var(--el-color-success); } }
+          &.info { background: var(--el-fill-color-light); .count { color: var(--el-text-color-secondary); } }
           .count { font-weight: bold; }
         }
       }
@@ -570,10 +572,10 @@ function getScreenshotUrl(screenshot) {
       padding: 15px;
       .stat-value { font-size: 20px; font-weight: 600; color: var(--el-color-primary); }
       .stat-label { color: var(--el-text-color-secondary); margin-top: 5px; font-size: 12px; }
-      &.status-2xx .stat-value { color: #67c23a; }
-      &.status-3xx .stat-value { color: #e6a23c; }
-      &.status-4xx .stat-value { color: #f56c6c; }
-      &.status-5xx .stat-value { color: #909399; }
+      &.status-2xx .stat-value { color: var(--el-color-success); }
+      &.status-3xx .stat-value { color: var(--el-color-warning); }
+      &.status-4xx .stat-value { color: var(--el-color-danger); }
+      &.status-5xx .stat-value { color: var(--el-text-color-secondary); }
     }
   }
 
@@ -627,6 +629,11 @@ function getScreenshotUrl(screenshot) {
     align-items: center;
     justify-content: center;
     padding: 60px 0;
+  }
+
+  .empty-hint {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
   }
 }
 </style>

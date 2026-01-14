@@ -3,9 +3,13 @@ module cscan
 go 1.24.2
 
 require (
+	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/chromedp/chromedp v0.14.2
+	github.com/gobwas/ws v1.4.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
+	github.com/leanovate/gopter v0.2.11
+	github.com/projectdiscovery/dnsx v1.2.3
 	github.com/projectdiscovery/goflags v0.1.74
 	github.com/projectdiscovery/httpx v1.7.4
 	github.com/projectdiscovery/naabu/v2 v2.3.7
@@ -57,7 +61,6 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/alexsnet/go-vnc v0.1.0 // indirect
-	github.com/alicebob/miniredis/v2 v2.35.0 // indirect
 	github.com/alitto/pond v1.9.2 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
@@ -178,7 +181,6 @@ require (
 	github.com/goburrow/cache v0.1.4 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/gocarina/gocsv v0.0.0-20240520201108-78e41c74b4b1 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -239,7 +241,6 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/labstack/echo/v4 v4.13.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
-	github.com/leanovate/gopter v0.2.11 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/leslie-qiwa/flat v0.0.0-20230424180412-f9d1cf014baa // indirect
 	github.com/lib/pq v1.10.9 // indirect
@@ -298,7 +299,6 @@ require (
 	github.com/projectdiscovery/cdncheck v1.2.14 // indirect
 	github.com/projectdiscovery/chaos-client v0.5.2 // indirect
 	github.com/projectdiscovery/clistats v0.1.1 // indirect
-	github.com/projectdiscovery/dnsx v1.2.3 // indirect
 	github.com/projectdiscovery/dsl v0.8.8 // indirect
 	github.com/projectdiscovery/fastdialer v0.4.20 // indirect
 	github.com/projectdiscovery/fasttemplate v0.0.2 // indirect
@@ -350,7 +350,6 @@ require (
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
-	github.com/smartystreets/goconvey v1.8.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.8 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect

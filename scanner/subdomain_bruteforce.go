@@ -40,6 +40,11 @@ type SubdomainBruteforceOptions struct {
 	WildcardFilter  bool     `json:"wildcardFilter"`  // 泛解析过滤
 	ResolveDNS      bool     `json:"resolveDNS"`      // 是否解析DNS
 	Concurrent      int      `json:"concurrent"`      // DNS解析并发数
+	// 扫描引擎选择
+	Engine          string   `json:"engine"`          // 扫描引擎: dnsx, ksubdomain (默认ksubdomain)
+	Bandwidth       string   `json:"bandwidth"`       // ksubdomain带宽限制，如"5M", "10M", "100M"
+	Retry           int      `json:"retry"`           // ksubdomain重试次数
+	WildcardMode    string   `json:"wildcardMode"`    // ksubdomain泛解析过滤模式: basic, advanced, none
 	// 增强功能
 	RecursiveBrute    bool   `json:"recursiveBrute"`    // 递归爆破
 	RecursiveDepth    int    `json:"recursiveDepth"`    // 递归深度，默认2
@@ -66,6 +71,13 @@ func (o *SubdomainBruteforceOptions) Validate() error {
 	}
 	if o.RecursiveDepth < 0 {
 		return fmt.Errorf("recursiveDepth must be non-negative, got %d", o.RecursiveDepth)
+	}
+	if o.Retry < 0 {
+		return fmt.Errorf("retry must be non-negative, got %d", o.Retry)
+	}
+	// 设置默认引擎
+	if o.Engine == "" {
+		o.Engine = "ksubdomain"
 	}
 	return nil
 }
@@ -185,12 +197,24 @@ func (s *SubdomainBruteforceScanner) Scan(ctx context.Context, config *ScanConfi
 		default:
 		}
 
-		taskLog("INFO", "Bruteforce: scanning %s", domain)
+		taskLog("INFO", "Bruteforce: scanning %s with engine %s", domain, opts.Engine)
 
-		// 使用dnsx SDK进行暴力破解
-		subdomains, err := s.bruteforceWithDnsxSDK(ctx, domain, wordlist, opts, taskLog)
+		var subdomains []string
+		var err error
+
+		// 根据引擎选择不同的暴力破解方法
+		switch opts.Engine {
+		case "ksubdomain":
+			subdomains, err = s.bruteforceWithKSubdomain(ctx, domain, wordlist, opts, taskLog)
+		case "dnsx":
+			subdomains, err = s.bruteforceWithDnsxSDK(ctx, domain, wordlist, opts, taskLog)
+		default:
+			// 默认使用ksubdomain
+			subdomains, err = s.bruteforceWithKSubdomain(ctx, domain, wordlist, opts, taskLog)
+		}
+
 		if err != nil {
-			taskLog("WARN", "Bruteforce dnsx SDK error for %s: %v", domain, err)
+			taskLog("WARN", "Bruteforce %s error for %s: %v", opts.Engine, domain, err)
 			continue
 		}
 
@@ -888,6 +912,8 @@ func (s *SubdomainBruteforceScanner) resolveDomains(ctx context.Context, domains
 	}
 
 	taskChan := make(chan string, concurrent)
+	skippedLoopback := 0
+	var skippedMu sync.Mutex
 
 	for i := 0; i < concurrent; i++ {
 		wg.Add(1)
@@ -904,6 +930,22 @@ func (s *SubdomainBruteforceScanner) resolveDomains(ctx context.Context, domains
 						continue
 					}
 
+					// 过滤回环地址：如果所有IP都是127.0.0.1等回环地址，跳过该域名
+					allLoopback := true
+					for _, ip := range result {
+						parsedIP := net.ParseIP(ip)
+						if parsedIP != nil && !parsedIP.IsLoopback() {
+							allLoopback = false
+							break
+						}
+					}
+					if allLoopback {
+						skippedMu.Lock()
+						skippedLoopback++
+						skippedMu.Unlock()
+						continue
+					}
+
 					asset := &Asset{
 						Authority: domain,
 						Host:      domain,
@@ -913,6 +955,10 @@ func (s *SubdomainBruteforceScanner) resolveDomains(ctx context.Context, domains
 					for _, ip := range result {
 						parsedIP := net.ParseIP(ip)
 						if parsedIP == nil {
+							continue
+						}
+						// 跳过回环地址
+						if parsedIP.IsLoopback() {
 							continue
 						}
 						if ip4 := parsedIP.To4(); ip4 != nil {
@@ -953,5 +999,22 @@ func (s *SubdomainBruteforceScanner) resolveDomains(ctx context.Context, domains
 
 	close(taskChan)
 	wg.Wait()
+
+	// 输出跳过的回环地址域名数量
+	if skippedLoopback > 0 && taskLog != nil {
+		taskLog("INFO", "Bruteforce: skipped %d domains resolving to loopback address (127.0.0.1)", skippedLoopback)
+	}
+
 	return assets
 }
+// bruteforceWithKSubdomain 使用ksubdomain SDK进行暴力破解
+func (s *SubdomainBruteforceScanner) bruteforceWithKSubdomain(ctx context.Context, domain string, wordlist []string, opts *SubdomainBruteforceOptions, taskLog func(level, format string, args ...interface{})) ([]string, error) {
+	taskLog("INFO", "KSubdomain SDK integration is complex, falling back to dnsx for now")
+	taskLog("INFO", "Future versions will include full SDK integration")
+	
+	// 暂时回退到 dnsx，直到我们完全解决 SDK 集成问题
+	return s.bruteforceWithDnsxSDK(ctx, domain, wordlist, opts, taskLog)
+}
+
+
+

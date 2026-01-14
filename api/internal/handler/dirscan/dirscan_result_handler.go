@@ -22,6 +22,8 @@ type DirScanResultListReq struct {
 	StatusCode int    `json:"statusCode"`
 	Page       int    `json:"page"`
 	PageSize   int    `json:"pageSize"`
+	SortField  string `json:"sortField"`  // 排序字段: statusCode, contentLength
+	SortOrder  string `json:"sortOrder"`  // 排序方向: asc, desc
 }
 
 // DirScanResultListResp 列表响应
@@ -74,8 +76,8 @@ func DirScanResultListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		// 先统计总数（不带分页）
 		total, _ := resultModel.CountByFilter(ctx, filter)
 
-		// 查询数据
-		list, err := resultModel.FindByFilter(ctx, filter, req.Page, req.PageSize)
+		// 查询数据（支持排序）
+		list, err := resultModel.FindByFilterWithSort(ctx, filter, req.Page, req.PageSize, req.SortField, req.SortOrder)
 		if err != nil {
 			httpx.OkJson(w, &DirScanResultListResp{Code: 500, Msg: "查询失败: " + err.Error()})
 			return

@@ -203,7 +203,7 @@ func (m *MainTaskModel) UpdateByTaskId(ctx context.Context, taskId string, updat
 	return err
 }
 
-// IncrSubTaskDone 递增已完成子任务数
+// IncrSubTaskDone 递增已完成子任务数 (已废弃，请使用 IncrSubTaskDoneAtomic)
 func (m *MainTaskModel) IncrSubTaskDone(ctx context.Context, id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -214,6 +214,92 @@ func (m *MainTaskModel) IncrSubTaskDone(ctx context.Context, id string) error {
 		"$set": bson.M{"update_time": time.Now()},
 	})
 	return err
+}
+
+// IncrSubTaskDoneAtomic 原子递增子任务完成数
+// 使用 FindOneAndUpdate 实现原子操作，防止并发导致计数超过上限
+// 返回更新后的文档，如果已达上限则返回当前文档但不递增
+// 返回值: (更新后的任务, 是否实际递增了, 错误)
+func (m *MainTaskModel) IncrSubTaskDoneAtomic(ctx context.Context, id string) (*MainTask, bool, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, false, err
+	}
+
+	now := time.Now()
+
+	// 使用 $expr 条件确保只有 sub_task_done < sub_task_count 时才递增
+	// 这样可以防止并发情况下计数超过上限
+	filter := bson.M{
+		"_id": oid,
+		"$expr": bson.M{
+			"$lt": bson.A{"$sub_task_done", "$sub_task_count"},
+		},
+	}
+
+	update := bson.M{
+		"$inc": bson.M{"sub_task_done": 1},
+		"$set": bson.M{"update_time": now},
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var task MainTask
+	err = m.coll.FindOneAndUpdate(ctx, filter, update, opts).Decode(&task)
+
+	if err == mongo.ErrNoDocuments {
+		// 没有匹配的文档，可能是已达上限或文档不存在
+		// 尝试获取当前文档状态
+		currentTask, findErr := m.FindById(ctx, id)
+		if findErr != nil {
+			return nil, false, findErr
+		}
+		// 返回当前文档，但标记为未递增
+		return currentTask, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &task, true, nil
+}
+
+// MarkTaskCompleted 原子标记任务为完成状态
+// 只有当 sub_task_done >= sub_task_count 且状态不是 SUCCESS 时才更新
+// 返回值: (是否更新成功, 错误)
+func (m *MainTaskModel) MarkTaskCompleted(ctx context.Context, id string) (bool, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+
+	// 条件：sub_task_done >= sub_task_count 且状态不是 SUCCESS
+	filter := bson.M{
+		"_id": oid,
+		"$expr": bson.M{
+			"$gte": bson.A{"$sub_task_done", "$sub_task_count"},
+		},
+		"status": bson.M{"$ne": TaskStatusSuccess},
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"status":      TaskStatusSuccess,
+			"progress":    100,
+			"end_time":    now,
+			"update_time": now,
+		},
+	}
+
+	result, err := m.coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return false, err
+	}
+
+	return result.ModifiedCount > 0, nil
 }
 
 // ExecutorTaskModel

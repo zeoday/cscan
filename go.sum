@@ -138,10 +138,6 @@ github.com/alexbrainman/sspi v0.0.0-20231016080023-1a75b4708caa h1:LHTHcTQiSGT7V
 github.com/alexbrainman/sspi v0.0.0-20231016080023-1a75b4708caa/go.mod h1:cEWa1LVoE5KvSD9ONXsZrj0z6KqySlCCNKHlLzbqAt4=
 github.com/alexsnet/go-vnc v0.1.0 h1:vBCwPNy79WEL8V/Z5A0ngEFCvTWBAjmS048lkR2rdmY=
 github.com/alexsnet/go-vnc v0.1.0/go.mod h1:bbRsg41Sh3zvrnWsw+REKJVGZd8Of2+S0V1G0ZaBhlU=
-github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 h1:uvdUDbHQHO85qeSydJtItA4T55Pw6BtAejd0APRJOCE=
-github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302/go.mod h1:SGnFV6hVsYE877CKEZ6tDNTjaSXYUk6QqoIK6PrAtcc=
-github.com/alicebob/miniredis/v2 v2.33.0 h1:uvTF0EDeu9RLnUEG27Db5I68ESoIxTiXbNUiji6lZrA=
-github.com/alicebob/miniredis/v2 v2.33.0/go.mod h1:MhP4a3EU7aENRi9aO+tHfTBZicLqQevyi/DJpoj6mi0=
 github.com/alicebob/miniredis/v2 v2.35.0 h1:QwLphYqCEAo1eu1TqPRN2jgVMPBweeQcR21jeqDCONI=
 github.com/alicebob/miniredis/v2 v2.35.0/go.mod h1:TcL7YfarKPGDAthEtl5NBeHZfeUQj6OXMm/+iu5cLMM=
 github.com/alitto/pond v1.9.2 h1:9Qb75z/scEZVCoSU+osVmQ0I0JOeLfdTDafrbcJ8CLs=
@@ -956,8 +952,6 @@ github.com/projectdiscovery/chaos-client v0.5.2 h1:dN+7GXEypsJAbCD//dBcUxzAEAEH1
 github.com/projectdiscovery/chaos-client v0.5.2/go.mod h1:KnoJ/NJPhll42uaqlDga6oafFfNw5l2XI2ajRijtDuU=
 github.com/projectdiscovery/clistats v0.1.1 h1:8mwbdbwTU4aT88TJvwIzTpiNeow3XnAB72JIg66c8wE=
 github.com/projectdiscovery/clistats v0.1.1/go.mod h1:4LtTC9Oy//RiuT1+76MfTg8Hqs7FQp1JIGBM3nHK6a0=
-github.com/projectdiscovery/dnsx v1.2.2 h1:ZjUov0GOyrS8ERlKAAhk+AOkqzaYHBzCP0qZfO+6Ihg=
-github.com/projectdiscovery/dnsx v1.2.2/go.mod h1:3iYm86OEqo0WxeGDkVl5WZNmG0qYE5TYNx8fBg6wX1I=
 github.com/projectdiscovery/dnsx v1.2.3 h1:S87U9kYuuqqvMFyen8mZQy1FMuR5EGCsXHqfHPQAeuc=
 github.com/projectdiscovery/dnsx v1.2.3/go.mod h1:NjAEyJt6+meNqZqnYHL4ZPxXfysuva+et56Eq/e1cVE=
 github.com/projectdiscovery/dsl v0.8.8 h1:UlcCf/2hfqqfDlhHWun3xT0u310iLWMiRoVw1t3TTLg=

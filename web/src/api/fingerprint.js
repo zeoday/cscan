@@ -88,6 +88,16 @@ export function saveHttpServiceConfig(data) {
   return request.post('/httpservice/config', data)
 }
 
+// 导出HTTP服务映射配置
+export function exportHttpServiceConfig() {
+  return request.post('/httpservice/export')
+}
+
+// 导入HTTP服务映射配置
+export function importHttpServiceConfig(data) {
+  return request.post('/httpservice/import', data)
+}
+
 
 // ==================== 主动扫描指纹 API ====================
 

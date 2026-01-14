@@ -1,20 +1,29 @@
-<template>
+﻿<template>
   <div class="login-container">
-    <!-- 主题切换按钮 -->
-    <div class="theme-switch" @click="themeStore.toggleTheme">
-      <el-icon v-if="themeStore.isDark"><Sunny /></el-icon>
-      <el-icon v-else><Moon /></el-icon>
+    <!-- 主题和语言切换按钮 -->
+    <div class="controls">
+      <!-- 语言切换 -->
+      <div class="control-btn" @click="localeStore.toggleLocale">
+        <el-icon><Position /></el-icon>
+        <span>{{ localeStore.currentLocale === 'zh-CN' ? 'EN' : '中' }}</span>
+      </div>
+      <!-- 主题切换 -->
+      <div class="control-btn" @click="themeStore.toggleTheme">
+        <el-icon v-if="themeStore.isDark"><Sunny /></el-icon>
+        <el-icon v-else><Moon /></el-icon>
+      </div>
     </div>
+    
     <div class="login-box">
       <div class="login-header">
         <h1>CSCAN</h1>
-        <p>资产安全扫描平台</p>
+        <p>{{ $t('auth.loginTitle') }}</p>
       </div>
       <el-form ref="formRef" :model="form" :rules="rules" class="login-form">
         <el-form-item prop="username">
           <el-input
             v-model="form.username"
-            placeholder="用户名"
+            :placeholder="$t('auth.username')"
             prefix-icon="User"
             size="large"
           />
@@ -23,7 +32,7 @@
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="密码"
+            :placeholder="$t('auth.password')"
             prefix-icon="Lock"
             size="large"
             show-password
@@ -38,7 +47,7 @@
             class="login-btn"
             @click="handleLogin"
           >
-            登 录
+            {{ $t('auth.login') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -47,16 +56,20 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
-import { Sunny, Moon } from '@element-plus/icons-vue'
+import { useLocaleStore } from '@/stores/locale'
+import { Sunny, Moon, Position } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const { t } = useI18n()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const localeStore = useLocaleStore()
 const formRef = ref()
 const loading = ref(false)
 
@@ -65,10 +78,10 @@ const form = reactive({
   password: ''
 })
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
+const rules = computed(() => ({
+  username: [{ required: true, message: t('auth.pleaseEnterUsername'), trigger: 'blur' }],
+  password: [{ required: true, message: t('auth.pleaseEnterPassword'), trigger: 'blur' }]
+}))
 
 async function handleLogin() {
   await formRef.value.validate()
@@ -76,10 +89,10 @@ async function handleLogin() {
   try {
     const res = await userStore.login(form)
     if (res.code === 0) {
-      ElMessage.success('登录成功')
+      ElMessage.success(t('auth.loginSuccess'))
       router.push('/dashboard')
     } else {
-      ElMessage.error(res.msg || '登录失败')
+      ElMessage.error(res.msg || t('auth.loginFailed'))
     }
   } finally {
     loading.value = false
@@ -87,21 +100,26 @@ async function handleLogin() {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .login-container {
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e8ecf1;
+  background: hsl(var(--background));
   position: relative;
   transition: background 0.3s;
 }
 
-.theme-switch {
+.controls {
   position: absolute;
   top: 20px;
   right: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.control-btn {
   cursor: pointer;
   width: 40px;
   height: 40px;
@@ -109,30 +127,35 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid #d0d5dd;
-  color: #667085;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s;
   
   &:hover {
     transform: scale(1.1);
-    border-color: #409eff;
-    color: #409eff;
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
   }
   
   .el-icon {
-    font-size: 20px;
+    font-size: 18px;
+  }
+  
+  span {
+    font-size: 12px;
+    font-weight: 600;
   }
 }
 
 .login-box {
   width: 400px;
   padding: 40px;
-  background: #fff;
+  background: hsl(var(--card));
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e4e7ed;
+  border: 1px solid hsl(var(--border));
   transition: all 0.3s;
 }
 
@@ -142,14 +165,14 @@ async function handleLogin() {
 
   h1 {
     font-size: 32px;
-    color: #1a1a2e;
+    color: hsl(var(--foreground));
     margin: 0 0 10px;
     letter-spacing: 4px;
     font-weight: 600;
   }
 
   p {
-    color: #606266;
+    color: hsl(var(--muted-foreground));
     margin: 0;
     font-size: 14px;
   }
@@ -157,36 +180,37 @@ async function handleLogin() {
 
 .login-form {
   :deep(.el-input__wrapper) {
-    background: #fff;
-    border: 1px solid #dcdfe6;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
     box-shadow: none;
     border-radius: 8px;
     
     &:hover {
-      border-color: #c0c4cc;
+      border-color: hsl(var(--border));
     }
     
     &.is-focus {
-      border-color: #409eff;
+      border-color: hsl(var(--primary));
     }
   }
   
   :deep(.el-input__inner) {
-    color: #303133;
+    color: hsl(var(--foreground));
     
     &::placeholder {
-      color: #a8abb2;
+      color: hsl(var(--muted-foreground));
     }
   }
   
   :deep(.el-input__prefix) {
-    color: #909399;
+    color: hsl(var(--muted-foreground));
   }
 
   .login-btn {
     width: 100%;
     height: 44px;
-    background: linear-gradient(90deg, #409eff 0%, #66b1ff 100%);
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
     border: none;
     border-radius: 8px;
     font-size: 16px;
@@ -194,70 +218,9 @@ async function handleLogin() {
     letter-spacing: 2px;
     
     &:hover {
-      background: linear-gradient(90deg, #66b1ff 0%, #409eff 100%);
+      background: hsl(var(--primary) / 0.9);
     }
   }
 }
 </style>
 
-<!-- 暗黑模式样式 -->
-<style lang="scss">
-html.dark {
-  .login-container {
-    background: #0d0d0d;
-  }
-  
-  .theme-switch {
-    background: #252525;
-    border-color: #333;
-    color: #fbbf24;
-    
-    &:hover {
-      border-color: #fbbf24;
-    }
-  }
-  
-  .login-box {
-    background: #1a1a1a;
-    border-color: #2a2a2a;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  }
-  
-  .login-header {
-    h1 {
-      color: #fff;
-    }
-    
-    p {
-      color: #888;
-    }
-  }
-  
-  .login-form {
-    .el-input__wrapper {
-      background: #252525 !important;
-      border-color: #333 !important;
-      
-      &:hover {
-        border-color: #444 !important;
-      }
-      
-      &.is-focus {
-        border-color: #409eff !important;
-      }
-    }
-    
-    .el-input__inner {
-      color: #fff !important;
-      
-      &::placeholder {
-        color: #666 !important;
-      }
-    }
-    
-    .el-input__prefix {
-      color: #666 !important;
-    }
-  }
-}
-</style>

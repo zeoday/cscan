@@ -86,6 +86,12 @@ const routes = [
         meta: { title: '任务管理', icon: 'List' }
       },
       {
+        path: 'cron-task',
+        name: 'CronTask',
+        component: lazyLoad(() => import('@/views/CronTask.vue')),
+        meta: { title: '定时扫描', icon: 'Timer' }
+      },
+      {
         path: 'vul',
         name: 'Vul',
         component: lazyLoad(() => import('@/views/Vul.vue')),
@@ -107,7 +113,25 @@ const routes = [
         path: 'worker',
         name: 'Worker',
         component: lazyLoad(() => import('@/views/Worker.vue')),
-        meta: { title: 'Worker管理', icon: 'Connection' }
+        meta: { title: 'Worker节点', icon: 'Connection' }
+      },
+      {
+        path: 'worker-logs',
+        name: 'WorkerLogs',
+        component: lazyLoad(() => import('@/views/WorkerLogs.vue')),
+        meta: { title: '运行日志', icon: 'Document' }
+      },
+      {
+        path: 'blacklist',
+        name: 'Blacklist',
+        component: lazyLoad(() => import('@/views/Blacklist.vue')),
+        meta: { title: '全局黑名单', icon: 'CircleClose' }
+      },
+      {
+        path: 'high-risk-filter',
+        name: 'HighRiskFilter',
+        component: lazyLoad(() => import('@/views/HighRiskFilter.vue')),
+        meta: { title: '高危过滤配置', icon: 'Warning' }
       },
       {
         path: 'worker/console/:name',

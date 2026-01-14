@@ -1,0 +1,41 @@
+# HTTP服务映射配置
+# 格式说明:
+# [service_mapping] 服务名称映射 (格式: 服务名=http/non_http # 描述)
+
+[service_mapping]
+# HTTP服务
+http=http # 标准HTTP服务
+https=http # 标准HTTPS服务
+http-proxy=http # HTTP代理服务
+https-alt=http # HTTPS备用端口
+http-alt=http # HTTP备用端口
+ajp12=http # Apache JServ Protocol
+esmagent=http # Enterprise Security Manager Agent
+
+# 非HTTP服务
+ssh=non_http # SSH远程登录
+ftp=non_http # FTP文件传输
+smtp=non_http # 邮件发送
+pop3=non_http # 邮件接收
+imap=non_http # 邮件访问
+mysql=non_http # MySQL数据库
+mssql=non_http # SQL Server数据库
+oracle=non_http # Oracle数据库
+postgresql=non_http # PostgreSQL数据库
+redis=non_http # Redis缓存
+mongodb=non_http # MongoDB数据库
+memcached=non_http # Memcached缓存
+elasticsearch=non_http # Elasticsearch搜索
+dns=non_http # DNS服务
+snmp=non_http # 网络管理
+ldap=non_http # 目录服务
+smb=non_http # 文件共享
+netbios=non_http # NetBIOS服务
+rdp=non_http # 远程桌面
+vnc=non_http # VNC远程桌面
+telnet=non_http # Telnet远程登录
+rpc=non_http # RPC服务
+ntp=non_http # 时间同步
+tftp=non_http # 简单文件传输
+sip=non_http # SIP通信
+rtsp=non_http # 流媒体

@@ -4,27 +4,27 @@
     <el-card class="search-card">
       <!-- Tab切换 -->
       <el-tabs v-model="activeTab" class="search-tabs">
-        <el-tab-pane label="快捷查询" name="quick">
+        <el-tab-pane :label="$t('asset.quickSearch')" name="quick">
           <div class="quick-search-form">
             <div class="search-row">
               <div class="search-item">
-                <label class="search-label">主机</label>
-                <el-input v-model="searchForm.host" placeholder="IP/域名" clearable @keyup.enter="handleSearch">
+                <label class="search-label">{{ $t('asset.host') }}</label>
+                <el-input v-model="searchForm.host" :placeholder="$t('asset.ipOrDomain')" clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Monitor /></el-icon>
                   </template>
                 </el-input>
               </div>
               <div class="search-item">
-                <label class="search-label">端口</label>
-                <el-input v-model.number="searchForm.port" placeholder="端口号" clearable @keyup.enter="handleSearch">
+                <label class="search-label">{{ $t('asset.port') }}</label>
+                <el-input v-model.number="searchForm.port" :placeholder="$t('asset.portNumber')" clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Connection /></el-icon>
                   </template>
                 </el-input>
               </div>
               <div class="search-item">
-                <label class="search-label">服务</label>
+                <label class="search-label">{{ $t('asset.service') }}</label>
                 <el-input v-model="searchForm.service" placeholder="http/ssh..." clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Service /></el-icon>
@@ -32,25 +32,25 @@
                 </el-input>
               </div>
               <div class="search-item">
-                <label class="search-label">标题</label>
-                <el-input v-model="searchForm.title" placeholder="网页标题" clearable @keyup.enter="handleSearch">
+                <label class="search-label">{{ $t('asset.pageTitle') }}</label>
+                <el-input v-model="searchForm.title" :placeholder="$t('asset.webPageTitle')" clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Document /></el-icon>
                   </template>
                 </el-input>
               </div>
               <div class="search-item">
-                <label class="search-label">应用</label>
-                <el-input v-model="searchForm.app" placeholder="指纹/应用" clearable @keyup.enter="handleSearch">
+                <label class="search-label">{{ $t('asset.app') }}</label>
+                <el-input v-model="searchForm.app" :placeholder="$t('asset.fingerprintApp')" clearable @keyup.enter="handleSearch">
                   <template #prefix>
                     <el-icon><Cpu /></el-icon>
                   </template>
                 </el-input>
               </div>
               <div class="search-item">
-                <label class="search-label">组织</label>
-                <el-select v-model="searchForm.orgId" placeholder="全部组织" clearable @change="handleSearch">
-                  <el-option label="全部组织" value="" />
+                <label class="search-label">{{ $t('task.organization') }}</label>
+                <el-select v-model="searchForm.orgId" :placeholder="$t('common.allOrganizations')" clearable @change="handleSearch">
+                  <el-option :label="$t('common.allOrganizations')" value="" />
                   <el-option
                     v-for="org in organizations"
                     :key="org.id"
@@ -62,17 +62,17 @@
             </div>
           </div>
         </el-tab-pane>
-      <el-tab-pane label="语法查询" name="syntax">
-          <el-input v-model="searchForm.query" placeholder="输入搜索语法，如: port=80 && service=http" style="width: 100%" @keyup.enter="handleSearch" />
+      <el-tab-pane :label="$t('asset.syntaxSearch')" name="syntax">
+          <el-input v-model="searchForm.query" :placeholder="$t('asset.syntaxPlaceholder')" style="width: 100%" @keyup.enter="handleSearch" />
           <div class="syntax-hints">
-            <span class="hint-title">语法示例：</span>
+            <span class="hint-title">{{ $t('asset.syntaxExample') }}</span>
             <span class="hint-item" @click="searchForm.query = 'port=80'">port=80</span>
             <span class="hint-item" @click="searchForm.query = 'port=80 && service=http'">port=80 && service=http</span>
             <span class="hint-item" @click="searchForm.query = 'title=&quot;后台管理&quot;'">title="后台管理"</span>
             <span class="hint-item" @click="searchForm.query = 'app=nginx && port=443'">app=nginx && port=443</span>
           </div>
         </el-tab-pane>
-        <el-tab-pane label="统计信息" name="stat">
+        <el-tab-pane :label="$t('asset.statistics')" name="stat">
           <div class="stat-panel">
             <div class="stat-column">
               <div class="stat-title">Port</div>
@@ -104,54 +104,54 @@
             </div>
             <div class="stat-column filter-column">
               <div class="filter-options">
-                <el-checkbox v-model="searchForm.onlyUpdated">只看有更新</el-checkbox>
-                <el-checkbox v-model="searchForm.sortByUpdate">按更新时间排序</el-checkbox>
+                <el-checkbox v-model="searchForm.onlyUpdated">{{ $t('asset.onlyUpdated') }}</el-checkbox>
+                <el-checkbox v-model="searchForm.sortByUpdate">{{ $t('asset.sortByUpdate') }}</el-checkbox>
               </div>
             </div>
           </div>
         </el-tab-pane>
       </el-tabs>
       <div class="search-actions">
-        <el-button type="primary" @click="handleSearch">搜索</el-button>
-        <el-button @click="handleReset">重置</el-button>
+        <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+        <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
       </div>
     </el-card>
 
     <!-- 数据表格 -->
     <el-card class="table-card">
       <div class="table-header">
-        <span class="total-info">共 {{ pagination.total }} 条记录，当前显示 {{ tableData.length }} 条</span>
+        <span class="total-info">{{ $t('asset.totalRecords', { total: pagination.total, current: tableData.length }) }}</span>
         <div class="table-actions">
           <el-dropdown :disabled="selectedRows.length === 0" @command="handleQuickScan">
             <el-button type="primary" size="small" :disabled="selectedRows.length === 0">
-              <el-icon><VideoPlay /></el-icon>快速扫描 ({{ selectedRows.length }})
+              <el-icon><VideoPlay /></el-icon>{{ $t('asset.quickScan') }} ({{ selectedRows.length }})
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="portscan">端口扫描</el-dropdown-item>
-                <el-dropdown-item command="portidentify">端口识别 (Nmap)</el-dropdown-item>
-                <el-dropdown-item command="fingerprint">指纹识别</el-dropdown-item>
-                <el-dropdown-item command="pocscan">漏洞扫描</el-dropdown-item>
-                <el-dropdown-item divided command="custom">自定义扫描...</el-dropdown-item>
+                <el-dropdown-item command="portscan">{{ $t('task.portScan') }}</el-dropdown-item>
+                <el-dropdown-item command="portidentify">{{ $t('task.portIdentify') }} (Nmap)</el-dropdown-item>
+                <el-dropdown-item command="fingerprint">{{ $t('task.fingerprintScan') }}</el-dropdown-item>
+                <el-dropdown-item command="pocscan">{{ $t('task.vulScan') }}</el-dropdown-item>
+                <el-dropdown-item divided command="custom">{{ $t('asset.customScan') }}...</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
           <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            <el-icon><Delete /></el-icon>批量删除 ({{ selectedRows.length }})
+            <el-icon><Delete /></el-icon>{{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
         </div>
       </div>
       <el-table :data="tableData" v-loading="loading" stripe size="small" max-height="500" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
-        <el-table-column type="index" label="序号" width="60" />
-        <el-table-column label="资产-组织" min-width="160">
+        <el-table-column type="index" :label="$t('asset.index')" width="60" />
+        <el-table-column :label="$t('asset.assetOrg')" min-width="160">
           <template #default="{ row }">
             <div class="asset-cell">
               <a :href="getAssetUrl(row)" target="_blank" class="asset-link">{{ row.authority }}</a>
               <el-icon v-if="row.authority" class="link-icon"><Link /></el-icon>
             </div>
-            <div class="org-text">{{ row.orgName || '默认组织' }}</div>
+            <div class="org-text">{{ row.orgName || $t('common.defaultOrganization') }}</div>
           </template>
         </el-table-column>
         <el-table-column label="IP" width="140">
@@ -160,13 +160,13 @@
             <div v-if="row.location && row.location !== 'IANA'" class="location-text">{{ row.location }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="端口-协议" width="120">
+        <el-table-column :label="$t('asset.portProtocol')" width="120">
           <template #default="{ row }">
             <span class="port-text">{{ row.port }}</span>
             <span v-if="row.service" class="service-text">{{ row.service }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="标题-指纹" min-width="200">
+        <el-table-column :label="$t('asset.titleFingerprint')" min-width="200">
           <template #default="{ row }">
             <div class="title-text" :title="row.title">{{ row.title || '-' }}</div>
             <div class="app-tags-container">
@@ -189,7 +189,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="指纹信息" min-width="320">
+        <el-table-column :label="$t('asset.fingerprintInfo')" min-width="320">
           <template #default="{ row }">
             <div class="fingerprint-info">
               <el-tabs v-if="row.httpHeader || row.httpStatus || row.httpBody || row.banner || row.iconHash" type="border-card" class="fingerprint-tabs">
@@ -200,22 +200,22 @@
                 </el-tab-pane>
                 <el-tab-pane label="Body">
                   <pre v-if="row.httpBody" class="tab-content">{{ row.httpBody }}</pre>
-                  <span v-else class="no-data">无内容</span>
+                  <span v-else class="no-data">{{ $t('asset.noContent') }}</span>
                 </el-tab-pane>
                 <el-tab-pane label="IconHash">
                   <div v-if="row.iconHash" class="icon-hash-content">
-                    <el-tooltip content="点击复制" placement="top">
+                    <el-tooltip :content="$t('asset.clickToCopy')" placement="top">
                       <span class="icon-hash-value" @click="copyIconHash(row.iconHash)">{{ row.iconHash }}</span>
                     </el-tooltip>
                   </div>
-                  <span v-else class="no-data">无IconHash</span>
+                  <span v-else class="no-data">{{ $t('asset.noIconHash') }}</span>
                 </el-tab-pane>
               </el-tabs>
               <span v-else class="no-data">-</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Web截屏" width="100" align="center">
+        <el-table-column :label="$t('asset.webScreenshot')" width="100" align="center">
           <template #default="{ row }">
             <el-image 
               v-if="row.screenshot" 
@@ -230,11 +230,11 @@
             <span v-else class="no-screenshot">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="更新时间" width="160">
+        <el-table-column :label="$t('common.updateTime')" width="160">
           <template #default="{ row }">
             <div class="update-time">{{ formatTime(row.updateTime) }}</div>
-            <el-tag v-if="row.isNew" type="success" size="small" effect="dark" class="mark-tag">新</el-tag>
-            <el-tag v-if="row.isUpdated" type="warning" size="small" effect="dark" class="mark-tag" style="cursor: pointer" @click="showHistory(row)">更新</el-tag>
+            <el-tag v-if="row.isNew" type="success" size="small" effect="dark" class="mark-tag">{{ $t('common.new') }}</el-tag>
+            <el-tag v-if="row.isUpdated" type="warning" size="small" effect="dark" class="mark-tag" style="cursor: pointer" @click="showHistory(row)">{{ $t('asset.updated') }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -252,26 +252,26 @@
     </el-card>
 
     <!-- 历史记录对话框 -->
-    <el-dialog v-model="historyVisible" title="资产扫描历史" width="800px">
+    <el-dialog v-model="historyVisible" :title="$t('asset.scanHistory')" width="800px">
       <div v-if="currentAsset" class="history-current">
-        <span>当前资产: </span>
+        <span>{{ $t('asset.currentAsset') }}: </span>
         <strong>{{ currentAsset.authority }}</strong>
-        <span style="margin-left: 15px; color: #909399">{{ currentAsset.host }}:{{ currentAsset.port }}</span>
+        <span class="text-secondary" style="margin-left: 15px">{{ currentAsset.host }}:{{ currentAsset.port }}</span>
       </div>
       <el-table :data="historyList" v-loading="historyLoading" stripe size="small" max-height="400">
-        <el-table-column prop="createTime" label="扫描时间" width="160" />
-        <el-table-column prop="title" label="标题" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="service" label="服务" width="80" />
-        <el-table-column prop="httpStatus" label="状态码" width="80" />
-        <el-table-column label="应用" min-width="150">
+        <el-table-column prop="createTime" :label="$t('asset.scanTime')" width="160" />
+        <el-table-column prop="title" :label="$t('asset.pageTitle')" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="service" :label="$t('asset.service')" width="80" />
+        <el-table-column prop="httpStatus" :label="$t('asset.statusCode')" width="80" />
+        <el-table-column :label="$t('asset.app')" min-width="150">
           <template #default="{ row }">
             <el-tag v-for="app in (row.app || []).slice(0, 3)" :key="app" size="small" type="success" style="margin-right: 4px">
               {{ app }}
             </el-tag>
-            <span v-if="(row.app || []).length > 3" style="color: #909399; font-size: 12px">+{{ (row.app || []).length - 3 }}</span>
+            <span v-if="(row.app || []).length > 3" class="hint-secondary">+{{ (row.app || []).length - 3 }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="截图" width="80" align="center">
+        <el-table-column :label="$t('asset.screenshot')" width="80" align="center">
           <template #default="{ row }">
             <el-image 
               v-if="row.screenshot" 
@@ -282,35 +282,35 @@
               fit="cover"
               style="width: 50px; height: 40px; border-radius: 4px"
             />
-            <span v-else style="color: #c0c4cc">-</span>
+            <span v-else class="text-secondary">-</span>
           </template>
         </el-table-column>
       </el-table>
       <div v-if="!historyLoading && historyList.length === 0" class="history-empty">
-        暂无历史记录
+        {{ $t('asset.noHistory') }}
       </div>
     </el-dialog>
 
     <!-- 自定义扫描配置对话框 -->
-    <el-dialog v-model="scanDialogVisible" title="扫描配置" width="650px" top="5vh">
+    <el-dialog v-model="scanDialogVisible" :title="$t('asset.scanConfig')" width="650px" top="5vh">
       <div class="scan-target-info">
         <el-icon><Aim /></el-icon>
-        <span>已选择 {{ selectedRows.length }} 个资产 (将使用已知的 IP:Port 进行扫描)</span>
+        <span>{{ $t('asset.selectedAssets', { count: selectedRows.length }) }}</span>
       </div>
       <el-form label-width="100px" class="scan-form">
-        <el-form-item label="任务名称">
-          <el-input v-model="scanForm.name" placeholder="资产扫描任务" />
+        <el-form-item :label="$t('task.taskName')">
+          <el-input v-model="scanForm.name" :placeholder="$t('asset.assetScanTask')" />
         </el-form-item>
         
-        <el-divider content-position="left">端口扫描</el-divider>
-        <el-form-item label="启用">
+        <el-divider content-position="left">{{ $t('task.portScan') }}</el-divider>
+        <el-form-item :label="$t('task.enable')">
           <el-switch v-model="scanForm.portscanEnable" />
-          <span class="form-hint">重新扫描端口 (会忽略已知端口)</span>
+          <span class="form-hint">{{ $t('asset.rescanPortHint') }}</span>
         </el-form-item>
         <template v-if="scanForm.portscanEnable">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="扫描工具">
+              <el-form-item :label="$t('task.scanTool')">
                 <el-radio-group v-model="scanForm.portscanTool">
                   <el-radio label="naabu">Naabu</el-radio>
                   <el-radio label="masscan">Masscan</el-radio>
@@ -318,105 +318,105 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="端口范围">
+              <el-form-item :label="$t('task.portRange')">
                 <el-select v-model="scanForm.ports" style="width: 100%">
                   <el-option label="top100" value="top100" />
                   <el-option label="top1000" value="top1000" />
-                  <el-option label="全端口 1-65535" value="1-65535" />
+                  <el-option :label="$t('task.allPorts') + ' 1-65535'" value="1-65535" />
                 </el-select>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="扫描速率">
+              <el-form-item :label="$t('task.scanRate')">
                 <el-input-number v-model="scanForm.portscanRate" :min="100" :max="100000" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="端口阈值">
+              <el-form-item :label="$t('task.portThreshold')">
                 <el-input-number v-model="scanForm.portThreshold" :min="0" :max="65535" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="超时(秒)">
+              <el-form-item :label="$t('task.timeoutSeconds')">
                 <el-input-number v-model="scanForm.portscanTimeout" :min="5" :max="1200" style="width:100%" />
               </el-form-item>
             </el-col>
           </el-row>
-          <el-form-item label="高级选项">
+          <el-form-item :label="$t('task.advancedOptions')">
             <div style="display: block; width: 100%">
-              <el-checkbox v-model="scanForm.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
+              <el-checkbox v-model="scanForm.skipHostDiscovery">{{ $t('task.skipHostDiscovery') }} (-Pn)</el-checkbox>
             </div>
             <div v-if="scanForm.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
-              <el-checkbox v-model="scanForm.excludeCDN">排除 CDN/WAF (-ec)</el-checkbox>
+              <el-checkbox v-model="scanForm.excludeCDN">{{ $t('task.excludeCdnWaf') }} (-ec)</el-checkbox>
             </div>
           </el-form-item>
-          <el-form-item label="排除目标">
+          <el-form-item :label="$t('task.excludeTargets')">
             <el-input v-model="scanForm.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
-            <span class="form-hint">排除的 IP/CIDR，逗号分隔</span>
+            <span class="form-hint">{{ $t('task.excludeTargetsHint') }}</span>
           </el-form-item>
         </template>
         
-        <el-divider content-position="left">端口识别</el-divider>
-        <el-form-item label="启用">
+        <el-divider content-position="left">{{ $t('task.portIdentify') }}</el-divider>
+        <el-form-item :label="$t('task.enable')">
           <el-switch v-model="scanForm.portidentifyEnable" />
-          <span class="form-hint">Nmap 服务版本探测</span>
+          <span class="form-hint">{{ $t('asset.nmapServiceProbe') }}</span>
         </el-form-item>
         <template v-if="scanForm.portidentifyEnable">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="超时(秒)">
+              <el-form-item :label="$t('task.timeoutSeconds')">
                 <el-input-number v-model="scanForm.portidentifyTimeout" :min="5" :max="300" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Nmap参数">
+              <el-form-item :label="$t('task.nmapParams')">
                 <el-input v-model="scanForm.portidentifyArgs" placeholder="-sV" />
               </el-form-item>
             </el-col>
           </el-row>
         </template>
         
-        <el-divider content-position="left">指纹识别</el-divider>
-        <el-form-item label="启用">
+        <el-divider content-position="left">{{ $t('task.fingerprintScan') }}</el-divider>
+        <el-form-item :label="$t('task.enable')">
           <el-switch v-model="scanForm.fingerprintEnable" />
-          <span class="form-hint">Web指纹探测</span>
+          <span class="form-hint">{{ $t('asset.webFingerprintProbe') }}</span>
         </el-form-item>
         <template v-if="scanForm.fingerprintEnable">
-          <el-form-item label="探测工具">
+          <el-form-item :label="$t('task.probeTool')">
             <el-radio-group v-model="scanForm.fingerprintTool">
               <el-radio label="httpx">Httpx</el-radio>
               <el-radio label="builtin">Wappalyzer</el-radio>
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="附加功能">
-            <el-checkbox v-model="scanForm.fingerprintIconHash">IconHash</el-checkbox>
-            <el-checkbox v-model="scanForm.fingerprintCustomEngine">自定义指纹</el-checkbox>
-            <el-checkbox v-model="scanForm.fingerprintScreenshot">截图</el-checkbox>
+          <el-form-item :label="$t('task.additionalFeatures')">
+            <el-checkbox v-model="scanForm.fingerprintIconHash">{{ $t('task.iconHash') }}</el-checkbox>
+            <el-checkbox v-model="scanForm.fingerprintCustomEngine">{{ $t('task.customFingerprint') }}</el-checkbox>
+            <el-checkbox v-model="scanForm.fingerprintScreenshot">{{ $t('task.screenshot') }}</el-checkbox>
           </el-form-item>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="超时(秒)">
+              <el-form-item :label="$t('task.timeoutSeconds')">
                 <el-input-number v-model="scanForm.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
-                <span class="form-hint">并发数由Worker设置控制</span>
+                <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
               </el-form-item>
             </el-col>
           </el-row>
         </template>
         
-        <el-divider content-position="left">漏洞扫描</el-divider>
-        <el-form-item label="启用">
+        <el-divider content-position="left">{{ $t('task.vulScan') }}</el-divider>
+        <el-form-item :label="$t('task.enable')">
           <el-switch v-model="scanForm.pocscanEnable" />
-          <span class="form-hint">Nuclei POC扫描</span>
+          <span class="form-hint">{{ $t('task.useNucleiEngine') }}</span>
         </el-form-item>
         <template v-if="scanForm.pocscanEnable">
-          <el-form-item label="扫描模式">
-            <el-checkbox v-model="scanForm.pocscanAutoScan" :disabled="scanForm.pocscanCustomOnly">标签映射</el-checkbox>
-            <el-checkbox v-model="scanForm.pocscanAutomaticScan" :disabled="scanForm.pocscanCustomOnly">Wappalyzer自动</el-checkbox>
-            <el-checkbox v-model="scanForm.pocscanCustomOnly">只用自定义POC</el-checkbox>
+          <el-form-item :label="$t('asset.scanMode')">
+            <el-checkbox v-model="scanForm.pocscanAutoScan" :disabled="scanForm.pocscanCustomOnly">{{ $t('task.customTagMapping') }}</el-checkbox>
+            <el-checkbox v-model="scanForm.pocscanAutomaticScan" :disabled="scanForm.pocscanCustomOnly">{{ $t('task.webFingerprintAutoMatch') }}</el-checkbox>
+            <el-checkbox v-model="scanForm.pocscanCustomOnly">{{ $t('task.onlyUseCustomPoc') }}</el-checkbox>
           </el-form-item>
-          <el-form-item label="严重级别">
+          <el-form-item :label="$t('task.severityLevel')">
             <el-checkbox-group v-model="scanForm.pocscanSeverity">
               <el-checkbox label="critical">Critical</el-checkbox>
               <el-checkbox label="high">High</el-checkbox>
@@ -425,15 +425,15 @@
               <el-checkbox label="info">Info</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
-          <el-form-item label="目标超时">
+          <el-form-item :label="$t('task.targetTimeout')">
             <el-input-number v-model="scanForm.pocscanTargetTimeout" :min="30" :max="600" />
-            <span class="form-hint">秒</span>
+            <span class="form-hint">{{ $t('task.seconds') }}</span>
           </el-form-item>
         </template>
       </el-form>
       <template #footer>
-        <el-button @click="scanDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="scanSubmitting" @click="handleScanSubmit">创建并启动</el-button>
+        <el-button @click="scanDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="scanSubmitting" @click="handleScanSubmit">{{ $t('asset.createAndStart') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -441,12 +441,15 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Link, Monitor, Connection, Service, Document, Cpu, VideoPlay, ArrowDown, Aim } from '@element-plus/icons-vue'
 import { getAssetList, getAssetStat, deleteAsset, batchDeleteAsset, getAssetHistory } from '@/api/asset'
 import { createTask, startTask } from '@/api/task'
 import { useWorkspaceStore } from '@/stores/workspace'
 import request from '@/api/request'
+
+const { t } = useI18n()
 
 const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
@@ -695,10 +698,10 @@ function handleReset() {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该资产吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('asset.confirmDeleteAsset'), t('common.tip'), { type: 'warning' })
   const res = await deleteAsset({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     loadData()
     loadStat()
   }
@@ -710,11 +713,11 @@ function handleSelectionChange(rows) {
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 条资产吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('asset.confirmBatchDeleteAsset', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ids = selectedRows.value.map(row => row.id)
   const res = await batchDeleteAsset({ ids })
   if (res.code === 0) {
-    ElMessage.success(`成功删除 ${selectedRows.value.length} 条资产`)
+    ElMessage.success(t('asset.batchDeleteSuccess', { count: selectedRows.value.length }))
     selectedRows.value = []
     loadData()
     loadStat()
@@ -733,10 +736,10 @@ async function showHistory(row) {
     if (res.code === 0) {
       historyList.value = res.list || []
     } else {
-      ElMessage.error(res.msg || '获取历史记录失败')
+      ElMessage.error(res.msg || t('asset.getHistoryFailed'))
     }
   } catch (e) {
-    ElMessage.error('获取历史记录失败')
+    ElMessage.error(t('asset.getHistoryFailed'))
   } finally {
     historyLoading.value = false
   }
@@ -915,7 +918,7 @@ function copyIconHash(hash) {
 // 快速扫描处理
 function handleQuickScan(command) {
   if (selectedRows.value.length === 0) {
-    ElMessage.warning('请先选择要扫描的资产')
+    ElMessage.warning(t('asset.pleaseSelectAssets'))
     return
   }
   
@@ -1035,18 +1038,18 @@ function buildScanConfig() {
 async function doCreateScanTask() {
   const targets = buildScanTargets()
   if (!targets) {
-    ElMessage.warning('没有有效的扫描目标')
+    ElMessage.warning(t('asset.noValidTargets'))
     return
   }
   
   const config = buildScanConfig()
-  const taskName = scanForm.name || '资产扫描'
+  const taskName = scanForm.name || t('asset.assetScan')
   
   try {
     scanSubmitting.value = true
     const wsId = workspaceStore.currentWorkspaceId === 'all' ? '' : (workspaceStore.currentWorkspaceId || '')
     const res = await createTask({
-      name: `${taskName} (${selectedRows.value.length}个资产)`,
+      name: `${taskName} (${selectedRows.value.length}${t('asset.assetsCount')})`,
       target: targets,
       workspaceId: wsId,
       config: JSON.stringify(config)
@@ -1058,20 +1061,20 @@ async function doCreateScanTask() {
       if (taskId) {
         const startRes = await startTask({ id: taskId, workspaceId: wsId || res.workspaceId })
         if (startRes.code === 0) {
-          ElMessage.success('扫描任务已创建并启动')
+          ElMessage.success(t('asset.taskCreatedAndStarted'))
         } else {
-          ElMessage.success('任务创建成功，但启动失败: ' + (startRes.msg || ''))
+          ElMessage.success(t('asset.taskCreatedButStartFailed') + (startRes.msg || ''))
         }
       } else {
-        ElMessage.success('扫描任务创建成功')
+        ElMessage.success(t('asset.taskCreatedSuccess'))
       }
       scanDialogVisible.value = false
       selectedRows.value = []
     } else {
-      ElMessage.error(res.msg || '创建任务失败')
+      ElMessage.error(res.msg || t('asset.createTaskFailed'))
     }
   } catch (e) {
-    ElMessage.error('创建任务失败')
+    ElMessage.error(t('asset.createTaskFailed'))
   } finally {
     scanSubmitting.value = false
   }
@@ -1080,7 +1083,7 @@ async function doCreateScanTask() {
 // 提交自定义扫描
 async function handleScanSubmit() {
   if (!scanForm.portscanEnable && !scanForm.portidentifyEnable && !scanForm.fingerprintEnable && !scanForm.pocscanEnable) {
-    ElMessage.warning('请至少选择一个扫描阶段')
+    ElMessage.warning(t('asset.pleaseSelectScanStage'))
     return
   }
   await doCreateScanTask()
@@ -1174,8 +1177,8 @@ async function handleScanSubmit() {
           cursor: pointer;
           
           &:hover {
-            background: rgba(64, 158, 255, 0.1);
-            color: #409eff;
+            background: var(--el-color-primary-light-9);
+            color: var(--el-color-primary);
           }
         }
       }
@@ -1205,7 +1208,7 @@ async function handleScanSubmit() {
         color: var(--el-text-color-primary);
         margin-bottom: 8px;
         padding-bottom: 5px;
-        border-bottom: 2px solid #409eff;
+        border-bottom: 2px solid var(--el-color-primary);
       }
       
       .stat-item {
@@ -1223,15 +1226,15 @@ async function handleScanSubmit() {
           min-width: 30px;
           padding: 1px 6px;
           margin-right: 8px;
-          background: #409eff;
-          color: #fff;
+          background: var(--el-color-primary);
+          color: var(--el-color-white);
           border-radius: 3px;
           font-size: 12px;
           text-align: center;
         }
         
         .stat-name {
-          color: #409eff;
+          color: var(--el-color-primary);
           font-size: 13px;
         }
       }
@@ -1266,7 +1269,7 @@ async function handleScanSubmit() {
       align-items: center;
       
       .asset-link {
-        color: #409eff;
+        color: var(--el-color-primary);
         text-decoration: none;
         
         &:hover {
@@ -1277,7 +1280,7 @@ async function handleScanSubmit() {
       .link-icon {
         margin-left: 4px;
         font-size: 12px;
-        color: #409eff;
+        color: var(--el-color-primary);
       }
     }
     
@@ -1292,7 +1295,7 @@ async function handleScanSubmit() {
     }
 
     .service-text {
-      color: #67c23a;
+      color: var(--el-color-success);
       font-size: 12px;
     }
     
@@ -1420,7 +1423,7 @@ async function handleScanSubmit() {
       .icon-hash-value {
         font-family: Consolas, Monaco, monospace;
         font-size: 13px;
-        color: #409eff;
+        color: var(--el-color-primary);
         cursor: pointer;
         
         &:hover {

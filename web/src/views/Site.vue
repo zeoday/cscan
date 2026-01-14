@@ -1,19 +1,19 @@
-<template>
+﻿<template>
   <div class="site-page">
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :inline="true" class="search-form">
-        <el-form-item label="站点">
-          <el-input v-model="searchForm.site" placeholder="URL/域名" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('site.site')">
+          <el-input v-model="searchForm.site" :placeholder="$t('site.url')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="标题">
-          <el-input v-model="searchForm.title" placeholder="网页标题" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('site.pageTitle')">
+          <el-input v-model="searchForm.title" :placeholder="$t('site.pageTitle')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="指纹">
-          <el-input v-model="searchForm.app" placeholder="应用指纹" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('site.fingerprint')">
+          <el-input v-model="searchForm.app" :placeholder="$t('site.fingerprint')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="状态码">
-          <el-select v-model="searchForm.httpStatus" placeholder="全部" clearable style="width: 100px">
+        <el-form-item :label="$t('site.statusCode')">
+          <el-select v-model="searchForm.httpStatus" :placeholder="$t('common.all')" clearable style="width: 100px">
             <el-option label="200" value="200" />
             <el-option label="301" value="301" />
             <el-option label="302" value="302" />
@@ -22,15 +22,15 @@
             <el-option label="500" value="500" />
           </el-select>
         </el-form-item>
-        <el-form-item label="组织">
-          <el-select v-model="searchForm.orgId" placeholder="全部组织" clearable style="width: 140px">
-            <el-option label="全部组织" value="" />
+        <el-form-item :label="$t('site.organization')">
+          <el-select v-model="searchForm.orgId" :placeholder="$t('common.allOrganizations')" clearable style="width: 140px">
+            <el-option :label="$t('common.allOrganizations')" value="" />
             <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -40,25 +40,25 @@
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.total }}</div>
-          <div class="stat-label">站点总数</div>
+          <div class="stat-label">{{ $t('site.totalSites') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.httpCount }}</div>
-          <div class="stat-label">HTTP站点</div>
+          <div class="stat-label">{{ $t('site.httpSites') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.httpsCount }}</div>
-          <div class="stat-label">HTTPS站点</div>
+          <div class="stat-label">{{ $t('site.httpsSites') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.newCount }}</div>
-          <div class="stat-label">新增站点</div>
+          <div class="stat-label">{{ $t('site.newSites') }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -66,17 +66,17 @@
     <!-- 数据表格 -->
     <el-card class="table-card">
       <div class="table-header">
-        <span class="total-info">共 {{ pagination.total }} 个站点</span>
+        <span class="total-info">{{ $t('common.total') }} {{ pagination.total }} {{ $t('site.site') }}</span>
         <div class="table-actions">
           <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            批量删除 ({{ selectedRows.length }})
+            {{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
         </div>
       </div>
       
       <el-table :data="tableData" v-loading="loading" stripe @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
-        <el-table-column label="站点" min-width="280">
+        <el-table-column :label="$t('site.site')" min-width="280">
           <template #default="{ row }">
             <div class="site-cell">
               <el-image 
@@ -102,12 +102,12 @@
             <div v-if="row.location" class="location-text">{{ row.location }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="80" align="center">
+        <el-table-column :label="$t('common.status')" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.httpStatus)" size="small">{{ row.httpStatus || '-' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="指纹" min-width="200">
+        <el-table-column :label="$t('site.fingerprint')" min-width="200">
           <template #default="{ row }">
             <div class="app-tags">
               <el-tag v-for="app in (row.app || []).slice(0, 5)" :key="app" size="small" type="success" class="app-tag">
@@ -117,20 +117,20 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="组织" width="120">
+        <el-table-column :label="$t('site.organization')" width="120">
           <template #default="{ row }">
-            {{ row.orgName || '默认组织' }}
+            {{ row.orgName || $t('common.defaultOrganization') }}
           </template>
         </el-table-column>
-        <el-table-column label="更新时间" width="160">
+        <el-table-column :label="$t('common.updateTime')" width="160">
           <template #default="{ row }">
             {{ row.updateTime }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column :label="$t('common.operation')" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="showDetail(row)">{{ $t('common.detail') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -148,22 +148,22 @@
     </el-card>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="站点详情" width="800px">
+    <el-dialog v-model="detailVisible" :title="$t('site.siteDetail')" width="800px">
       <el-descriptions v-if="currentSite" :column="2" border>
-        <el-descriptions-item label="站点URL" :span="2">
+        <el-descriptions-item :label="$t('site.siteUrl')" :span="2">
           <a :href="currentSite.site" target="_blank">{{ currentSite.site }}</a>
         </el-descriptions-item>
-        <el-descriptions-item label="标题" :span="2">{{ currentSite.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.pageTitle')" :span="2">{{ currentSite.title || '-' }}</el-descriptions-item>
         <el-descriptions-item label="IP">{{ currentSite.ip }}</el-descriptions-item>
-        <el-descriptions-item label="端口">{{ currentSite.port }}</el-descriptions-item>
-        <el-descriptions-item label="状态码">{{ currentSite.httpStatus }}</el-descriptions-item>
-        <el-descriptions-item label="服务">{{ currentSite.service }}</el-descriptions-item>
-        <el-descriptions-item label="指纹" :span="2">
+        <el-descriptions-item :label="$t('site.port')">{{ currentSite.port }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.statusCode')">{{ currentSite.httpStatus }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.service')">{{ currentSite.service }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('site.fingerprint')" :span="2">
           <el-tag v-for="app in (currentSite.app || [])" :key="app" size="small" type="success" style="margin-right: 4px">
             {{ app }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="响应头" :span="2">
+        <el-descriptions-item :label="$t('site.responseHeader')" :span="2">
           <pre class="header-pre">{{ currentSite.httpHeader || '-' }}</pre>
         </el-descriptions-item>
       </el-descriptions>
@@ -173,10 +173,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
 import { useWorkspaceStore } from '@/stores/workspace'
 
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const tableData = ref([])
@@ -284,21 +286,21 @@ function handleSelectionChange(rows) {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该站点吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('site.confirmDeleteSite'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/asset/delete', { id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     loadData()
   }
 }
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 个站点吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('site.confirmBatchDeleteSite', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ids = selectedRows.value.map(row => row.id)
   const res = await request.post('/asset/batchDelete', { ids })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     selectedRows.value = []
     loadData()
   }
@@ -335,7 +337,7 @@ function getAppName(app) {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .site-page {
   .search-card {
     margin-bottom: 16px;
@@ -447,3 +449,4 @@ function getAppName(app) {
   }
 }
 </style>
+

@@ -160,6 +160,10 @@ func (l *MainTaskListLogic) MainTaskList(req *types.MainTaskListReq, workspaceId
 			// 进度 = 已完成子任务数 / 总子任务数 * 100
 			if subTaskCount > 0 {
 				progress = subTaskDone * 100 / subTaskCount
+				// 确保进度不超过100%（防止异常数据）
+				if progress > 100 {
+					progress = 100
+				}
 				// 未全部完成时最多显示99%
 				if progress > 99 && subTaskDone < subTaskCount {
 					progress = 99
@@ -307,8 +311,6 @@ func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, works
 		ProfileId:   req.ProfileId,
 		ProfileName: profileName,
 		OrgId:       req.OrgId,
-		IsCron:      req.IsCron,
-		CronRule:    req.CronRule,
 		Config:      string(configBytes),
 		Status:      model.TaskStatusCreated, // 设置初始状态
 	}

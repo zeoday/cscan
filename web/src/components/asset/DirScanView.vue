@@ -1,16 +1,16 @@
-<template>
+﻿<template>
   <div class="dirscan-view">
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :model="searchForm" inline>
-        <el-form-item label="目标">
-          <el-input v-model="searchForm.authority" placeholder="IP:端口" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('dirscan.target')">
+          <el-input v-model="searchForm.authority" :placeholder="$t('dirscan.targetPlaceholder')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="路径">
-          <el-input v-model="searchForm.path" placeholder="路径关键词" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('dirscan.path')">
+          <el-input v-model="searchForm.path" :placeholder="$t('dirscan.pathPlaceholder')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="状态码">
-          <el-select v-model="searchForm.statusCode" placeholder="全部" clearable style="width: 120px">
+        <el-form-item :label="$t('dirscan.statusCode')">
+          <el-select v-model="searchForm.statusCode" :placeholder="$t('common.all')" clearable style="width: 120px">
             <el-option label="200" :value="200" />
             <el-option label="301" :value="301" />
             <el-option label="302" :value="302" />
@@ -20,9 +20,9 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-          <el-button type="danger" plain @click="handleClear">清空数据</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
+          <el-button type="danger" plain @click="handleClear">{{ $t('dirscan.clearData') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -32,7 +32,7 @@
       <el-col :span="4">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.total }}</div>
-          <div class="stat-label">总数</div>
+          <div class="stat-label">{{ $t('dirscan.total') }}</div>
         </el-card>
       </el-col>
       <el-col :span="4">
@@ -64,17 +64,18 @@
     <!-- 按目标分组的折叠面板 -->
     <el-card class="collapse-card" v-loading="loading">
       <div class="collapse-header">
-        <span class="total-info">共 {{ Object.keys(groupedData).length }} 个目标，{{ pagination.total }} 条记录</span>
+        <span class="total-info">{{ $t('dirscan.totalTargets', { targets: Object.keys(groupedData).length, records: pagination.total }) }}</span>
         <div class="collapse-actions">
-          <el-button size="small" @click="expandAll">全部展开</el-button>
-          <el-button size="small" @click="collapseAll">全部收起</el-button>
+          <el-button size="small" @click="expandAll">{{ $t('dirscan.expandAll') }}</el-button>
+          <el-button size="small" @click="collapseAll">{{ $t('dirscan.collapseAll') }}</el-button>
           <el-dropdown style="margin-left: 10px" @command="handleExport">
             <el-button type="success" size="small">
-              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              {{ $t('common.export') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="all-url">导出全部URL</el-dropdown-item>
+                <el-dropdown-item command="all-url">{{ $t('dirscan.exportAllUrl') }}</el-dropdown-item>
+                <el-dropdown-item command="csv">{{ $t('dirscan.exportCsv') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -89,43 +90,47 @@
               <el-badge :value="items.length" :max="999" type="primary" style="margin-left: 10px" />
             </div>
           </template>
-          <el-table :data="items" stripe size="small" max-height="400">
+          <el-table :data="items" stripe size="small" max-height="400" @sort-change="handleSortChange">
             <el-table-column prop="url" label="URL" min-width="300" show-overflow-tooltip>
               <template #default="{ row }">
                 <a :href="row.url" target="_blank" rel="noopener" class="url-link">{{ row.url }}</a>
               </template>
             </el-table-column>
-            <el-table-column prop="path" label="路径" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="statusCode" label="状态码" width="90">
+            <el-table-column prop="path" :label="$t('dirscan.path')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="statusCode" :label="$t('dirscan.statusCode')" width="100" sortable="custom">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.statusCode)" size="small">{{ row.statusCode }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="contentLength" label="大小" width="90">
+            <el-table-column prop="contentLength" :label="$t('dirscan.size')" width="100" sortable="custom">
               <template #default="{ row }">{{ formatSize(row.contentLength) }}</template>
             </el-table-column>
-            <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="createTime" label="发现时间" width="150" />
-            <el-table-column label="操作" width="80" fixed="right">
+            <el-table-column prop="title" :label="$t('dirscan.title')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="contentType" :label="$t('dirscan.contentType')" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="redirectUrl" :label="$t('dirscan.redirectUrl')" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="createTime" :label="$t('dirscan.discoveryTime')" width="150" />
+            <el-table-column :label="$t('common.operation')" width="80" fixed="right">
               <template #default="{ row }">
-                <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+                <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-collapse-item>
       </el-collapse>
 
-      <el-empty v-if="Object.keys(groupedData).length === 0 && !loading" description="暂无数据" />
+      <el-empty v-if="Object.keys(groupedData).length === 0 && !loading" :description="$t('common.noData')" />
     </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
+const { t } = useI18n()
 const emit = defineEmits(['data-changed'])
 
 const loading = ref(false)
@@ -133,6 +138,7 @@ const tableData = ref([])
 const activeNames = ref([])
 
 const searchForm = reactive({ authority: '', path: '', statusCode: null })
+const sortForm = reactive({ sortField: '', sortOrder: '' })
 const stat = reactive({ total: 0, status_2xx: 0, status_3xx: 0, status_4xx: 0, status_5xx: 0 })
 const pagination = reactive({ page: 1, pageSize: 1000, total: 0 })
 
@@ -162,6 +168,8 @@ async function loadData() {
     if (searchForm.authority) params.authority = searchForm.authority
     if (searchForm.path) params.path = searchForm.path
     if (searchForm.statusCode != null) params.statusCode = searchForm.statusCode
+    if (sortForm.sortField) params.sortField = sortForm.sortField
+    if (sortForm.sortOrder) params.sortOrder = sortForm.sortOrder
     
     const res = await request.post('/dirscan/result/list', params)
     if (res.code === 0) { 
@@ -196,7 +204,20 @@ async function loadStat() {
 function handleSearch() { loadData() }
 function handleReset() {
   Object.assign(searchForm, { authority: '', path: '', statusCode: null })
+  Object.assign(sortForm, { sortField: '', sortOrder: '' })
   handleSearch()
+}
+
+// 处理排序变化
+function handleSortChange({ prop, order }) {
+  if (order) {
+    sortForm.sortField = prop
+    sortForm.sortOrder = order === 'ascending' ? 'asc' : 'desc'
+  } else {
+    sortForm.sortField = ''
+    sortForm.sortOrder = ''
+  }
+  loadData()
 }
 
 function expandAll() { activeNames.value = Object.keys(groupedData.value) }
@@ -218,24 +239,63 @@ function formatSize(bytes) {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该记录吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('dirscan.confirmDelete'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/dirscan/result/delete', { id: row.id })
-  if (res.code === 0) { ElMessage.success('删除成功'); loadData(); loadStat() }
+  if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); loadData(); loadStat() }
 }
 
 async function handleClear() {
-  await ElMessageBox.confirm('确定清空所有目录扫描数据吗？此操作不可恢复！', '警告', { type: 'error', confirmButtonText: '确定清空', cancelButtonText: '取消' })
+  await ElMessageBox.confirm(t('dirscan.confirmClear'), t('common.warning'), { type: 'error', confirmButtonText: t('dirscan.confirmClearBtn'), cancelButtonText: t('common.cancel') })
   const res = await request.post('/dirscan/result/clear', {})
-  if (res.code === 0) { ElMessage.success(res.msg || '清空成功'); loadData(); loadStat(); emit('data-changed') }
-  else { ElMessage.error(res.msg || '清空失败') }
+  if (res.code === 0) { ElMessage.success(res.msg || t('dirscan.clearSuccess')); loadData(); loadStat(); emit('data-changed') }
+  else { ElMessage.error(res.msg || t('dirscan.clearFailed')) }
 }
 
 async function handleExport(command) {
   if (tableData.value.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('dirscan.noDataToExport'))
     return
   }
   
+  if (command === 'csv') {
+    // CSV导出所有字段
+    const headers = ['URL', 'Path', 'StatusCode', 'ContentLength', 'ContentType', 'Title', 'RedirectUrl', 'Host', 'Port', 'Authority', 'CreateTime']
+    const csvRows = [headers.join(',')]
+    
+    for (const row of tableData.value) {
+      const values = [
+        escapeCsvField(row.url || ''),
+        escapeCsvField(row.path || ''),
+        row.statusCode || '',
+        row.contentLength || 0,
+        escapeCsvField(row.contentType || ''),
+        escapeCsvField(row.title || ''),
+        escapeCsvField(row.redirectUrl || ''),
+        escapeCsvField(row.host || ''),
+        row.port || '',
+        escapeCsvField(row.authority || ''),
+        escapeCsvField(row.createTime || '')
+      ]
+      csvRows.push(values.join(','))
+    }
+    
+    // 添加BOM以支持Excel正确识别UTF-8
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dirscan_results_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('dirscan.exportSuccess', { count: tableData.value.length }))
+    return
+  }
+  
+  // 原有的URL导出逻辑
   const seen = new Set()
   const exportData = []
   for (const row of tableData.value) {
@@ -246,7 +306,7 @@ async function handleExport(command) {
   }
   
   if (exportData.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('dirscan.noDataToExport'))
     return
   }
   
@@ -260,7 +320,17 @@ async function handleExport(command) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   
-  ElMessage.success(`成功导出 ${exportData.length} 条数据`)
+  ElMessage.success(t('dirscan.exportSuccess', { count: exportData.length }))
+}
+
+// CSV字段转义
+function escapeCsvField(field) {
+  if (field == null) return ''
+  const str = String(field)
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"'
+  }
+  return str
 }
 
 function refresh() { loadData(); loadStat() }
@@ -268,7 +338,7 @@ function refresh() { loadData(); loadStat() }
 defineExpose({ refresh })
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .dirscan-view {
   .search-card { margin-bottom: 16px; }
   .stat-row {
@@ -309,3 +379,4 @@ defineExpose({ refresh })
   }
 }
 </style>
+

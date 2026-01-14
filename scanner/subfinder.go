@@ -405,6 +405,19 @@ func (s *SubfinderScanner) resolveSingleDomain(domain string, resolver dnsResolv
 		return nil
 	}
 
+	// 过滤回环地址：如果所有IP都是127.0.0.1等回环地址，跳过该域名
+	// 防止扫描本地服务造成安全风险
+	allLoopback := true
+	for _, ip := range ips {
+		if !ip.IsLoopback() {
+			allLoopback = false
+			break
+		}
+	}
+	if allLoopback {
+		return nil
+	}
+
 	asset := &Asset{
 		Authority: domain,
 		Host:      domain,
@@ -412,6 +425,10 @@ func (s *SubfinderScanner) resolveSingleDomain(domain string, resolver dnsResolv
 	}
 
 	for _, ip := range ips {
+		// 跳过回环地址，不添加到资产IP列表中
+		if ip.IsLoopback() {
+			continue
+		}
 		if ip4 := ip.To4(); ip4 != nil {
 			asset.IPV4 = append(asset.IPV4, IPInfo{IP: ip4.String()})
 		} else {

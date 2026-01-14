@@ -131,6 +131,12 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		model.NewSubdomainDictModel(svcCtx.MongoDB),
 	)
 
+	// 设置HTTP服务模型（用于启动时导入）
+	svcCtx.SyncMethods.SetHttpServiceModel(svcCtx.HttpServiceModel)
+
+	// 设置黑名单模型（用于启动时导入默认黑名单）
+	svcCtx.SyncMethods.SetBlacklistModel(model.NewBlacklistConfigModel(svcCtx.MongoDB))
+
 	return svcCtx
 }
 

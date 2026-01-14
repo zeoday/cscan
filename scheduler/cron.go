@@ -12,16 +12,20 @@ import (
 
 // CronTask 定时任务
 type CronTask struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	CronSpec    string `json:"cronSpec"`
-	WorkspaceId string `json:"workspaceId"`
-	MainTaskId  string `json:"mainTaskId"`
-	Config      string `json:"config"`
-	Status      string `json:"status"` // enable/disable
-	LastRunTime string `json:"lastRunTime"`
-	NextRunTime string `json:"nextRunTime"`
-	EntryId     cron.EntryID `json:"-"`
+	Id           string       `json:"id"`
+	Name         string       `json:"name"`
+	ScheduleType string       `json:"scheduleType"` // cron: Cron表达式, once: 指定时间执行一次
+	CronSpec     string       `json:"cronSpec"`     // Cron表达式 (scheduleType=cron时使用)
+	ScheduleTime string       `json:"scheduleTime"` // 指定执行时间 (scheduleType=once时使用)
+	WorkspaceId  string       `json:"workspaceId"`
+	MainTaskId   string       `json:"mainTaskId"`  // 关联的任务ID
+	TaskName     string       `json:"taskName"`    // 关联的任务名称
+	Target       string       `json:"target"`      // 扫描目标（从任务复制）
+	Config       string       `json:"config"`      // 任务配置（从任务复制）
+	Status       string       `json:"status"`      // enable/disable
+	LastRunTime  string       `json:"lastRunTime"`
+	NextRunTime  string       `json:"nextRunTime"`
+	EntryId      cron.EntryID `json:"-"`
 }
 
 // CronManager 定时任务管理器
@@ -164,13 +168,41 @@ func (m *CronManager) GetTasks() []*CronTask {
 
 // startTask 启动定时任务
 func (m *CronManager) startTask(task *CronTask) {
-	entryId, err := m.scheduler.AddCronTask(task.CronSpec, func() {
-		m.executeTask(task)
-	})
-	if err != nil {
-		return
+	if task.ScheduleType == "once" {
+		// 指定时间执行一次
+		scheduleTime, err := time.ParseInLocation("2006-01-02 15:04:05", task.ScheduleTime, time.Local)
+		if err != nil {
+			return
+		}
+		
+		// 如果时间已过，不启动
+		if scheduleTime.Before(time.Now()) {
+			return
+		}
+		
+		// 使用定时器在指定时间执行
+		duration := time.Until(scheduleTime)
+		go func(t *CronTask) {
+			timer := time.NewTimer(duration)
+			<-timer.C
+			// 检查任务是否仍然启用
+			if currentTask, ok := m.tasks[t.Id]; ok && currentTask.Status == "enable" {
+				m.executeTask(t)
+			}
+		}(task)
+	} else {
+		// Cron表达式
+		if task.CronSpec == "" {
+			return
+		}
+		entryId, err := m.scheduler.AddCronTask(task.CronSpec, func() {
+			m.executeTask(task)
+		})
+		if err != nil {
+			return
+		}
+		task.EntryId = entryId
 	}
-	task.EntryId = entryId
 }
 
 // executeTask 执行定时任务
@@ -181,21 +213,110 @@ func (m *CronManager) executeTask(task *CronTask) {
 	task.LastRunTime = time.Now().Local().Format("2006-01-02 15:04:05")
 
 	// 计算下次执行时间
-	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-	schedule, _ := parser.Parse(task.CronSpec)
-	task.NextRunTime = schedule.Next(time.Now()).Local().Format("2006-01-02 15:04:05")
+	if task.ScheduleType == "cron" {
+		parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+		schedule, _ := parser.Parse(task.CronSpec)
+		task.NextRunTime = schedule.Next(time.Now()).Local().Format("2006-01-02 15:04:05")
+	} else if task.ScheduleType == "once" {
+		// 一次性任务执行后禁用
+		task.Status = "disable"
+		task.NextRunTime = ""
+	}
+
+	// 增加运行次数
+	runCountKey := fmt.Sprintf("cscan:cron:runcount:%s", task.Id)
+	m.rdb.Incr(ctx, runCountKey)
 
 	// 更新Redis
 	data, _ := json.Marshal(task)
 	m.rdb.HSet(ctx, m.cronKey, task.Id, data)
 
-	// 推送任务到队列
-	taskInfo := &TaskInfo{
-		MainTaskId:  task.MainTaskId,
-		WorkspaceId: task.WorkspaceId,
-		TaskName:    task.Name,
-		Config:      task.Config,
-		Priority:    0,
+	// 发布消息通知 API 服务创建新任务
+	// API 服务会创建新的 MainTask 记录并推送到队列
+	cronExecData, _ := json.Marshal(map[string]interface{}{
+		"cronTaskId":  task.Id,
+		"workspaceId": task.WorkspaceId,
+		"mainTaskId":  task.MainTaskId,
+		"taskName":    task.Name,
+		"target":      task.Target,
+		"config":      task.Config,
+	})
+	m.rdb.Publish(ctx, "cscan:cron:execute", string(cronExecData))
+}
+
+// ReloadTask 重新加载单个任务
+func (m *CronManager) ReloadTask(ctx context.Context, taskId string) error {
+	// 先停止现有任务
+	if existingTask, ok := m.tasks[taskId]; ok {
+		if existingTask.EntryId > 0 {
+			m.scheduler.RemoveCronTask(existingTask.EntryId)
+		}
 	}
-	m.scheduler.PushTask(ctx, taskInfo)
+
+	// 从Redis获取最新任务数据
+	taskData, err := m.rdb.HGet(ctx, m.cronKey, taskId).Result()
+	if err != nil {
+		delete(m.tasks, taskId)
+		return err
+	}
+
+	var task CronTask
+	if err := json.Unmarshal([]byte(taskData), &task); err != nil {
+		return err
+	}
+	task.Id = taskId
+
+	// 如果启用则启动
+	if task.Status == "enable" {
+		m.startTask(&task)
+	}
+	m.tasks[taskId] = &task
+
+	return nil
+}
+
+// RunTaskNow 立即执行任务
+func (m *CronManager) RunTaskNow(ctx context.Context, taskId string) error {
+	task, ok := m.tasks[taskId]
+	if !ok {
+		// 尝试从Redis加载
+		taskData, err := m.rdb.HGet(ctx, m.cronKey, taskId).Result()
+		if err != nil {
+			return fmt.Errorf("task not found: %s", taskId)
+		}
+		var t CronTask
+		if err := json.Unmarshal([]byte(taskData), &t); err != nil {
+			return err
+		}
+		task = &t
+	}
+
+	// 执行任务
+	go m.executeTask(task)
+	return nil
+}
+
+// StartMessageSubscriber 启动消息订阅
+func (m *CronManager) StartMessageSubscriber(ctx context.Context) {
+	go func() {
+		pubsub := m.rdb.Subscribe(ctx, "cscan:cron:reload", "cscan:cron:remove", "cscan:cron:runnow")
+		defer pubsub.Close()
+
+		ch := pubsub.Channel()
+		for msg := range ch {
+			switch msg.Channel {
+			case "cscan:cron:reload":
+				m.ReloadTask(ctx, msg.Payload)
+			case "cscan:cron:remove":
+				if task, ok := m.tasks[msg.Payload]; ok {
+					if task.EntryId > 0 {
+						m.scheduler.RemoveCronTask(task.EntryId)
+					}
+					delete(m.tasks, msg.Payload)
+				}
+			case "cscan:cron:runnow":
+				m.RunTaskNow(ctx, msg.Payload)
+			}
+		}
+	}()
 }

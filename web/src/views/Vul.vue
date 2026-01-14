@@ -3,40 +3,41 @@
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :model="searchForm" inline>
-        <el-form-item label="目标">
-          <el-input v-model="searchForm.authority" placeholder="IP:端口" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('vulnerability.target')">
+          <el-input v-model="searchForm.authority" placeholder="IP:Port" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="危害等级">
-          <el-select v-model="searchForm.severity" placeholder="全部" clearable style="width: 120px">
-            <el-option label="严重" value="critical" />
-            <el-option label="高危" value="high" />
-            <el-option label="中危" value="medium" />
-            <el-option label="低危" value="low" />
-            <el-option label="信息" value="info" />
-            <el-option label="未知" value="unknown" />
+        <el-form-item :label="$t('vulnerability.severity')">
+          <el-select v-model="searchForm.severity" :placeholder="$t('common.all')" clearable style="width: 120px">
+            <el-option :label="$t('vulnerability.critical')" value="critical" />
+            <el-option :label="$t('vulnerability.high')" value="high" />
+            <el-option :label="$t('vulnerability.medium')" value="medium" />
+            <el-option :label="$t('vulnerability.low')" value="low" />
+            <el-option :label="$t('vulnerability.info')" value="info" />
+            <el-option :label="$t('vulnerability.unknown')" value="unknown" />
           </el-select>
         </el-form-item>
-        <el-form-item label="来源">
-          <el-select v-model="searchForm.source" placeholder="全部" clearable style="width: 120px">
+        <el-form-item :label="$t('vulnerability.source')">
+          <el-select v-model="searchForm.source" :placeholder="$t('common.all')" clearable style="width: 120px">
             <el-option label="Nuclei" value="nuclei" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
           <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            批量删除 ({{ selectedRows.length }})
+            {{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
           <el-dropdown style="margin-left: 10px" @command="handleExport">
             <el-button type="success">
-              导出<el-icon class="el-icon--right"><arrow-down /></el-icon>
+              {{ $t('common.export') }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="selected-target" :disabled="selectedRows.length === 0">导出选中目标 ({{ selectedRows.length }})</el-dropdown-item>
-                <el-dropdown-item command="selected-url" :disabled="selectedRows.length === 0">导出选中URL ({{ selectedRows.length }})</el-dropdown-item>
-                <el-dropdown-item divided command="all-target">导出全部目标</el-dropdown-item>
-                <el-dropdown-item command="all-url">导出全部URL</el-dropdown-item>
+                <el-dropdown-item command="selected-target" :disabled="selectedRows.length === 0">{{ $t('vulnerability.exportSelectedTarget') }} ({{ selectedRows.length }})</el-dropdown-item>
+                <el-dropdown-item command="selected-url" :disabled="selectedRows.length === 0">{{ $t('vulnerability.exportSelectedUrl') }} ({{ selectedRows.length }})</el-dropdown-item>
+                <el-dropdown-item divided command="all-target">{{ $t('vulnerability.exportAllTarget') }}</el-dropdown-item>
+                <el-dropdown-item command="all-url">{{ $t('vulnerability.exportAllUrl') }}</el-dropdown-item>
+                <el-dropdown-item command="csv">{{ $t('common.exportCsv') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -54,22 +55,22 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="authority" label="目标" min-width="150" />
+        <el-table-column prop="authority" :label="$t('vulnerability.target')" min-width="150" />
         <el-table-column prop="url" label="URL" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="pocFile" label="POC" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="severity" label="危害等级" width="100">
+        <el-table-column prop="pocFile" :label="$t('vulnerability.poc')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="severity" :label="$t('vulnerability.severity')" width="100">
           <template #default="{ row }">
             <el-tag :type="getSeverityType(row.severity)" size="small">
               {{ getSeverityLabel(row.severity) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="source" label="来源" width="100" />
-        <el-table-column prop="createTime" label="发现时间" width="160" />
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column prop="source" :label="$t('vulnerability.source')" width="100" />
+        <el-table-column prop="createTime" :label="$t('vulnerability.discoveryTime')" width="160" />
+        <el-table-column :label="$t('common.operation')" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="showDetail(row)">{{ $t('common.detail') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -87,59 +88,59 @@
     </el-card>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="漏洞详情" width="800px">
+    <el-dialog v-model="detailVisible" :title="$t('vulnerability.vulDetail')" width="800px">
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="目标">{{ currentVul.authority }}</el-descriptions-item>
-        <el-descriptions-item label="危害等级">
+        <el-descriptions-item :label="$t('vulnerability.target')">{{ currentVul.authority }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.severity')">
           <el-tag :type="getSeverityType(currentVul.severity)">
             {{ getSeverityLabel(currentVul.severity) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="URL" :span="2">{{ currentVul.url }}</el-descriptions-item>
-        <el-descriptions-item label="POC文件" :span="2">{{ currentVul.pocFile }}</el-descriptions-item>
-        <el-descriptions-item label="来源">{{ currentVul.source }}</el-descriptions-item>
-        <el-descriptions-item label="发现时间">{{ currentVul.createTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.poc')" :span="2">{{ currentVul.pocFile }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.source')">{{ currentVul.source }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.discoveryTime')">{{ currentVul.createTime }}</el-descriptions-item>
         <!-- 知识库信息 -->
-        <el-descriptions-item label="CVE编号" v-if="currentVul.cveId">{{ currentVul.cveId }}</el-descriptions-item>
-        <el-descriptions-item label="CWE编号" v-if="currentVul.cweId">{{ currentVul.cweId }}</el-descriptions-item>
-        <el-descriptions-item label="CVSS评分" v-if="currentVul.cvssScore">{{ currentVul.cvssScore }}</el-descriptions-item>
-        <el-descriptions-item label="扫描次数" v-if="currentVul.scanCount">{{ currentVul.scanCount }}</el-descriptions-item>
-        <el-descriptions-item label="首次发现" v-if="currentVul.firstSeenTime">{{ currentVul.firstSeenTime }}</el-descriptions-item>
-        <el-descriptions-item label="最近发现" v-if="currentVul.lastSeenTime">{{ currentVul.lastSeenTime }}</el-descriptions-item>
-        <el-descriptions-item label="修复建议" :span="2" v-if="currentVul.remediation">
+        <el-descriptions-item :label="$t('vulnerability.cveId')" v-if="currentVul.cveId">{{ currentVul.cveId }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.cweId')" v-if="currentVul.cweId">{{ currentVul.cweId }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.cvssScore')" v-if="currentVul.cvssScore">{{ currentVul.cvssScore }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.scanCount')" v-if="currentVul.scanCount">{{ currentVul.scanCount }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.firstSeen')" v-if="currentVul.firstSeenTime">{{ currentVul.firstSeenTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.lastSeen')" v-if="currentVul.lastSeenTime">{{ currentVul.lastSeenTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vulnerability.remediation')" :span="2" v-if="currentVul.remediation">
           <pre class="result-pre">{{ currentVul.remediation }}</pre>
         </el-descriptions-item>
-        <el-descriptions-item label="参考链接" :span="2" v-if="currentVul.references && currentVul.references.length">
+        <el-descriptions-item :label="$t('vulnerability.references')" :span="2" v-if="currentVul.references && currentVul.references.length">
           <div v-for="(ref, idx) in currentVul.references" :key="idx">
             <a :href="ref" target="_blank" rel="noopener">{{ ref }}</a>
           </div>
         </el-descriptions-item>
-        <el-descriptions-item label="验证结果" :span="2">
+        <el-descriptions-item :label="$t('vulnerability.verifyResult')" :span="2">
           <pre class="result-pre">{{ currentVul.result }}</pre>
         </el-descriptions-item>
       </el-descriptions>
 
       <!-- 证据链 -->
       <template v-if="currentVul.evidence">
-        <el-divider content-position="left">证据链</el-divider>
+        <el-divider content-position="left">{{ $t('vulnerability.evidence') }}</el-divider>
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="匹配器名称" v-if="currentVul.evidence.matcherName">
+          <el-descriptions-item :label="$t('vulnerability.matcherName')" v-if="currentVul.evidence.matcherName">
             {{ currentVul.evidence.matcherName }}
           </el-descriptions-item>
-          <el-descriptions-item label="提取结果" v-if="currentVul.evidence.extractedResults && currentVul.evidence.extractedResults.length">
+          <el-descriptions-item :label="$t('vulnerability.extractedResults')" v-if="currentVul.evidence.extractedResults && currentVul.evidence.extractedResults.length">
             <el-tag v-for="(item, idx) in currentVul.evidence.extractedResults" :key="idx" style="margin-right: 5px; margin-bottom: 5px;">
               {{ item }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="cURL命令" v-if="currentVul.evidence.curlCommand">
+          <el-descriptions-item :label="$t('vulnerability.curlCommand')" v-if="currentVul.evidence.curlCommand">
             <pre class="result-pre">{{ currentVul.evidence.curlCommand }}</pre>
           </el-descriptions-item>
-          <el-descriptions-item label="请求内容" v-if="currentVul.evidence.request">
+          <el-descriptions-item :label="$t('vulnerability.requestContent')" v-if="currentVul.evidence.request">
             <pre class="result-pre">{{ currentVul.evidence.request }}</pre>
           </el-descriptions-item>
-          <el-descriptions-item label="响应内容" v-if="currentVul.evidence.response">
+          <el-descriptions-item :label="$t('vulnerability.responseContent')" v-if="currentVul.evidence.response">
             <pre class="result-pre">{{ currentVul.evidence.response }}</pre>
-            <el-tag v-if="currentVul.evidence.responseTruncated" type="warning" size="small">响应已截断</el-tag>
+            <el-tag v-if="currentVul.evidence.responseTruncated" type="warning" size="small">{{ $t('vulnerability.responseTruncated') }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
       </template>
@@ -153,7 +154,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const tableData = ref([])
@@ -226,7 +229,14 @@ function getSeverityType(severity) {
 }
 
 function getSeverityLabel(severity) {
-  const map = { critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息', unknown: '未知' }
+  const map = { 
+    critical: t('vulnerability.critical'), 
+    high: t('vulnerability.high'), 
+    medium: t('vulnerability.medium'), 
+    low: t('vulnerability.low'), 
+    info: t('vulnerability.info'), 
+    unknown: t('vulnerability.unknown') 
+  }
   return map[severity] || severity
 }
 
@@ -245,27 +255,27 @@ async function showDetail(row) {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该漏洞记录吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('vulnerability.confirmDeleteVul'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/vul/delete', { id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     loadData()
   } else {
-    ElMessage.error(res.msg || '删除失败')
+    ElMessage.error(res.msg || t('common.operationFailed'))
   }
 }
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 条漏洞记录吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('vulnerability.confirmBatchDeleteVul', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ids = selectedRows.value.map(row => row.id)
   const res = await request.post('/vul/batchDelete', { ids })
   if (res.code === 0) {
-    ElMessage.success(res.msg || '删除成功')
+    ElMessage.success(res.msg || t('common.deleteSuccess'))
     selectedRows.value = []
     loadData()
   } else {
-    ElMessage.error(res.msg || '删除失败')
+    ElMessage.error(res.msg || t('common.operationFailed'))
   }
 }
 
@@ -277,14 +287,69 @@ async function handleExport(command) {
   if (command === 'selected-target' || command === 'selected-url') {
     // 导出选中的
     if (selectedRows.value.length === 0) {
-      ElMessage.warning('请先选择要导出的漏洞')
+      ElMessage.warning(t('vulnerability.selectToExport'))
       return
     }
     data = selectedRows.value
     filename = command === 'selected-target' ? 'vul_targets_selected.txt' : 'vul_urls_selected.txt'
+  } else if (command === 'csv') {
+    // CSV导出所有字段
+    ElMessage.info(t('vulnerability.fetchingData'))
+    try {
+      const res = await request.post('/vul/list', {
+        ...searchForm,
+        page: 1,
+        pageSize: 10000,
+        workspaceId: workspaceStore.currentWorkspaceId || ''
+      })
+      if (res.code === 0) {
+        data = res.list || []
+      } else {
+        ElMessage.error(t('vulnerability.fetchFailed'))
+        return
+      }
+    } catch (e) {
+      ElMessage.error(t('vulnerability.fetchFailed') + ': ' + e.message)
+      return
+    }
+    
+    if (data.length === 0) {
+      ElMessage.warning(t('vulnerability.noDataToExport'))
+      return
+    }
+    
+    const headers = ['Target', 'URL', 'POC', 'Severity', 'Source', 'Result', 'CreateTime']
+    const csvRows = [headers.join(',')]
+    
+    for (const row of data) {
+      const values = [
+        escapeCsvField(row.authority || ''),
+        escapeCsvField(row.url || ''),
+        escapeCsvField(row.pocFile || ''),
+        escapeCsvField(row.severity || ''),
+        escapeCsvField(row.source || ''),
+        escapeCsvField(row.result || ''),
+        escapeCsvField(row.createTime || '')
+      ]
+      csvRows.push(values.join(','))
+    }
+    
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `vulnerabilities_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('vulnerability.exportSuccess', { count: data.length }))
+    return
   } else {
     // 导出全部 - 需要获取所有数据
-    ElMessage.info('正在获取全部数据...')
+    ElMessage.info(t('vulnerability.fetchingData'))
     try {
       const res = await request.post('/vul/list', {
         ...searchForm,
@@ -295,18 +360,18 @@ async function handleExport(command) {
       if (res.code === 0) {
         data = res.list || []
       } else {
-        ElMessage.error('获取数据失败')
+        ElMessage.error(t('vulnerability.fetchFailed'))
         return
       }
     } catch (e) {
-      ElMessage.error('获取数据失败: ' + e.message)
+      ElMessage.error(t('vulnerability.fetchFailed') + ': ' + e.message)
       return
     }
     filename = command === 'all-target' ? 'vul_targets_all.txt' : 'vul_urls_all.txt'
   }
   
   if (data.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('vulnerability.noDataToExport'))
     return
   }
   
@@ -333,7 +398,7 @@ async function handleExport(command) {
   }
   
   if (exportData.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('vulnerability.noDataToExport'))
     return
   }
   
@@ -349,7 +414,17 @@ async function handleExport(command) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   
-  ElMessage.success(`成功导出 ${exportData.length} 条数据`)
+  ElMessage.success(t('vulnerability.exportSuccess', { count: exportData.length }))
+}
+
+// CSV字段转义
+function escapeCsvField(field) {
+  if (field == null) return ''
+  const str = String(field)
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"'
+  }
+  return str
 }
 </script>
 
@@ -370,14 +445,14 @@ async function handleExport(command) {
     word-break: break-all;
     max-height: 300px;
     overflow: auto;
-    background: #1e1e1e !important;
-    color: #d4d4d4 !important;
+    background: var(--el-fill-color-darker, #1e1e1e) !important;
+    color: var(--el-text-color-primary, #d4d4d4) !important;
     padding: 12px;
     border-radius: 6px;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 13px;
     line-height: 1.5;
-    border: 1px solid #3c3c3c;
+    border: 1px solid var(--el-border-color);
   }
 }
 
@@ -385,8 +460,8 @@ async function handleExport(command) {
 :deep(.el-descriptions) {
   .el-descriptions__content {
     .result-pre {
-      background: #1e1e1e !important;
-      color: #d4d4d4 !important;
+      background: var(--el-fill-color-darker, #1e1e1e) !important;
+      color: var(--el-text-color-primary, #d4d4d4) !important;
     }
   }
 }
@@ -394,13 +469,22 @@ async function handleExport(command) {
 // 对话框内的代码块样式
 :deep(.el-dialog) {
   .result-pre {
-    background: #1e1e1e !important;
-    color: #d4d4d4 !important;
+    background: var(--el-fill-color-darker, #1e1e1e) !important;
+    color: var(--el-text-color-primary, #d4d4d4) !important;
   }
   
   .el-descriptions__content .result-pre {
-    background: #1e1e1e !important;
-    color: #d4d4d4 !important;
+    background: var(--el-fill-color-darker, #1e1e1e) !important;
+    color: var(--el-text-color-primary, #d4d4d4) !important;
+  }
+}
+
+// 暗黑模式下的代码块样式
+html.dark {
+  .result-pre {
+    background: var(--el-fill-color-darker, #1e1e1e) !important;
+    color: var(--el-text-color-primary) !important;
+    border-color: var(--el-border-color);
   }
 }
 </style>

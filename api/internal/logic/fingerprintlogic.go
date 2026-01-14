@@ -2262,3 +2262,259 @@ func (l *HttpServiceMappingDeleteV2Logic) HttpServiceMappingDeleteV2(req *types.
 
 	return &types.BaseResp{Code: 0, Msg: "删除成功"}, nil
 }
+
+// ==================== HTTP服务映射导出/导入 ====================
+
+// HttpServiceExportLogic 导出HTTP服务映射
+type HttpServiceExportLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+}
+
+func NewHttpServiceExportLogic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceExportLogic {
+	return &HttpServiceExportLogic{ctx: ctx, svcCtx: svcCtx}
+}
+
+func (l *HttpServiceExportLogic) HttpServiceExport(req *types.HttpServiceExportReq) (*types.HttpServiceExportResp, error) {
+	var sb strings.Builder
+
+	// 1. 导出端口配置
+	config, err := l.svcCtx.HttpServiceModel.GetConfig(l.ctx)
+	if err != nil {
+		return &types.HttpServiceExportResp{Code: 500, Msg: "获取端口配置失败: " + err.Error()}, nil
+	}
+
+	sb.WriteString("# HTTP服务映射配置\n")
+	sb.WriteString("# 格式说明:\n")
+	sb.WriteString("# [http_ports] HTTP端口列表\n")
+	sb.WriteString("# [https_ports] HTTPS端口列表\n")
+	sb.WriteString("# [non_http_ports] 非HTTP端口列表（明确排除）\n")
+	sb.WriteString("# [service_mapping] 服务名称映射 (格式: 服务名=http/非http 描述)\n")
+	sb.WriteString("\n")
+
+	// HTTP端口
+	sb.WriteString("[http_ports]\n")
+	for _, port := range config.HttpPorts {
+		sb.WriteString(fmt.Sprintf("%d\n", port))
+	}
+	sb.WriteString("\n")
+
+	// HTTPS端口
+	sb.WriteString("[https_ports]\n")
+	for _, port := range config.HttpsPorts {
+		sb.WriteString(fmt.Sprintf("%d\n", port))
+	}
+	sb.WriteString("\n")
+
+	// 非HTTP端口
+	sb.WriteString("[non_http_ports]\n")
+	for _, port := range config.NonHttpPorts {
+		sb.WriteString(fmt.Sprintf("%d\n", port))
+	}
+	sb.WriteString("\n")
+
+	// 2. 导出服务映射
+	mappings, err := l.svcCtx.HttpServiceModel.GetMappings(l.ctx)
+	if err != nil {
+		return &types.HttpServiceExportResp{Code: 500, Msg: "获取服务映射失败: " + err.Error()}, nil
+	}
+
+	sb.WriteString("[service_mapping]\n")
+	for _, m := range mappings {
+		httpType := "http"
+		if !m.IsHttp {
+			httpType = "non_http"
+		}
+		enabledStr := ""
+		if !m.Enabled {
+			enabledStr = " [disabled]"
+		}
+		desc := ""
+		if m.Description != "" {
+			desc = " # " + m.Description
+		}
+		sb.WriteString(fmt.Sprintf("%s=%s%s%s\n", m.ServiceName, httpType, enabledStr, desc))
+	}
+
+	return &types.HttpServiceExportResp{
+		Code:    0,
+		Msg:     "导出成功",
+		Content: sb.String(),
+	}, nil
+}
+
+// HttpServiceImportLogic 导入HTTP服务映射
+type HttpServiceImportLogic struct {
+	ctx    context.Context
+	svcCtx *svc.ServiceContext
+	logx.Logger
+}
+
+func NewHttpServiceImportLogic(ctx context.Context, svcCtx *svc.ServiceContext) *HttpServiceImportLogic {
+	return &HttpServiceImportLogic{
+		ctx:    ctx,
+		svcCtx: svcCtx,
+		Logger: logx.WithContext(ctx),
+	}
+}
+
+func (l *HttpServiceImportLogic) HttpServiceImport(req *types.HttpServiceImportReq) (*types.HttpServiceImportResp, error) {
+	if req.Content == "" {
+		return &types.HttpServiceImportResp{Code: 400, Msg: "内容不能为空"}, nil
+	}
+
+	return l.ParseAndImport(req.Content)
+}
+
+// ParseAndImport 解析并导入HTTP服务映射配置
+func (l *HttpServiceImportLogic) ParseAndImport(content string) (*types.HttpServiceImportResp, error) {
+	lines := strings.Split(content, "\n")
+	
+	var httpPorts, httpsPorts, nonHttpPorts []int
+	var serviceMappings []struct {
+		ServiceName string
+		IsHttp      bool
+		Description string
+		Enabled     bool
+	}
+
+	currentSection := ""
+	var imported, skipped int
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// 跳过空行和注释
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// 检测section
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			currentSection = strings.ToLower(line[1 : len(line)-1])
+			continue
+		}
+
+		switch currentSection {
+		case "http_ports":
+			if port := parsePort(line); port > 0 {
+				httpPorts = append(httpPorts, port)
+			}
+		case "https_ports":
+			if port := parsePort(line); port > 0 {
+				httpsPorts = append(httpsPorts, port)
+			}
+		case "non_http_ports":
+			if port := parsePort(line); port > 0 {
+				nonHttpPorts = append(nonHttpPorts, port)
+			}
+		case "service_mapping":
+			// 解析服务映射: serviceName=http/non_http [disabled] # description
+			mapping := parseServiceMapping(line)
+			if mapping.ServiceName != "" {
+				serviceMappings = append(serviceMappings, mapping)
+			}
+		}
+	}
+
+	// 保存端口配置（如果有）
+	if len(httpPorts) > 0 || len(httpsPorts) > 0 || len(nonHttpPorts) > 0 {
+		config := &model.HttpServiceConfig{
+			HttpPorts:    httpPorts,
+			HttpsPorts:   httpsPorts,
+			NonHttpPorts: nonHttpPorts,
+		}
+		if err := l.svcCtx.HttpServiceModel.SaveConfig(l.ctx, config); err != nil {
+			l.Logger.Errorf("保存端口配置失败: %v", err)
+		}
+	}
+
+	// 保存服务映射（去重）
+	for _, m := range serviceMappings {
+		// 检查是否已存在
+		existing, _ := l.svcCtx.HttpServiceModel.GetMappings(l.ctx)
+		exists := false
+		for _, e := range existing {
+			if strings.ToLower(e.ServiceName) == strings.ToLower(m.ServiceName) {
+				exists = true
+				skipped++
+				break
+			}
+		}
+		if !exists {
+			doc := &model.HttpServiceMapping{
+				ServiceName: strings.ToLower(m.ServiceName),
+				IsHttp:      m.IsHttp,
+				Description: m.Description,
+				Enabled:     m.Enabled,
+			}
+			if err := l.svcCtx.HttpServiceModel.SaveMapping(l.ctx, doc); err != nil {
+				l.Logger.Errorf("保存服务映射失败: %v", err)
+				skipped++
+			} else {
+				imported++
+			}
+		}
+	}
+
+	return &types.HttpServiceImportResp{
+		Code:     0,
+		Msg:      fmt.Sprintf("导入完成: 新增 %d 条, 跳过 %d 条（重复）", imported, skipped),
+		Imported: imported,
+		Skipped:  skipped,
+	}, nil
+}
+
+// parsePort 解析端口号
+func parsePort(line string) int {
+	// 去除注释
+	if idx := strings.Index(line, "#"); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
+	var port int
+	fmt.Sscanf(line, "%d", &port)
+	if port > 0 && port <= 65535 {
+		return port
+	}
+	return 0
+}
+
+// parseServiceMapping 解析服务映射行
+func parseServiceMapping(line string) struct {
+	ServiceName string
+	IsHttp      bool
+	Description string
+	Enabled     bool
+} {
+	result := struct {
+		ServiceName string
+		IsHttp      bool
+		Description string
+		Enabled     bool
+	}{Enabled: true}
+
+	// 提取描述（# 后面的内容）
+	if idx := strings.Index(line, "#"); idx >= 0 {
+		result.Description = strings.TrimSpace(line[idx+1:])
+		line = strings.TrimSpace(line[:idx])
+	}
+
+	// 检查是否禁用
+	if strings.Contains(line, "[disabled]") {
+		result.Enabled = false
+		line = strings.Replace(line, "[disabled]", "", 1)
+		line = strings.TrimSpace(line)
+	}
+
+	// 解析 serviceName=http/non_http
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return result
+	}
+
+	result.ServiceName = strings.TrimSpace(parts[0])
+	httpType := strings.ToLower(strings.TrimSpace(parts[1]))
+	result.IsHttp = (httpType == "http" || httpType == "true" || httpType == "1")
+
+	return result
+}

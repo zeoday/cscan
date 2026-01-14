@@ -466,6 +466,8 @@ type PortScanConfig struct {
 	PortThreshold     int    `json:"portThreshold"`     // 开放端口数量阈值，超过则过滤该主机
 	ScanType          string `json:"scanType"`          // s=SYN, c=CONNECT，默认 c
 	SkipHostDiscovery bool   `json:"skipHostDiscovery"` // 跳过主机发现 (-Pn)
+	ExcludeCDN        bool   `json:"excludeCDN"`        // 排除 CDN/WAF，仅扫描 80,443 端口 (-ec)
+	ExcludeHosts      string `json:"excludeHosts"`      // 排除的目标，逗号分隔的 IP/CIDR
 }
 
 // PortIdentifyConfig 端口识别配置（Nmap服务识别）
@@ -490,6 +492,11 @@ type DomainScanConfig struct {
 	ResolveDNS         bool     `json:"resolveDNS"`         // 是否解析DNS（使用dnsx）
 	Concurrent         int      `json:"concurrent"`         // DNS解析并发数
 	SubdomainDictIds   []string `json:"subdomainDictIds"`   // 子域名暴力破解字典ID列表
+	// 子域名暴力破解引擎配置
+	BruteforceEngine   string   `json:"bruteforceEngine"`   // 暴力破解引擎: dnsx, ksubdomain (默认ksubdomain)
+	Bandwidth          string   `json:"bandwidth"`          // ksubdomain带宽限制，如"5M", "10M", "100M"
+	Retry              int      `json:"retry"`              // ksubdomain重试次数
+	WildcardMode       string   `json:"wildcardMode"`       // ksubdomain泛解析过滤模式: basic, advanced, none
 	// Dnsx增强功能
 	RecursiveBrute       bool     `json:"recursiveBrute"`       // 递归爆破
 	RecursiveDictIds     []string `json:"recursiveDictIds"`     // 递归爆破字典ID列表

@@ -139,3 +139,36 @@ func AssetImportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		httpx.OkJson(w, resp)
 	}
 }
+
+
+// AssetFingerprintsListHandler 获取资产中已识别的指纹列表
+func AssetFingerprintsListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.AssetFingerprintsListReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewAssetFingerprintsListLogic(r.Context(), svcCtx)
+		resp, err := l.AssetFingerprintsList(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// AssetPortsStatsHandler 获取资产端口统计
+func AssetPortsStatsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l := logic.NewAssetPortsStatsLogic(r.Context(), svcCtx)
+		resp, err := l.AssetPortsStats()
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}

@@ -44,7 +44,11 @@ func (s *SchedulerService) Start() {
 	s.scheduler.Start()
 
 	// 加载定时任务
-	s.cronManager.LoadTasks(context.Background())
+	ctx := context.Background()
+	s.cronManager.LoadTasks(ctx)
+
+	// 启动定时任务消息订阅
+	s.cronManager.StartMessageSubscriber(ctx)
 
 	// 启动后台同步任务
 	if s.syncMethods != nil {

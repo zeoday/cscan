@@ -2,26 +2,26 @@
   <div class="poc-page">
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <!-- Nuclei默认模板 -->
-      <el-tab-pane label="默认模板" name="nucleiTemplates">
+      <el-tab-pane :label="$t('poc.defaultTemplates')" name="nucleiTemplates">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>Nuclei 默认模板库</span>
+              <span>{{ $t('poc.nucleiTemplateLib') }}</span>
               <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ templateStats.total || 0 }} 个模板
+                {{ $t('poc.totalTemplates', { count: templateStats.total || 0 }) }}
               </span>
               <el-dropdown style="margin-left: auto" @command="handleSyncCommand">
                 <el-button type="primary" size="small" :loading="syncLoading">
-                  <el-icon><Refresh /></el-icon>同步模板<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                  <el-icon><Refresh /></el-icon>{{ $t('poc.syncTemplate') }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                 </el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="local">从本地文件夹导入</el-dropdown-item>
+                    <el-dropdown-item command="local">{{ $t('poc.importFromLocal') }}</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
               <el-button type="danger" size="small" plain style="margin-left: 10px" @click="handleClearTemplates">
-                清空模板
+                {{ $t('poc.clearTemplates') }}
               </el-button>
               <input 
                 ref="folderInputRef" 
@@ -35,17 +35,17 @@
             </div>
           </template>
           <p class="tip-text">
-            Nuclei 模板库，支持从本地 nuclei-templates 文件夹导入模板。扫描时将根据任务配置的严重级别从数据库加载模板。
+            {{ $t('poc.templateLibTip') }}
           </p>
           <!-- 筛选条件 -->
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="分类">
-              <el-select v-model="templateFilter.category" placeholder="全部分类" clearable style="width: 150px" @change="loadNucleiTemplates">
+            <el-form-item :label="$t('poc.filterCategory')">
+              <el-select v-model="templateFilter.category" :placeholder="$t('poc.allCategories')" clearable style="width: 150px" @change="loadNucleiTemplates">
                 <el-option v-for="cat in templateCategories" :key="cat" :label="cat" :value="cat" />
               </el-select>
             </el-form-item>
-            <el-form-item label="级别">
-              <el-select v-model="templateFilter.severity" placeholder="全部级别" clearable style="width: 120px" @change="loadNucleiTemplates">
+            <el-form-item :label="$t('poc.filterLevel')">
+              <el-select v-model="templateFilter.severity" :placeholder="$t('poc.allLevels')" clearable style="width: 120px" @change="loadNucleiTemplates">
                 <el-option label="Critical" value="critical" />
                 <el-option label="High" value="high" />
                 <el-option label="Medium" value="medium" />
@@ -54,14 +54,14 @@
                 <el-option label="Unknown" value="unknown" />
               </el-select>
             </el-form-item>
-            <el-form-item label="标签">
-              <el-input v-model="templateFilter.tag" placeholder="输入标签" clearable style="width: 150px" @keyup.enter="loadNucleiTemplates" />
+            <el-form-item :label="$t('poc.filterTag')">
+              <el-input v-model="templateFilter.tag" :placeholder="$t('poc.enterTag')" clearable style="width: 150px" @keyup.enter="loadNucleiTemplates" />
             </el-form-item>
-            <el-form-item label="搜索">
-              <el-input v-model="templateFilter.keyword" placeholder="名称/ID/描述" clearable style="width: 180px" @keyup.enter="loadNucleiTemplates" />
+            <el-form-item :label="$t('poc.filterSearch')">
+              <el-input v-model="templateFilter.keyword" :placeholder="$t('poc.searchPlaceholder')" clearable style="width: 180px" @keyup.enter="loadNucleiTemplates" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="loadNucleiTemplates">搜索</el-button>
+              <el-button type="primary" @click="loadNucleiTemplates">{{ $t('common.search') }}</el-button>
             </el-form-item>
           </el-form>
           <!-- 统计信息和批量操作 -->
@@ -78,7 +78,7 @@
               style="margin-left: 20px"
               @click="showTemplateBatchValidateDialog"
             >
-              批量验证 ({{ selectedTemplates.length }})
+              {{ $t('poc.batchValidate') }} ({{ selectedTemplates.length }})
             </el-button>
           </div>
           <!-- 模板列表 -->
@@ -90,15 +90,15 @@
             @selection-change="handleTemplateSelectionChange"
           >
             <el-table-column type="selection" width="45" />
-            <el-table-column prop="id" label="模板ID" width="200" show-overflow-tooltip />
-            <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="severity" label="级别" width="90">
+            <el-table-column prop="id" :label="$t('poc.templateId')" width="200" show-overflow-tooltip />
+            <el-table-column prop="name" :label="$t('poc.name')" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="severity" :label="$t('poc.level')" width="90">
               <template #default="{ row }">
                 <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="category" label="分类" width="100" />
-            <el-table-column prop="tags" label="标签" min-width="180">
+            <el-table-column prop="category" :label="$t('poc.category')" width="100" />
+            <el-table-column prop="tags" :label="$t('poc.tags')" min-width="180">
               <template #default="{ row }">
                 <el-tag v-for="tag in (row.tags || [])" :key="tag" size="small" style="margin-right: 3px">
                   {{ tag }}
@@ -106,11 +106,11 @@
                 <span v-if="row.tags && row.tags.length > 4" style="color: #909399">+{{ row.tags.length - 4 }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="author" label="作者" width="100" show-overflow-tooltip />
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column prop="author" :label="$t('poc.author')" width="100" show-overflow-tooltip />
+            <el-table-column :label="$t('poc.operation')" width="120" fixed="right">
               <template #default="{ row }">
-                <el-button type="success" link size="small" @click="showTemplateValidateDialog(row)">验证</el-button>
-                <el-button type="primary" link size="small" @click="showTemplateContent(row)">查看</el-button>
+                <el-button type="success" link size="small" @click="showTemplateValidateDialog(row)">{{ $t('poc.validate') }}</el-button>
+                <el-button type="primary" link size="small" @click="showTemplateContent(row)">{{ $t('poc.view') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -128,43 +128,43 @@
       </el-tab-pane>
 
       <!-- 标签映射 -->
-      <el-tab-pane label="标签映射" name="tagMapping">
+      <el-tab-pane :label="$t('poc.tagMapping')" name="tagMapping">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>应用标签映射配置</span>
+              <span>{{ $t('poc.appTagMappingConfig') }}</span>
               <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ tagMappings.length || 0 }} 条映射
+                {{ $t('poc.totalMappings', { count: tagMappings.length || 0 }) }}
               </span>
               <el-button type="primary" size="small" style="margin-left: auto" @click="showTagMappingForm()">
-                <el-icon><Plus /></el-icon>新增映射
+                <el-icon><Plus /></el-icon>{{ $t('poc.addMapping') }}
               </el-button>
             </div>
           </template>
           <p class="tip-text">
-            配置 Wappalyzer 识别的应用名称与 Nuclei 标签的映射关系，扫描时会根据识别到的应用自动选择对应的 POC 进行检测。
+            {{ $t('poc.tagMappingTip') }}
           </p>
           <el-table :data="tagMappings" stripe v-loading="tagMappingLoading" max-height="500">
-            <el-table-column prop="appName" label="应用名称" width="180" />
-            <el-table-column prop="nucleiTags" label="POC标签（Tag）" min-width="250">
+            <el-table-column prop="appName" :label="$t('poc.appName')" width="180" />
+            <el-table-column prop="nucleiTags" :label="$t('poc.pocTags')" min-width="250">
               <template #default="{ row }">
                 <el-tag v-for="tag in row.nucleiTags" :key="tag" size="small" style="margin-right: 5px">
                   {{ tag }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="description" label="描述" min-width="150" />
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="description" :label="$t('poc.description')" min-width="150" />
+            <el-table-column prop="enabled" :label="$t('poc.status')" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-                  {{ row.enabled ? '启用' : '禁用' }}
+                  {{ row.enabled ? $t('poc.enabled') : $t('poc.disabled') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120">
+            <el-table-column :label="$t('poc.operation')" width="120">
               <template #default="{ row }">
-                <el-button type="primary" link size="small" @click="showTagMappingForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteTagMapping(row)">删除</el-button>
+                <el-button type="primary" link size="small" @click="showTagMappingForm(row)">{{ $t('poc.edit') }}</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteTagMapping(row)">{{ $t('poc.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -172,40 +172,40 @@
       </el-tab-pane>
 
       <!-- 自定义POC -->
-      <el-tab-pane label="自定义POC" name="customPoc">
+      <el-tab-pane :label="$t('poc.customPoc')" name="customPoc">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>自定义 Nuclei POC</span>
+              <span>{{ $t('poc.customNucleiPoc') }}</span>
               <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ pocPagination.total || 0 }} 个POC
+                {{ $t('poc.totalPocs', { count: pocPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto">
                 <el-button type="danger" size="small" @click="handleClearAllPocs" :loading="clearPocLoading" style="margin-right: 10px">
-                  <el-icon><Delete /></el-icon>清空
+                  <el-icon><Delete /></el-icon>{{ $t('poc.clearPoc') }}
                 </el-button>
                 <el-button type="warning" size="small" @click="handleExportPocs" :loading="exportPocLoading" style="margin-right: 10px">
-                  <el-icon><Download /></el-icon>导出POC
+                  <el-icon><Download /></el-icon>{{ $t('poc.exportPoc') }}
                 </el-button>
                 <el-button type="success" size="small" @click="showImportPocDialog" style="margin-right: 10px">
-                  <el-icon><Upload /></el-icon>导入POC
+                  <el-icon><Upload /></el-icon>{{ $t('poc.importPoc') }}
                 </el-button>
                 <el-button type="primary" size="small" @click="showCustomPocForm()">
-                  <el-icon><Plus /></el-icon>新增POC
+                  <el-icon><Plus /></el-icon>{{ $t('poc.addPoc') }}
                 </el-button>
               </div>
             </div>
           </template>
           <!-- 筛选条件 -->
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="名称">
-              <el-input v-model="customPocFilter.name" placeholder="POC名称" clearable style="width: 150px" @keyup.enter="loadCustomPocs" />
+            <el-form-item :label="$t('poc.pocNameFilter')">
+              <el-input v-model="customPocFilter.name" :placeholder="$t('poc.pocNamePlaceholder')" clearable style="width: 150px" @keyup.enter="loadCustomPocs" />
             </el-form-item>
-            <el-form-item label="模板ID">
-              <el-input v-model="customPocFilter.templateId" placeholder="模板ID" clearable style="width: 150px" @keyup.enter="loadCustomPocs" />
+            <el-form-item :label="$t('poc.templateIdFilter')">
+              <el-input v-model="customPocFilter.templateId" :placeholder="$t('poc.templateIdPlaceholder')" clearable style="width: 150px" @keyup.enter="loadCustomPocs" />
             </el-form-item>
-            <el-form-item label="级别">
-              <el-select v-model="customPocFilter.severity" placeholder="全部级别" clearable style="width: 120px" @change="loadCustomPocs">
+            <el-form-item :label="$t('poc.filterLevel')">
+              <el-select v-model="customPocFilter.severity" :placeholder="$t('poc.allLevels')" clearable style="width: 120px" @change="loadCustomPocs">
                 <el-option label="Critical" value="critical" />
                 <el-option label="High" value="high" />
                 <el-option label="Medium" value="medium" />
@@ -214,48 +214,48 @@
                 <el-option label="Unknown" value="unknown" />
               </el-select>
             </el-form-item>
-            <el-form-item label="标签">
-              <el-input v-model="customPocFilter.tag" placeholder="输入标签" clearable style="width: 120px" @keyup.enter="loadCustomPocs" />
+            <el-form-item :label="$t('poc.tagFilter')">
+              <el-input v-model="customPocFilter.tag" :placeholder="$t('poc.tagPlaceholder')" clearable style="width: 120px" @keyup.enter="loadCustomPocs" />
             </el-form-item>
-            <el-form-item label="状态">
-              <el-select v-model="customPocFilter.enabled" placeholder="全部状态" clearable style="width: 100px" @change="loadCustomPocs">
-                <el-option label="启用" :value="true" />
-                <el-option label="禁用" :value="false" />
+            <el-form-item :label="$t('poc.statusFilter')">
+              <el-select v-model="customPocFilter.enabled" :placeholder="$t('poc.allStatus')" clearable style="width: 100px" @change="loadCustomPocs">
+                <el-option :label="$t('poc.enabled')" :value="true" />
+                <el-option :label="$t('poc.disabled')" :value="false" />
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="loadCustomPocs">搜索</el-button>
-              <el-button @click="resetCustomPocFilter">重置</el-button>
+              <el-button type="primary" @click="loadCustomPocs">{{ $t('common.search') }}</el-button>
+              <el-button @click="resetCustomPocFilter">{{ $t('common.reset') }}</el-button>
             </el-form-item>
           </el-form>
           <el-table :data="customPocs" stripe v-loading="customPocLoading" max-height="500">
-            <el-table-column prop="name" label="名称" width="250" />
-            <el-table-column prop="templateId" label="模板ID" width="250" />
-            <el-table-column prop="severity" label="严重级别" width="100">
+            <el-table-column prop="name" :label="$t('poc.name')" width="250" />
+            <el-table-column prop="templateId" :label="$t('poc.templateId')" width="250" />
+            <el-table-column prop="severity" :label="$t('poc.severityLevel')" width="100">
               <template #default="{ row }">
                 <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="tags" label="标签" min-width="200">
+            <el-table-column prop="tags" :label="$t('poc.tags')" min-width="200">
               <template #default="{ row }">
                 <el-tag v-for="tag in row.tags" :key="tag" size="small" style="margin-right: 5px">
                   {{ tag }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" :label="$t('poc.status')" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-                  {{ row.enabled ? '启用' : '禁用' }}
+                  {{ row.enabled ? $t('poc.enabled') : $t('poc.disabled') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="300">
+            <el-table-column :label="$t('poc.operation')" width="300">
               <template #default="{ row }">
-                <el-button type="success" link size="small" @click="showPocValidateDialog(row)">验证</el-button>
-                <el-button type="warning" link size="small" @click="showScanAssetsDialog(row)">扫描资产</el-button>
-                <el-button type="primary" link size="small" @click="showCustomPocForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteCustomPoc(row)">删除</el-button>
+                <el-button type="success" link size="small" @click="showPocValidateDialog(row)">{{ $t('poc.validate') }}</el-button>
+                <el-button type="warning" link size="small" @click="showScanAssetsDialog(row)">{{ $t('poc.scanAssets') }}</el-button>
+                <el-button type="primary" link size="small" @click="showCustomPocForm(row)">{{ $t('poc.edit') }}</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteCustomPoc(row)">{{ $t('poc.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -273,49 +273,49 @@
       </el-tab-pane>
 
       <!-- 目录扫描字典 -->
-      <el-tab-pane label="目录扫描字典" name="dirscanDict">
+      <el-tab-pane :label="$t('poc.dirscanDict')" name="dirscanDict">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>目录扫描字典管理</span>
+              <span>{{ $t('poc.dirscanDictManage') }}</span>
               <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ dirscanDictPagination.total || 0 }} 个字典
+                {{ $t('poc.totalDicts', { count: dirscanDictPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto">
                 <el-button type="danger" size="small" @click="handleClearDirscanDict" :loading="clearDictLoading" style="margin-right: 10px">
-                  <el-icon><Delete /></el-icon>清空自定义
+                  <el-icon><Delete /></el-icon>{{ $t('poc.clearCustomDict') }}
                 </el-button>
                 <el-button type="primary" size="small" @click="showDirscanDictForm()">
-                  <el-icon><Plus /></el-icon>新增字典
+                  <el-icon><Plus /></el-icon>{{ $t('poc.addDict') }}
                 </el-button>
               </div>
             </div>
           </template>
           <p class="tip-text">
-            管理目录扫描使用的字典文件，支持自定义路径列表。创建任务时可选择要使用的字典进行目录扫描。
+            {{ $t('poc.dirscanDictTip') }}
           </p>
           <el-table :data="dirscanDicts" stripe v-loading="dirscanDictLoading" max-height="500">
-            <el-table-column prop="name" label="字典名称" width="200" />
-            <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-            <el-table-column prop="pathCount" label="路径数量" width="100" />
-            <el-table-column prop="isBuiltin" label="类型" width="80">
+            <el-table-column prop="name" :label="$t('poc.dictName')" width="200" />
+            <el-table-column prop="description" :label="$t('poc.description')" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="pathCount" :label="$t('poc.pathCount')" width="100" />
+            <el-table-column prop="isBuiltin" :label="$t('poc.dictType')" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">
-                  {{ row.isBuiltin ? '内置' : '自定义' }}
+                  {{ row.isBuiltin ? $t('poc.builtin') : $t('poc.custom') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" :label="$t('poc.status')" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-                  {{ row.enabled ? '启用' : '禁用' }}
+                  {{ row.enabled ? $t('poc.enabled') : $t('poc.disabled') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150">
+            <el-table-column :label="$t('poc.operation')" width="150">
               <template #default="{ row }">
-                <el-button type="primary" link size="small" @click="showDirscanDictForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteDirscanDict(row)">删除</el-button>
+                <el-button type="primary" link size="small" @click="showDirscanDictForm(row)">{{ $t('poc.edit') }}</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteDirscanDict(row)">{{ $t('poc.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -333,49 +333,49 @@
       </el-tab-pane>
 
       <!-- 子域名字典 -->
-      <el-tab-pane label="子域名字典" name="subdomainDict">
+      <el-tab-pane :label="$t('poc.subdomainDict')" name="subdomainDict">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>子域名字典管理</span>
+              <span>{{ $t('poc.subdomainDictManage') }}</span>
               <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ subdomainDictPagination.total || 0 }} 个字典
+                {{ $t('poc.totalDicts', { count: subdomainDictPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto">
                 <el-button type="danger" size="small" @click="handleClearSubdomainDict" :loading="clearSubdomainDictLoading" style="margin-right: 10px">
-                  <el-icon><Delete /></el-icon>清空自定义
+                  <el-icon><Delete /></el-icon>{{ $t('poc.clearCustomDict') }}
                 </el-button>
                 <el-button type="primary" size="small" @click="showSubdomainDictForm()">
-                  <el-icon><Plus /></el-icon>新增字典
+                  <el-icon><Plus /></el-icon>{{ $t('poc.addDict') }}
                 </el-button>
               </div>
             </div>
           </template>
           <p class="tip-text">
-            管理子域名暴力破解使用的字典文件，支持自定义子域名前缀列表。创建任务时可选择要使用的字典进行子域名枚举。
+            {{ $t('poc.subdomainDictTip') }}
           </p>
           <el-table :data="subdomainDicts" stripe v-loading="subdomainDictLoading" max-height="500">
-            <el-table-column prop="name" label="字典名称" width="200" />
-            <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-            <el-table-column prop="wordCount" label="词条数量" width="100" />
-            <el-table-column prop="isBuiltin" label="类型" width="80">
+            <el-table-column prop="name" :label="$t('poc.dictName')" width="200" />
+            <el-table-column prop="description" :label="$t('poc.description')" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="wordCount" :label="$t('poc.wordCount')" width="100" />
+            <el-table-column prop="isBuiltin" :label="$t('poc.dictType')" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">
-                  {{ row.isBuiltin ? '内置' : '自定义' }}
+                  {{ row.isBuiltin ? $t('poc.builtin') : $t('poc.custom') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" :label="$t('poc.status')" width="80">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-                  {{ row.enabled ? '启用' : '禁用' }}
+                  {{ row.enabled ? $t('poc.enabled') : $t('poc.disabled') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150">
+            <el-table-column :label="$t('poc.operation')" width="150">
               <template #default="{ row }">
-                <el-button type="primary" link size="small" @click="showSubdomainDictForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteSubdomainDict(row)">删除</el-button>
+                <el-button type="primary" link size="small" @click="showSubdomainDictForm(row)">{{ $t('poc.edit') }}</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteSubdomainDict(row)">{{ $t('poc.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -394,18 +394,18 @@
     </el-tabs>
 
     <!-- 目录扫描字典编辑对话框 -->
-    <el-dialog v-model="dirscanDictDialogVisible" :title="dirscanDictForm.id ? '编辑字典' : '新增字典'" width="700px">
+    <el-dialog v-model="dirscanDictDialogVisible" :title="dirscanDictForm.id ? $t('poc.editDict') : $t('poc.addDictTitle')" width="700px">
       <el-form ref="dirscanDictFormRef" :model="dirscanDictForm" :rules="dirscanDictRules" label-width="100px">
-        <el-form-item label="字典名称" prop="name">
-          <el-input v-model="dirscanDictForm.name" placeholder="输入字典名称" />
+        <el-form-item :label="$t('poc.dictNameLabel')" prop="name">
+          <el-input v-model="dirscanDictForm.name" :placeholder="$t('poc.dictNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="dirscanDictForm.description" placeholder="可选描述" />
+        <el-form-item :label="$t('poc.descriptionLabel')">
+          <el-input v-model="dirscanDictForm.description" :placeholder="$t('poc.descriptionPlaceholder')" />
         </el-form-item>
-        <el-form-item label="路径列表" prop="content">
+        <el-form-item :label="$t('poc.pathListLabel')" prop="content">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
-              每行一个路径，以 / 开头，支持 # 开头的注释行
+              {{ $t('poc.pathListHint') }}
             </div>
             <el-input
               v-model="dirscanDictForm.content"
@@ -414,33 +414,33 @@
               placeholder="/admin&#10;/login&#10;/api&#10;/backup&#10;/.git&#10;/config"
             />
             <div style="margin-top: 8px; color: #909399; font-size: 12px">
-              当前路径数量: {{ countDictPaths(dirscanDictForm.content) }}
+              {{ $t('poc.currentPathCount') }}: {{ countDictPaths(dirscanDictForm.content) }}
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('poc.enableLabel')">
           <el-switch v-model="dirscanDictForm.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dirscanDictDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveDirscanDict">保存</el-button>
+        <el-button @click="dirscanDictDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveDirscanDict">{{ $t('poc.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 子域名字典编辑对话框 -->
-    <el-dialog v-model="subdomainDictDialogVisible" :title="subdomainDictForm.id ? '编辑字典' : '新增字典'" width="700px">
+    <el-dialog v-model="subdomainDictDialogVisible" :title="subdomainDictForm.id ? $t('poc.editDict') : $t('poc.addDictTitle')" width="700px">
       <el-form ref="subdomainDictFormRef" :model="subdomainDictForm" :rules="subdomainDictRules" label-width="100px">
-        <el-form-item label="字典名称" prop="name">
-          <el-input v-model="subdomainDictForm.name" placeholder="输入字典名称" />
+        <el-form-item :label="$t('poc.dictNameLabel')" prop="name">
+          <el-input v-model="subdomainDictForm.name" :placeholder="$t('poc.dictNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="subdomainDictForm.description" placeholder="可选描述" />
+        <el-form-item :label="$t('poc.descriptionLabel')">
+          <el-input v-model="subdomainDictForm.description" :placeholder="$t('poc.descriptionPlaceholder')" />
         </el-form-item>
-        <el-form-item label="词条列表" prop="content">
+        <el-form-item :label="$t('poc.wordListLabel')" prop="content">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
-              每行一个子域名前缀，支持 # 开头的注释行
+              {{ $t('poc.wordListHint') }}
             </div>
             <el-input
               v-model="subdomainDictForm.content"
@@ -449,57 +449,57 @@
               placeholder="www&#10;mail&#10;ftp&#10;admin&#10;api&#10;dev&#10;test"
             />
             <div style="margin-top: 8px; color: #909399; font-size: 12px">
-              当前词条数量: {{ countSubdomainWords(subdomainDictForm.content) }}
+              {{ $t('poc.currentWordCount') }}: {{ countSubdomainWords(subdomainDictForm.content) }}
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('poc.enableLabel')">
           <el-switch v-model="subdomainDictForm.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="subdomainDictDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveSubdomainDict">保存</el-button>
+        <el-button @click="subdomainDictDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveSubdomainDict">{{ $t('poc.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 标签映射编辑对话框 -->
-    <el-dialog v-model="tagMappingDialogVisible" :title="tagMappingForm.id ? '编辑映射' : '新增映射'" width="500px">
+    <el-dialog v-model="tagMappingDialogVisible" :title="tagMappingForm.id ? $t('poc.editMapping') : $t('poc.addMappingTitle')" width="500px">
       <el-form ref="tagMappingFormRef" :model="tagMappingForm" :rules="tagMappingRules" label-width="100px">
-        <el-form-item label="应用名称" prop="appName">
-          <el-input v-model="tagMappingForm.appName" placeholder="Wappalyzer识别的应用名称，如: WordPress" />
+        <el-form-item :label="$t('poc.appNameLabel')" prop="appName">
+          <el-input v-model="tagMappingForm.appName" :placeholder="$t('poc.appNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="Nuclei标签" prop="nucleiTagsInput">
+        <el-form-item :label="$t('poc.nucleiTagsLabel')" prop="nucleiTagsInput">
           <el-input 
             v-model="tagMappingForm.nucleiTagsInput" 
-            placeholder="输入Nuclei标签，多个用逗号分隔，如: wordpress,wp-plugin,cve"
+            :placeholder="$t('poc.nucleiTagsPlaceholder')"
             style="width: 100%"
           />
           <div style="color: #909399; font-size: 12px; margin-top: 4px;">
-            常用标签: wordpress, apache, nginx, php, java, cve, rce, sqli, xss, lfi
+            {{ $t('poc.commonTags') }}
           </div>
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="tagMappingForm.description" placeholder="可选描述" />
+        <el-form-item :label="$t('poc.descriptionLabel')">
+          <el-input v-model="tagMappingForm.description" :placeholder="$t('poc.descriptionPlaceholder')" />
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('poc.enableLabel')">
           <el-switch v-model="tagMappingForm.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="tagMappingDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveTagMapping">保存</el-button>
+        <el-button @click="tagMappingDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveTagMapping">{{ $t('poc.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 自定义POC编辑对话框 -->
-    <el-dialog v-model="customPocDialogVisible" :title="customPocForm.id ? '编辑POC' : '新增POC'" width="900px">
+    <el-dialog v-model="customPocDialogVisible" :title="customPocForm.id ? $t('poc.editPoc') : $t('poc.addPocTitle')" width="900px">
       <el-form ref="customPocFormRef" :model="customPocForm" :rules="customPocRules" label-width="100px">
-        <el-form-item label="YAML内容" prop="content">
+        <el-form-item :label="$t('poc.yamlContent')" prop="content">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-              <span style="color: #909399; font-size: 12px">粘贴或编辑 Nuclei YAML 模板，下方字段将自动从 YAML 中解析</span>
-              <el-button type="primary" size="small" @click="showAiAssistDialog" :icon="MagicStick">AI辅助</el-button>
+              <span style="color: #909399; font-size: 12px">{{ $t('poc.yamlHint') }}</span>
+              <el-button type="primary" size="small" @click="showAiAssistDialog" :icon="MagicStick">{{ $t('poc.aiAssist') }}</el-button>
             </div>
             <div class="yaml-editor-wrapper">
               <el-input
@@ -512,22 +512,22 @@
             </div>
           </div>
         </el-form-item>
-        <el-divider content-position="left">解析结果（自动从YAML提取，可手动修改）</el-divider>
+        <el-divider content-position="left">{{ $t('poc.parseResult') }}</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="模板ID" prop="templateId">
-              <el-input v-model="customPocForm.templateId" placeholder="从YAML的id字段解析" />
+            <el-form-item :label="$t('poc.templateIdLabel')" prop="templateId">
+              <el-input v-model="customPocForm.templateId" :placeholder="$t('poc.templateIdParsed')" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="名称" prop="name">
-              <el-input v-model="customPocForm.name" placeholder="从YAML的info.name解析" />
+            <el-form-item :label="$t('poc.nameLabel')" prop="name">
+              <el-input v-model="customPocForm.name" :placeholder="$t('poc.nameParsed')" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="严重级别" prop="severity">
+            <el-form-item :label="$t('poc.severityLabel')" prop="severity">
               <el-select v-model="customPocForm.severity" style="width: 100%">
                 <el-option label="Critical" value="critical" />
                 <el-option label="High" value="high" />
@@ -539,57 +539,57 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="作者">
-              <el-input v-model="customPocForm.author" placeholder="从YAML的info.author解析" />
+            <el-form-item :label="$t('poc.authorLabel')">
+              <el-input v-model="customPocForm.author" :placeholder="$t('poc.authorParsed')" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="标签">
+        <el-form-item :label="$t('poc.tagsLabel')">
           <el-input 
             v-model="customPocForm.tagsInput" 
-            placeholder="从YAML的info.tags解析，多个用逗号分隔"
+            :placeholder="$t('poc.tagsParsed')"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="customPocForm.description" type="textarea" :rows="2" placeholder="从YAML的info.description解析" />
+        <el-form-item :label="$t('poc.descriptionLabel')">
+          <el-input v-model="customPocForm.description" type="textarea" :rows="2" :placeholder="$t('poc.descriptionParsed')" />
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('poc.enableLabel')">
           <el-switch v-model="customPocForm.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="customPocDialogVisible = false">取消</el-button>
-        <el-button @click="parseYamlContent">重新解析YAML</el-button>
-        <el-button type="success" @click="handleValidatePocSyntax" :loading="syntaxValidating">验证语法</el-button>
-        <el-button type="primary" @click="handleSaveCustomPoc">保存</el-button>
+        <el-button @click="customPocDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+        <el-button @click="parseYamlContent">{{ $t('poc.reparseYaml') }}</el-button>
+        <el-button type="success" @click="handleValidatePocSyntax" :loading="syntaxValidating">{{ $t('poc.validateSyntax') }}</el-button>
+        <el-button type="primary" @click="handleSaveCustomPoc">{{ $t('poc.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- AI辅助编写POC对话框 -->
-    <el-dialog v-model="aiAssistDialogVisible" title="AI辅助编写POC" width="700px">
+    <el-dialog v-model="aiAssistDialogVisible" :title="$t('poc.aiAssistTitle')" width="700px">
       <!-- AI配置折叠面板 -->
       <el-collapse v-model="aiConfigCollapse" style="margin-bottom: 15px;">
-        <el-collapse-item title="AI服务配置" name="config">
+        <el-collapse-item :title="$t('poc.aiServiceConfig')" name="config">
           <el-form label-width="100px" size="small">
-            <el-form-item label="协议类型">
+            <el-form-item :label="$t('poc.protocolType')">
               <el-radio-group v-model="aiConfig.protocol">
                 <el-radio-button value="openai">OpenAI</el-radio-button>
                 <el-radio-button value="anthropic">Anthropic</el-radio-button>
                 <el-radio-button value="gemini">Gemini</el-radio-button>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="服务地址">
+            <el-form-item :label="$t('poc.serverAddress')">
               <el-input v-model="aiConfig.baseUrl" placeholder="http://127.0.0.1:8045" />
               <div style="color: #909399; font-size: 12px; margin-top: 4px;">
                 {{ aiConfig.protocol === 'openai' ? 'OpenAI: /v1/chat/completions' : aiConfig.protocol === 'anthropic' ? 'Anthropic: /v1/messages' : 'Gemini: /v1beta/models/...' }}
               </div>
             </el-form-item>
-            <el-form-item label="API Key">
-              <el-input v-model="aiConfig.apiKey" placeholder="API密钥" show-password />
+            <el-form-item :label="$t('poc.apiKey')">
+              <el-input v-model="aiConfig.apiKey" :placeholder="$t('poc.apiKeyPlaceholder')" show-password />
             </el-form-item>
-            <el-form-item label="模型">
-              <el-select v-model="aiConfig.model" placeholder="选择模型" style="width: 100%" allow-create filterable>
+            <el-form-item :label="$t('poc.model')">
+              <el-select v-model="aiConfig.model" :placeholder="$t('poc.selectModel')" style="width: 100%" allow-create filterable>
                 <el-option label="gemini-2.5-flash" value="gemini-2.5-flash" />
                 <el-option label="gemini-2.5-pro" value="gemini-2.5-pro" />
                 <el-option label="claude-sonnet-4-20250514" value="claude-sonnet-4-20250514" />
@@ -599,73 +599,73 @@
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" size="small" @click="saveAiConfig" :loading="aiSaving">保存配置</el-button>
-              <el-button size="small" @click="testAiConnection" :loading="aiTesting">测试连接</el-button>
+              <el-button type="primary" size="small" @click="saveAiConfig" :loading="aiSaving">{{ $t('poc.saveConfig') }}</el-button>
+              <el-button size="small" @click="testAiConnection" :loading="aiTesting">{{ $t('poc.testConnection') }}</el-button>
             </el-form-item>
           </el-form>
         </el-collapse-item>
       </el-collapse>
 
       <el-form label-width="100px">
-        <el-form-item label="漏洞描述">
+        <el-form-item :label="$t('poc.vulnDescription')">
           <el-input
             v-model="aiAssistForm.description"
             type="textarea"
             :rows="4"
-            placeholder="请描述要检测的漏洞，例如：&#10;• 检测目标是否存在SQL注入漏洞，路径为/api/search，参数为keyword&#10;• 检测Apache Tomcat CVE-2020-1938 AJP文件读取漏洞&#10;• 检测目标是否存在未授权访问，路径为/admin"
+            :placeholder="$t('poc.vulnDescPlaceholder')"
           />
         </el-form-item>
-        <el-form-item label="漏洞类型">
-          <el-select v-model="aiAssistForm.vulnType" placeholder="选择漏洞类型" style="width: 100%">
-            <el-option label="SQL注入" value="sqli" />
-            <el-option label="XSS跨站脚本" value="xss" />
-            <el-option label="命令注入" value="rce" />
-            <el-option label="文件包含/读取" value="lfi" />
-            <el-option label="SSRF" value="ssrf" />
-            <el-option label="未授权访问" value="unauth" />
-            <el-option label="信息泄露" value="info-disclosure" />
-            <el-option label="CVE漏洞" value="cve" />
-            <el-option label="其他" value="other" />
+        <el-form-item :label="$t('poc.vulnType')">
+          <el-select v-model="aiAssistForm.vulnType" :placeholder="$t('poc.selectVulnType')" style="width: 100%">
+            <el-option :label="$t('poc.vulnTypeSqli')" value="sqli" />
+            <el-option :label="$t('poc.vulnTypeXss')" value="xss" />
+            <el-option :label="$t('poc.vulnTypeRce')" value="rce" />
+            <el-option :label="$t('poc.vulnTypeLfi')" value="lfi" />
+            <el-option :label="$t('poc.vulnTypeSsrf')" value="ssrf" />
+            <el-option :label="$t('poc.vulnTypeUnauth')" value="unauth" />
+            <el-option :label="$t('poc.vulnTypeInfoDisclosure')" value="info-disclosure" />
+            <el-option :label="$t('poc.vulnTypeCve')" value="cve" />
+            <el-option :label="$t('poc.vulnTypeOther')" value="other" />
           </el-select>
         </el-form-item>
-        <el-form-item label="CVE编号" v-if="aiAssistForm.vulnType === 'cve'">
-          <el-input v-model="aiAssistForm.cveId" placeholder="例如：CVE-2021-44228" />
+        <el-form-item :label="$t('poc.cveId')" v-if="aiAssistForm.vulnType === 'cve'">
+          <el-input v-model="aiAssistForm.cveId" :placeholder="$t('poc.cveIdPlaceholder')" />
         </el-form-item>
-        <el-form-item label="参考信息">
+        <el-form-item :label="$t('poc.referenceInfo')">
           <el-input
             v-model="aiAssistForm.reference"
             type="textarea"
             :rows="2"
-            placeholder="可选：提供漏洞的参考链接、PoC代码片段等"
+            :placeholder="$t('poc.referencePlaceholder')"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="aiAssistDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="generatePocWithAi" :loading="aiGenerating">生成POC</el-button>
+        <el-button @click="aiAssistDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+        <el-button type="primary" @click="generatePocWithAi" :loading="aiGenerating">{{ $t('poc.generatePoc') }}</el-button>
       </template>
-    </el-dialog>
+    </el-dialog> 
 
     <!-- 导入POC对话框 -->
-    <el-dialog v-model="importPocDialogVisible" title="导入POC" width="900px">
+    <el-dialog v-model="importPocDialogVisible" :title="$t('poc.importPocTitle')" width="900px">
       <el-form label-width="100px">
-        <el-form-item label="POC格式">
+        <el-form-item :label="$t('poc.pocFormat')">
           <el-radio-group v-model="importPocFormat" @change="handleImportFormatChange">
             <el-radio-button value="nuclei">Nuclei</el-radio-button>
-            <el-radio-button value="xray">XRAY (自动转换)</el-radio-button>
+            <el-radio-button value="xray">XRAY ({{ $t('poc.convertedToNuclei') }})</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="导入方式" v-if="importPocFormat === 'xray'">
+        <el-form-item :label="$t('poc.importMethod')" v-if="importPocFormat === 'xray'">
           <el-radio-group v-model="importPocType">
-            <el-radio-button value="text">文本粘贴</el-radio-button>
-            <el-radio-button value="file">文件上传</el-radio-button>
+            <el-radio-button value="text">{{ $t('poc.textPaste') }}</el-radio-button>
+            <el-radio-button value="file">{{ $t('poc.fileUpload') }}</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <!-- Nuclei格式：从本地文件夹导入 -->
-        <el-form-item v-if="importPocFormat === 'nuclei'" label="选择文件夹">
+        <el-form-item v-if="importPocFormat === 'nuclei'" :label="$t('poc.selectFolder')">
           <div style="width: 100%">
             <el-button type="primary" @click="customPocFolderInputRef?.click()" :loading="importPocLoading">
-              <el-icon><FolderOpened /></el-icon>选择本地文件夹
+              <el-icon><FolderOpened /></el-icon>{{ $t('poc.selectLocalFolder') }}
             </el-button>
             <input 
               ref="customPocFolderInputRef" 
@@ -677,32 +677,32 @@
               @change="handleCustomPocFolderSelect"
             />
             <div style="margin-top: 8px; color: #909399; font-size: 12px">
-              选择包含 Nuclei YAML 模板的文件夹，将自动扫描所有 .yaml/.yml 文件
+              {{ $t('poc.folderSelectHint') }}
             </div>
             <div v-if="uploadedFileCount > 0" style="margin-top: 10px; color: #67c23a; font-size: 13px">
-              <el-icon><UploadFilled /></el-icon> 已扫描 {{ uploadedFileCount }} 个文件
+              <el-icon><UploadFilled /></el-icon> {{ $t('poc.scannedFiles', { count: uploadedFileCount }) }}
             </div>
           </div>
         </el-form-item>
         <!-- XRAY格式：文本粘贴 -->
-        <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'text'" label="POC内容">
+        <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'text'" :label="$t('poc.yamlContent')">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
-              粘贴 XRAY YAML POC 内容，将自动转换为 Nuclei 格式，支持一次导入多个POC（用 --- 分隔）
+              {{ $t('poc.xrayPasteHint') }}
             </div>
             <div class="yaml-editor-wrapper">
               <el-input
                 v-model="importPocContent"
                 type="textarea"
                 :rows="18"
-                placeholder="粘贴 XRAY YAML POC 内容..."
+                :placeholder="$t('poc.pasteXrayContent')"
                 @input="parseImportContent"
               />
             </div>
           </div>
         </el-form-item>
         <!-- XRAY格式：文件上传 -->
-        <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'file'" label="上传文件">
+        <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'file'" :label="$t('poc.fileUpload')">
           <div style="width: 100%">
             <el-upload
               ref="importPocUploadRef"
@@ -717,16 +717,16 @@
               :show-file-list="false"
             >
               <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-              <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
+              <div class="el-upload__text">{{ $t('poc.uploadHint') }}</div>
               <template #tip>
                 <div class="el-upload__tip">
-                  支持 .yaml / .yml 文件，可批量选择多个文件
-                  <span style="color: #e6a23c">（XRAY格式将自动转换为Nuclei格式）</span>
+                  {{ $t('poc.uploadTip') }}
+                  <span style="color: #e6a23c">{{ $t('poc.xrayConvertNote') }}</span>
                 </div>
               </template>
             </el-upload>
             <div v-if="uploadedFileCount > 0" style="margin-top: 10px; color: #67c23a; font-size: 13px">
-              <el-icon><UploadFilled /></el-icon> 已上传 {{ uploadedFileCount }} 个文件
+              <el-icon><UploadFilled /></el-icon> {{ $t('poc.uploadedFiles', { count: uploadedFileCount }) }}
             </div>
           </div>
         </el-form-item>
@@ -735,20 +735,20 @@
       <!-- 解析预览（仅XRAY格式显示） -->
       <div v-if="importPocFormat === 'xray' && importPocPreviews.length > 0" class="import-preview">
         <div class="preview-header">
-          <span>解析预览 ({{ importPocPreviews.length }} 个POC)</span>
-          <el-tag type="warning" size="small" style="margin-left: 10px">已转换为Nuclei格式</el-tag>
-          <el-checkbox v-model="importPocEnabled" style="margin-left: 15px">导入后启用</el-checkbox>
+          <span>{{ $t('poc.parsePreview') }} ({{ importPocPreviews.length }} POC)</span>
+          <el-tag type="warning" size="small" style="margin-left: 10px">{{ $t('poc.convertedToNuclei') }}</el-tag>
+          <el-checkbox v-model="importPocEnabled" style="margin-left: 15px">{{ $t('poc.enableAfterImport') }}</el-checkbox>
         </div>
         <el-table :data="importPocPreviews" max-height="300" size="small">
-          <el-table-column prop="templateId" label="模板ID" width="180" show-overflow-tooltip />
-          <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
-          <el-table-column prop="severity" label="级别" width="90">
+          <el-table-column prop="templateId" :label="$t('poc.templateId')" width="180" show-overflow-tooltip />
+          <el-table-column prop="name" :label="$t('poc.name')" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="severity" :label="$t('poc.level')" width="90">
             <template #default="{ row }">
               <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="author" label="作者" width="100" show-overflow-tooltip />
-          <el-table-column prop="tags" label="标签" min-width="150">
+          <el-table-column prop="author" :label="$t('poc.author')" width="100" show-overflow-tooltip />
+          <el-table-column prop="tags" :label="$t('poc.tags')" min-width="150">
             <template #default="{ row }">
               <el-tag v-for="tag in (row.tags || []).slice(0, 3)" :key="tag" size="small" style="margin-right: 3px">
                 {{ tag }}
@@ -756,26 +756,26 @@
               <span v-if="row.tags && row.tags.length > 3" style="color: #909399">+{{ row.tags.length - 3 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="120">
+          <el-table-column :label="$t('poc.operation')" width="120">
             <template #default="{ row, $index }">
-              <el-button type="primary" link size="small" @click="previewConvertedPoc(row)">预览</el-button>
-              <el-button type="danger" link size="small" @click="removeImportPreview($index)">移除</el-button>
+              <el-button type="primary" link size="small" @click="previewConvertedPoc(row)">{{ $t('poc.preview') }}</el-button>
+              <el-button type="danger" link size="small" @click="removeImportPreview($index)">{{ $t('poc.remove') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
       </div>
       
       <template #footer>
-        <el-button @click="importPocDialogVisible = false">取消</el-button>
-        <el-button v-if="importPocFormat === 'xray'" @click="clearImportContent">清空</el-button>
+        <el-button @click="importPocDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+        <el-button v-if="importPocFormat === 'xray'" @click="clearImportContent">{{ $t('poc.clear') }}</el-button>
         <el-button v-if="importPocFormat === 'xray'" type="primary" @click="handleImportPocs" :loading="importPocLoading" :disabled="importPocPreviews.length === 0">
-          导入 ({{ importPocPreviews.length }})
+          {{ $t('poc.import') }} ({{ importPocPreviews.length }})
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 预览转换后的POC对话框 -->
-    <el-dialog v-model="convertedPocPreviewVisible" title="转换后的POC预览" width="800px">
+    <el-dialog v-model="convertedPocPreviewVisible" :title="$t('poc.convertedPocPreview')" width="800px">
       <el-input
         v-model="convertedPocPreviewContent"
         type="textarea"
@@ -784,24 +784,24 @@
         style="font-family: 'Consolas', 'Monaco', monospace; font-size: 13px"
       />
       <template #footer>
-        <el-button @click="convertedPocPreviewVisible = false">关闭</el-button>
-        <el-button type="primary" @click="copyConvertedPoc">复制内容</el-button>
+        <el-button @click="convertedPocPreviewVisible = false">{{ $t('poc.close') }}</el-button>
+        <el-button type="primary" @click="copyConvertedPoc">{{ $t('poc.copyContent') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 查看模板内容对话框 -->
-    <el-dialog v-model="templateContentDialogVisible" :title="currentTemplate.name || '模板内容'" width="900px">
+    <el-dialog v-model="templateContentDialogVisible" :title="currentTemplate.name || $t('poc.templateContent')" width="900px">
       <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
-        <el-descriptions-item label="模板ID">{{ currentTemplate.id }}</el-descriptions-item>
-        <el-descriptions-item label="严重级别">
+        <el-descriptions-item :label="$t('poc.templateId')">{{ currentTemplate.id }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('poc.severityLevel')">
           <el-tag :type="getSeverityType(currentTemplate.severity)" size="small">{{ currentTemplate.severity }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="分类">{{ currentTemplate.category }}</el-descriptions-item>
-        <el-descriptions-item label="作者">{{ currentTemplate.author }}</el-descriptions-item>
-        <el-descriptions-item label="标签" :span="2">
+        <el-descriptions-item :label="$t('poc.category')">{{ currentTemplate.category }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('poc.author')">{{ currentTemplate.author }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('poc.tags')" :span="2">
           <el-tag v-for="tag in (currentTemplate.tags || [])" :key="tag" size="small" style="margin-right: 5px">{{ tag }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="描述" :span="2">{{ currentTemplate.description || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('poc.description')" :span="2">{{ currentTemplate.description || '-' }}</el-descriptions-item>
       </el-descriptions>
       <div class="template-content-wrapper">
         <el-input
@@ -813,32 +813,32 @@
         />
       </div>
       <template #footer>
-        <el-button @click="templateContentDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="copyTemplateContent">复制内容</el-button>
+        <el-button @click="templateContentDialogVisible = false">{{ $t('poc.close') }}</el-button>
+        <el-button type="primary" @click="copyTemplateContent">{{ $t('poc.copyContent') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- POC验证对话框 -->
-    <el-dialog v-model="pocValidateDialogVisible" title="验证POC" width="700px" @close="handleValidateDialogClose">
+    <el-dialog v-model="pocValidateDialogVisible" :title="$t('poc.validatePoc')" width="700px" @close="handleValidateDialogClose">
       <el-form label-width="80px">
-        <el-form-item label="POC名称">
+        <el-form-item :label="$t('poc.pocName')">
           <el-input :value="validatePoc.name" disabled />
         </el-form-item>
-        <el-form-item label="模板ID">
+        <el-form-item :label="$t('poc.templateId')">
           <el-input :value="validatePoc.templateId" disabled />
         </el-form-item>
-        <el-form-item label="目标URL">
-          <el-input v-model="pocValidateUrl" placeholder="请输入目标URL，如 https://example.com" />
+        <el-form-item :label="$t('poc.targetUrl')">
+          <el-input v-model="pocValidateUrl" :placeholder="$t('poc.targetUrlPlaceholder')" />
         </el-form-item>
       </el-form>
       
       <!-- 执行日志区域 -->
       <div v-if="pocValidateLoading || pocValidateLogs.length > 0" class="validate-logs">
         <div class="logs-header">
-          <span>执行日志</span>
-          <el-tag v-if="pocValidateLoading" type="warning" size="small">执行中...</el-tag>
-          <el-tag v-else-if="pocValidateResult && pocValidateResult.matched" type="success" size="small">发现漏洞</el-tag>
-          <el-tag v-else-if="pocValidateResult" type="info" size="small">完成</el-tag>
+          <span>{{ $t('poc.executionLog') }}</span>
+          <el-tag v-if="pocValidateLoading" type="warning" size="small">{{ $t('poc.executing') }}</el-tag>
+          <el-tag v-else-if="pocValidateResult && pocValidateResult.matched" type="success" size="small">{{ $t('poc.vulnFound') }}</el-tag>
+          <el-tag v-else-if="pocValidateResult" type="info" size="small">{{ $t('poc.completed') }}</el-tag>
         </div>
         <div class="logs-content" ref="logsContainerRef">
           <div v-for="(log, index) in pocValidateLogs" :key="index" :class="['log-line', 'log-' + log.level.toLowerCase()]">
@@ -853,7 +853,7 @@
       <div v-if="pocValidateResult && !pocValidateLoading" class="validate-result">
         <div class="result-header">
           <el-tag :type="pocValidateResult.matched ? 'danger' : 'info'" size="large">
-            {{ pocValidateResult.matched ? '✓ 发现漏洞' : '✗ 未发现漏洞' }}
+            {{ pocValidateResult.matched ? '✓ ' + $t('poc.vulnFound') : '✗ ' + $t('poc.validateCompleteNoVuln') }}
           </el-tag>
           <el-tag :type="getSeverityType(pocValidateResult.severity)" size="small" style="margin-left: 10px">
             {{ pocValidateResult.severity }}
@@ -862,31 +862,31 @@
         <pre class="result-details">{{ pocValidateResult.details }}</pre>
       </div>
       <template #footer>
-        <el-button @click="pocValidateDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleValidatePoc" :loading="pocValidateLoading" :disabled="!pocValidateUrl">验证</el-button>
+        <el-button @click="pocValidateDialogVisible = false">{{ $t('poc.close') }}</el-button>
+        <el-button type="primary" @click="handleValidatePoc" :loading="pocValidateLoading" :disabled="!pocValidateUrl">{{ $t('poc.validate') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 默认模板批量验证对话框 -->
-    <el-dialog v-model="templateBatchValidateDialogVisible" title="批量验证POC" width="900px" @close="handleBatchValidateDialogClose">
+    <el-dialog v-model="templateBatchValidateDialogVisible" :title="$t('poc.batchValidatePoc')" width="900px" @close="handleBatchValidateDialogClose">
       <el-form label-width="100px">
-        <el-form-item label="已选模板">
+        <el-form-item :label="$t('poc.selectedTemplates')">
           <div class="selected-templates">
             <el-tag v-for="tpl in selectedTemplates.slice(0, 10)" :key="tpl.id" size="small" style="margin-right: 5px; margin-bottom: 5px">
               {{ tpl.name || tpl.id }}
             </el-tag>
-            <span v-if="selectedTemplates.length > 10" style="color: #909399">+{{ selectedTemplates.length - 10 }} 个</span>
+            <span v-if="selectedTemplates.length > 10" style="color: #909399">+{{ selectedTemplates.length - 10 }}</span>
           </div>
         </el-form-item>
-        <el-form-item label="目标URL">
+        <el-form-item :label="$t('poc.targetUrlLabel')">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
               <el-radio-group v-model="batchTargetInputType" size="small">
-                <el-radio-button value="text">文本输入</el-radio-button>
-                <el-radio-button value="file">文件上传</el-radio-button>
+                <el-radio-button value="text">{{ $t('poc.textInput') }}</el-radio-button>
+                <el-radio-button value="file">{{ $t('poc.fileUpload') }}</el-radio-button>
               </el-radio-group>
               <span style="color: #909399; font-size: 12px;">
-                {{ batchTargetInputType === 'text' ? '每行一个URL' : '支持 .txt 文件，每行一个URL' }}
+                {{ batchTargetInputType === 'text' ? $t('poc.oneUrlPerLine') : $t('poc.supportsTxtFile') }}
               </span>
             </div>
             <el-input 
@@ -894,7 +894,7 @@
               v-model="templateBatchValidateUrls" 
               type="textarea" 
               :rows="5" 
-              placeholder="请输入目标URL，每行一个，如：&#10;https://example1.com&#10;https://example2.com&#10;https://example3.com"
+              :placeholder="$t('poc.targetUrlsPlaceholder')"
             />
             <el-upload
               v-else
@@ -907,13 +907,13 @@
               drag
             >
               <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-              <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
+              <div class="el-upload__text">{{ $t('poc.uploadHint') }}</div>
               <template #tip>
-                <div class="el-upload__tip">仅支持 .txt 文件，每行一个URL</div>
+                <div class="el-upload__tip">{{ $t('poc.onlyTxtFile') }}</div>
               </template>
             </el-upload>
             <div v-if="batchTargetUrls.length > 0" style="margin-top: 8px; color: #67c23a; font-size: 12px;">
-              已解析 {{ batchTargetUrls.length }} 个目标URL
+              {{ $t('poc.parsedUrls', { count: batchTargetUrls.length }) }}
             </div>
           </div>
         </el-form-item>
@@ -922,7 +922,7 @@
       <!-- 批量验证进度 -->
       <div v-if="templateBatchValidateLoading || templateBatchValidateResults.length > 0" class="batch-validate-progress">
         <div class="progress-header">
-          <span>验证进度: {{ templateBatchValidateProgress.completed }}/{{ templateBatchValidateProgress.total }}</span>
+          <span>{{ $t('poc.validateProgress') }}: {{ templateBatchValidateProgress.completed }}/{{ templateBatchValidateProgress.total }}</span>
           <el-progress 
             :percentage="templateBatchValidateProgress.total > 0 ? Math.round(templateBatchValidateProgress.completed / templateBatchValidateProgress.total * 100) : 0" 
             :status="templateBatchValidateLoading ? '' : 'success'"
@@ -943,61 +943,61 @@
       <!-- 批量验证结果 -->
       <div v-if="templateBatchValidateResults.length > 0" class="batch-validate-results">
         <div class="results-header">
-          <span>验证结果</span>
+          <span>{{ $t('poc.validateResult') }}</span>
           <el-tag type="danger" size="small" style="margin-left: 10px">
-            发现漏洞: {{ templateBatchValidateResults.filter(r => r.matched).length }}
+            {{ $t('poc.foundVulns') }}: {{ templateBatchValidateResults.filter(r => r.matched).length }}
           </el-tag>
           <el-tag type="info" size="small" style="margin-left: 5px">
-            未匹配: {{ templateBatchValidateResults.filter(r => !r.matched).length }}
+            {{ $t('poc.notMatched') }}: {{ templateBatchValidateResults.filter(r => !r.matched).length }}
           </el-tag>
           <el-dropdown style="margin-left: auto" @command="handleExportResults">
             <el-button type="success" size="small">
-              导出结果<el-icon class="el-icon--right"><arrow-down /></el-icon>
+              {{ $t('poc.exportResult') }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="all">导出全部</el-dropdown-item>
-                <el-dropdown-item command="matched">仅导出匹配</el-dropdown-item>
-                <el-dropdown-item command="csv">导出CSV</el-dropdown-item>
+                <el-dropdown-item command="all">{{ $t('poc.exportAll') }}</el-dropdown-item>
+                <el-dropdown-item command="matched">{{ $t('poc.exportMatched') }}</el-dropdown-item>
+                <el-dropdown-item command="csv">{{ $t('poc.exportCsv') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
         <el-table :data="templateBatchValidateResults" max-height="250" size="small">
-          <el-table-column prop="pocName" label="模板名称" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="severity" label="级别" width="80">
+          <el-table-column prop="pocName" :label="$t('poc.templateName')" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="severity" :label="$t('poc.level')" width="80">
             <template #default="{ row }">
               <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="matched" label="结果" width="80">
+          <el-table-column prop="matched" :label="$t('poc.result')" width="80">
             <template #default="{ row }">
               <el-tag :type="row.matched ? 'danger' : 'info'" size="small">
-                {{ row.matched ? '匹配' : '未匹配' }}
+                {{ row.matched ? $t('poc.matched') : $t('poc.notMatched') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="matchedUrl" label="匹配URL" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="matchedUrl" :label="$t('poc.matchedUrl')" min-width="200" show-overflow-tooltip />
         </el-table>
       </div>
       
       <template #footer>
-        <el-button @click="templateBatchValidateDialogVisible = false">关闭</el-button>
+        <el-button @click="templateBatchValidateDialogVisible = false">{{ $t('poc.close') }}</el-button>
         <el-button type="primary" @click="handleTemplateBatchValidate" :loading="templateBatchValidateLoading" :disabled="batchTargetUrls.length === 0">
-          开始验证
+          {{ $t('poc.startValidate') }}
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 扫描现有资产对话框 -->
-    <el-dialog v-model="scanAssetsDialogVisible" title="扫描现有资产" width="900px" @close="handleScanAssetsDialogClose">
+    <el-dialog v-model="scanAssetsDialogVisible" :title="$t('poc.scanExistingAssets')" width="900px" @close="handleScanAssetsDialogClose">
       <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
-        <el-descriptions-item label="POC名称">{{ scanAssetsPoc.name }}</el-descriptions-item>
-        <el-descriptions-item label="模板ID">{{ scanAssetsPoc.templateId }}</el-descriptions-item>
-        <el-descriptions-item label="严重级别">
+        <el-descriptions-item :label="$t('poc.pocName')">{{ scanAssetsPoc.name }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('poc.templateId')">{{ scanAssetsPoc.templateId }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('poc.severityLevel')">
           <el-tag :type="getSeverityType(scanAssetsPoc.severity)" size="small">{{ scanAssetsPoc.severity }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="标签">
+        <el-descriptions-item :label="$t('poc.tags')">
           <el-tag v-for="tag in (scanAssetsPoc.tags || [])" :key="tag" size="small" style="margin-right: 3px">{{ tag }}</el-tag>
         </el-descriptions-item>
       </el-descriptions>
@@ -1005,11 +1005,11 @@
       <div v-if="!scanAssetsStarted" class="scan-assets-tip">
         <el-alert type="info" :closable="false" show-icon>
           <template #title>
-            点击"开始扫描"将使用此POC对当前工作空间的所有HTTP资产进行漏洞扫描
+            {{ $t('poc.scanAssetsTip') }}
           </template>
           <template #default>
             <div style="margin-top: 5px; color: #909399; font-size: 12px">
-              扫描任务将异步执行，发现的漏洞会显示在"漏洞管理"页面
+              {{ $t('poc.scanAssetsTipDetail') }}
             </div>
           </template>
         </el-alert>
@@ -1018,23 +1018,23 @@
       <!-- 扫描进度 -->
       <div v-if="scanAssetsStarted" class="scan-assets-progress">
         <div class="progress-header">
-          <span>扫描进度: {{ scanAssetsProgress.completed }}/{{ scanAssetsProgress.total }}</span>
+          <span>{{ $t('poc.scanProgress') }}: {{ scanAssetsProgress.completed }}/{{ scanAssetsProgress.total }}</span>
           <el-progress 
             :percentage="scanAssetsProgress.total > 0 ? Math.round(scanAssetsProgress.completed / scanAssetsProgress.total * 100) : 0" 
             :status="scanAssetsLoading ? '' : 'success'"
             style="width: 200px; margin-left: 15px"
           />
           <el-tag v-if="scanAssetsProgress.vulnCount > 0" type="danger" size="small" style="margin-left: 15px">
-            发现漏洞: {{ scanAssetsProgress.vulnCount }}
+            {{ $t('poc.foundVulns') }}: {{ scanAssetsProgress.vulnCount }}
           </el-tag>
         </div>
         
         <!-- 执行日志 -->
         <div class="validate-logs" style="margin-top: 15px">
           <div class="logs-header">
-            <span>执行日志</span>
-            <el-tag v-if="scanAssetsLoading" type="warning" size="small">扫描中...</el-tag>
-            <el-tag v-else type="success" size="small">扫描完成</el-tag>
+            <span>{{ $t('poc.executionLog') }}</span>
+            <el-tag v-if="scanAssetsLoading" type="warning" size="small">{{ $t('poc.scanning') }}</el-tag>
+            <el-tag v-else type="success" size="small">{{ $t('poc.scanCompleted') }}</el-tag>
           </div>
           <div class="logs-content" ref="scanAssetsLogsRef" style="max-height: 300px;">
             <div v-for="(log, index) in scanAssetsLogs" :key="index" :class="['log-line', 'log-' + log.level.toLowerCase()]">
@@ -1047,9 +1047,9 @@
       </div>
       
       <template #footer>
-        <el-button @click="scanAssetsDialogVisible = false">关闭</el-button>
+        <el-button @click="scanAssetsDialogVisible = false">{{ $t('poc.close') }}</el-button>
         <el-button type="primary" @click="handleScanAssets" :loading="scanAssetsLoading" :disabled="scanAssetsLoading">
-          {{ scanAssetsStarted ? '重新扫描' : '开始扫描' }}
+          {{ scanAssetsStarted ? $t('poc.rescan') : $t('poc.startScan') }}
         </el-button>
       </template>
     </el-dialog>
@@ -1059,6 +1059,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete, MagicStick, FolderOpened } from '@element-plus/icons-vue'
 import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, clearNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc, getAIConfig, saveAIConfig, validatePocSyntax } from '@/api/poc'
@@ -1070,6 +1071,7 @@ import { saveAs } from 'file-saver'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 // 有效的tab名称
 const validTabs = ['nucleiTemplates', 'tagMapping', 'customPoc', 'dirscanDict', 'subdomainDict']
@@ -1126,10 +1128,10 @@ const tagMappingForm = reactive({
   description: '',
   enabled: true
 })
-const tagMappingRules = {
-  appName: [{ required: true, message: '请输入应用名称', trigger: 'blur' }],
-  nucleiTagsInput: [{ required: true, message: '请输入Nuclei标签', trigger: 'blur' }]
-}
+const tagMappingRules = computed(() => ({
+  appName: [{ required: true, message: t('poc.appNamePlaceholder'), trigger: 'blur' }],
+  nucleiTagsInput: [{ required: true, message: t('poc.nucleiTagsPlaceholder'), trigger: 'blur' }]
+}))
 
 // 自定义POC
 const customPocs = ref([])
@@ -1150,10 +1152,10 @@ const dirscanDictForm = reactive({
   content: '',
   enabled: true
 })
-const dirscanDictRules = {
-  name: [{ required: true, message: '请输入字典名称', trigger: 'blur' }],
-  content: [{ required: true, message: '请输入路径列表', trigger: 'blur' }]
-}
+const dirscanDictRules = computed(() => ({
+  name: [{ required: true, message: t('poc.dictNamePlaceholder'), trigger: 'blur' }],
+  content: [{ required: true, message: t('poc.pathListHint'), trigger: 'blur' }]
+}))
 const dirscanDictPagination = reactive({
   page: 1,
   pageSize: 20,
@@ -1173,10 +1175,10 @@ const subdomainDictForm = reactive({
   content: '',
   enabled: true
 })
-const subdomainDictRules = {
-  name: [{ required: true, message: '请输入字典名称', trigger: 'blur' }],
-  content: [{ required: true, message: '请输入词条列表', trigger: 'blur' }]
-}
+const subdomainDictRules = computed(() => ({
+  name: [{ required: true, message: t('poc.dictNamePlaceholder'), trigger: 'blur' }],
+  content: [{ required: true, message: t('poc.wordListHint'), trigger: 'blur' }]
+}))
 const subdomainDictPagination = reactive({
   page: 1,
   pageSize: 20,
@@ -1222,7 +1224,7 @@ async function loadAiConfig() {
 // 保存AI配置到数据库
 async function saveAiConfig() {
   if (!aiConfig.baseUrl) {
-    ElMessage.warning('请输入服务地址')
+    ElMessage.warning(t('poc.pleaseConfigAiService'))
     return
   }
   
@@ -1235,13 +1237,13 @@ async function saveAiConfig() {
       model: aiConfig.model
     })
     if (res.code === 0) {
-      ElMessage.success('AI配置已保存')
+      ElMessage.success(t('poc.aiConfigSaved'))
     } else {
-      ElMessage.error(res.msg || '保存配置失败')
+      ElMessage.error(res.msg || t('poc.saveConfigFailed'))
     }
   } catch (e) {
     console.error('保存AI配置失败:', e)
-    ElMessage.error('保存配置失败')
+    ElMessage.error(t('poc.saveConfigFailed'))
   } finally {
     aiSaving.value = false
   }
@@ -1250,7 +1252,7 @@ async function saveAiConfig() {
 // 测试AI服务连接
 async function testAiConnection() {
   if (!aiConfig.baseUrl) {
-    ElMessage.warning('请输入服务地址')
+    ElMessage.warning(t('poc.pleaseConfigAiService'))
     return
   }
   
@@ -1307,16 +1309,16 @@ async function testAiConnection() {
     }
     
     if (response.ok) {
-      ElMessage.success('连接成功')
+      ElMessage.success(t('poc.connectionSuccess'))
     } else {
       const errorText = await response.text()
-      ElMessage.error(`连接失败: ${response.status} ${errorText.substring(0, 100)}`)
+      ElMessage.error(`${t('poc.connectionFailed')}: ${response.status} ${errorText.substring(0, 100)}`)
     }
   } catch (e) {
     if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-      ElMessage.error('无法连接到AI服务，请确保服务已启动')
+      ElMessage.error(t('poc.cannotConnectAi'))
     } else {
-      ElMessage.error('连接测试失败: ' + e.message)
+      ElMessage.error(t('poc.connectionFailed') + ': ' + e.message)
     }
   } finally {
     aiTesting.value = false
@@ -1362,12 +1364,12 @@ const customPocForm = reactive({
 })
 // AI生成的POC临时保存（关闭对话框后保留，直到生成新的POC或保存成功）
 const aiGeneratedPocCache = ref('')
-const customPocRules = {
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  templateId: [{ required: true, message: '请输入模板ID', trigger: 'blur' }],
-  severity: [{ required: true, message: '请选择严重级别', trigger: 'change' }],
-  content: [{ required: true, message: '请输入YAML内容', trigger: 'blur' }]
-}
+const customPocRules = computed(() => ({
+  name: [{ required: true, message: t('poc.nameParsed'), trigger: 'blur' }],
+  templateId: [{ required: true, message: t('poc.templateIdParsed'), trigger: 'blur' }],
+  severity: [{ required: true, message: t('poc.severityLabel'), trigger: 'change' }],
+  content: [{ required: true, message: t('poc.yamlContent'), trigger: 'blur' }]
+}))
 const pocPagination = reactive({
   page: 1,
   pageSize: 20,
@@ -1598,10 +1600,10 @@ function readFileContent(file) {
 // 清空模板
 async function handleClearTemplates() {
   try {
-    await ElMessageBox.confirm('确定清空所有Nuclei默认模板吗？此操作不可恢复！', '警告', { 
+    await ElMessageBox.confirm(t('poc.confirmClearTemplates'), t('common.warning'), { 
       type: 'error', 
-      confirmButtonText: '确定清空', 
-      cancelButtonText: '取消' 
+      confirmButtonText: t('poc.confirmClearTemplatesBtn'), 
+      cancelButtonText: t('poc.cancel') 
     })
   } catch {
     return
@@ -1611,14 +1613,14 @@ async function handleClearTemplates() {
   try {
     const res = await clearNucleiTemplates()
     if (res.code === 0) {
-      ElMessage.success(res.msg || '清空成功')
+      ElMessage.success(res.msg || t('poc.clearSuccess'))
       loadNucleiTemplateCategories()
       loadNucleiTemplates()
     } else {
-      ElMessage.error(res.msg || '清空失败')
+      ElMessage.error(res.msg || t('poc.clearFailed'))
     }
   } catch (e) {
-    ElMessage.error('清空失败: ' + e.message)
+    ElMessage.error(t('poc.clearFailed') + ': ' + e.message)
   } finally {
     syncLoading.value = false
   }
@@ -1642,7 +1644,7 @@ async function showTemplateContent(row) {
 function copyTemplateContent() {
   if (currentTemplate.value.content) {
     navigator.clipboard.writeText(currentTemplate.value.content)
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success(t('poc.copiedToClipboard'))
   }
 }
 
@@ -1744,7 +1746,7 @@ async function handleSaveTagMapping() {
   
   const res = await saveTagMapping(submitData)
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('poc.saveSuccess'))
     tagMappingDialogVisible.value = false
     loadTagMappings()
   } else {
@@ -1753,10 +1755,10 @@ async function handleSaveTagMapping() {
 }
 
 async function handleDeleteTagMapping(row) {
-  await ElMessageBox.confirm('确定删除该映射吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('poc.confirmDeleteMapping'), t('common.tip'), { type: 'warning' })
   const res = await deleteTagMapping({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('poc.deleteSuccess'))
     loadTagMappings()
   }
 }
@@ -1799,7 +1801,7 @@ function showCustomPocForm(row = null) {
 // 验证POC语法
 async function handleValidatePocSyntax() {
   if (!customPocForm.content) {
-    ElMessage.warning('请先输入POC内容')
+    ElMessage.warning(t('poc.pleaseEnterPocContent'))
     return
   }
   
@@ -1808,16 +1810,16 @@ async function handleValidatePocSyntax() {
     const res = await validatePocSyntax({ content: customPocForm.content })
     if (res.code === 0) {
       if (res.valid) {
-        ElMessage.success('POC语法验证通过')
+        ElMessage.success(t('poc.syntaxValidatePass'))
       } else {
-        ElMessage.error('POC语法错误: ' + res.error)
+        ElMessage.error(t('poc.syntaxError') + ': ' + res.error)
       }
     } else {
-      ElMessage.error(res.msg || '验证失败')
+      ElMessage.error(res.msg || t('poc.validateFailed'))
     }
   } catch (e) {
     console.error('验证POC语法失败:', e)
-    ElMessage.error('验证失败: ' + e.message)
+    ElMessage.error(t('poc.validateFailed') + ': ' + e.message)
   } finally {
     syntaxValidating.value = false
   }
@@ -1845,7 +1847,7 @@ async function handleSaveCustomPoc() {
   
   const res = await saveCustomPoc(submitData)
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('poc.saveSuccess'))
     customPocDialogVisible.value = false
     // 保存成功后清除AI生成的缓存
     aiGeneratedPocCache.value = ''
@@ -1856,10 +1858,10 @@ async function handleSaveCustomPoc() {
 }
 
 async function handleDeleteCustomPoc(row) {
-  await ElMessageBox.confirm('确定删除该POC吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('poc.confirmDeletePoc'), t('common.tip'), { type: 'warning' })
   const res = await deleteCustomPoc({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('poc.deleteSuccess'))
     loadCustomPocs()
   }
 }
@@ -1869,7 +1871,7 @@ async function handleDeleteCustomPoc(row) {
 // 导出所有自定义POC（每个POC一个文件，打包成ZIP）
 async function handleExportPocs() {
   if (customPocs.value.length === 0) {
-    ElMessage.warning('没有可导出的POC')
+    ElMessage.warning(t('poc.noPocToExport'))
     return
   }
   
@@ -1892,7 +1894,7 @@ async function handleExportPocs() {
     }
     
     if (allPocs.length === 0) {
-      ElMessage.warning('没有可导出的POC')
+      ElMessage.warning(t('poc.noPocToExport'))
       return
     }
     
@@ -1913,10 +1915,10 @@ async function handleExportPocs() {
     const dateStr = new Date().toISOString().slice(0, 10)
     saveAs(content, `custom-pocs-${dateStr}.zip`)
     
-    ElMessage.success(`成功导出 ${allPocs.length} 个POC`)
+    ElMessage.success(t('poc.exportedPocs', { count: allPocs.length }))
   } catch (e) {
     console.error('Export error:', e)
-    ElMessage.error('导出失败')
+    ElMessage.error(t('poc.exportError'))
   } finally {
     exportPocLoading.value = false
   }
@@ -1925,7 +1927,7 @@ async function handleExportPocs() {
 // 清空自定义POC（按当前筛选条件）
 async function handleClearAllPocs() {
   if (customPocs.value.length === 0 && pocPagination.total === 0) {
-    ElMessage.warning('没有可清空的POC')
+    ElMessage.warning(t('poc.noPocToClear'))
     return
   }
   
@@ -1936,25 +1938,25 @@ async function handleClearAllPocs() {
   let confirmMsg = ''
   if (hasFilter) {
     const filterDesc = []
-    if (customPocFilter.name) filterDesc.push(`名称含"${customPocFilter.name}"`)
-    if (customPocFilter.templateId) filterDesc.push(`模板ID含"${customPocFilter.templateId}"`)
-    if (customPocFilter.severity) filterDesc.push(`级别为"${customPocFilter.severity}"`)
-    if (customPocFilter.tag) filterDesc.push(`标签含"${customPocFilter.tag}"`)
-    if (customPocFilter.enabled === true) filterDesc.push('状态为启用')
-    if (customPocFilter.enabled === false) filterDesc.push('状态为禁用')
-    confirmMsg = `确定要清空符合条件的POC吗？\n筛选条件：${filterDesc.join('、')}\n共 ${pocPagination.total} 个POC将被删除，此操作不可恢复！`
+    if (customPocFilter.name) filterDesc.push(t('poc.filterNameContains', { name: customPocFilter.name }))
+    if (customPocFilter.templateId) filterDesc.push(t('poc.filterTemplateIdContains', { id: customPocFilter.templateId }))
+    if (customPocFilter.severity) filterDesc.push(t('poc.filterSeverityIs', { severity: customPocFilter.severity }))
+    if (customPocFilter.tag) filterDesc.push(t('poc.filterTagContains', { tag: customPocFilter.tag }))
+    if (customPocFilter.enabled === true) filterDesc.push(t('poc.filterStatusEnabled'))
+    if (customPocFilter.enabled === false) filterDesc.push(t('poc.filterStatusDisabled'))
+    confirmMsg = t('poc.confirmClearFilteredPoc', { filter: filterDesc.join('、'), count: pocPagination.total })
   } else {
-    confirmMsg = `确定要清空所有自定义POC吗？共 ${pocPagination.total} 个POC将被删除，此操作不可恢复！`
+    confirmMsg = t('poc.confirmClearPoc', { count: pocPagination.total })
   }
   
   try {
     await ElMessageBox.confirm(
       confirmMsg,
-      '危险操作',
+      t('poc.dangerOperation'),
       {
         type: 'warning',
-        confirmButtonText: '确定清空',
-        cancelButtonText: '取消',
+        confirmButtonText: t('poc.confirmClearBtn'),
+        cancelButtonText: t('poc.cancel'),
         confirmButtonClass: 'el-button--danger'
       }
     )
@@ -1971,15 +1973,15 @@ async function handleClearAllPocs() {
     
     const res = await clearAllCustomPoc(params)
     if (res.code === 0) {
-      ElMessage.success(`成功清空 ${res.deleted || pocPagination.total} 个POC`)
+      ElMessage.success(t('poc.clearedPocs', { count: res.deleted || pocPagination.total }))
       loadCustomPocs()
     } else {
-      ElMessage.error(res.msg || '清空失败')
+      ElMessage.error(res.msg || t('poc.clearFailed'))
     }
   } catch (e) {
     if (e !== 'cancel') {
       console.error('Clear error:', e)
-      ElMessage.error('清空失败')
+      ElMessage.error(t('poc.clearFailed'))
     }
   } finally {
     clearPocLoading.value = false
@@ -2685,9 +2687,9 @@ function previewConvertedPoc(poc) {
 // 复制转换后的 POC
 function copyConvertedPoc() {
   navigator.clipboard.writeText(convertedPocPreviewContent.value).then(() => {
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success(t('poc.copiedToClipboard'))
   }).catch(() => {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('poc.importFailed'))
   })
 }
 

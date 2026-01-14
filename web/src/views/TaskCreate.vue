@@ -3,62 +3,49 @@
     <el-card class="create-card">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="task-form">
         <!-- 基本信息 -->
-        <el-form-item label="任务名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入任务名称" />
+        <el-form-item :label="$t('task.taskName')" prop="name">
+          <el-input v-model="form.name" :placeholder="$t('task.pleaseEnterTaskName')" />
         </el-form-item>
-        <el-form-item label="扫描目标" prop="target">
-          <el-input v-model="form.target" type="textarea" :rows="6" placeholder="每行一个目标，支持格式:&#10;• IP: 192.168.1.1&#10;• CIDR: 192.168.1.0/24&#10;• IP范围: 192.168.1.1-192.168.1.100&#10;• 域名: example.com" />
+        <el-form-item :label="$t('task.scanTarget')" prop="target">
+          <el-input v-model="form.target" type="textarea" :rows="6" :placeholder="$t('task.targetPlaceholder')" />
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="工作空间">
-              <el-select v-model="form.workspaceId" placeholder="选择工作空间" clearable style="width: 100%">
+            <el-form-item :label="$t('task.workspace')">
+              <el-select v-model="form.workspaceId" :placeholder="$t('task.selectWorkspace')" clearable style="width: 100%">
                 <el-option v-for="ws in workspaces" :key="ws.id" :label="ws.name" :value="ws.id" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="所属组织">
-              <el-select v-model="form.orgId" placeholder="选择组织" clearable style="width: 100%">
+            <el-form-item :label="$t('task.organization')">
+              <el-select v-model="form.orgId" :placeholder="$t('task.selectOrganization')" clearable style="width: 100%">
                 <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="指定Worker">
-          <el-select v-model="form.workers" multiple placeholder="不选则任意Worker执行" clearable style="width: 100%">
+        <el-form-item :label="$t('task.specifyWorker')">
+          <el-select v-model="form.workers" multiple :placeholder="$t('task.anyWorkerExecute')" clearable style="width: 100%">
             <el-option v-for="w in workers" :key="w.name" :label="`${w.name} (${w.ip})`" :value="w.name" />
           </el-select>
         </el-form-item>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="定时任务">
-              <el-switch v-model="form.isCron" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item v-if="form.isCron" label="Cron表达式">
-              <el-input v-model="form.cronRule" placeholder="0 0 * * *" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-
         <!-- 可折叠配置区域 -->
         <el-collapse v-model="activeCollapse" class="config-collapse">
           <!-- 子域名扫描 -->
           <el-collapse-item name="domainscan">
             <template #title>
-              <span class="collapse-title">子域名扫描 <el-tag v-if="form.domainscanEnable" type="success" size="small">开</el-tag></span>
+              <span class="collapse-title">{{ $t('task.subdomainScan') }} <el-tag v-if="form.domainscanEnable" type="success" size="small">{{ $t('task.started') }}</el-tag></span>
             </template>
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.domainscanEnable" />
-              <span class="form-hint">针对域名目标进行子域名枚举</span>
+              <span class="form-hint">{{ $t('task.subdomainEnumHint') }}</span>
             </el-form-item>
             <template v-if="form.domainscanEnable">
-              <el-form-item label="扫描工具">
-                <el-checkbox v-model="form.domainscanSubfinder">Subfinder (被动枚举)</el-checkbox>
-                <el-checkbox v-model="form.domainscanBruteforce" :disabled="!form.subdomainDictIds || !form.subdomainDictIds.length">Dnsx (字典爆破)</el-checkbox>
-                <span class="form-hint">可同时启用多种扫描方式，结果自动合并去重</span>
+              <el-form-item :label="$t('task.scanTool')">
+                <el-checkbox v-model="form.domainscanSubfinder">Subfinder ({{ $t('task.passiveEnum') }})</el-checkbox>
+                <el-checkbox v-model="form.domainscanBruteforce" :disabled="!form.subdomainDictIds || !form.subdomainDictIds.length">Dnsx ({{ $t('task.dictBrute') }})</el-checkbox>
+                <span class="form-hint">{{ $t('task.multiScanHint') }}</span>
               </el-form-item>
               
               <!-- 左右分栏布局 -->
@@ -67,33 +54,33 @@
                 <el-col :span="12">
                   <div class="scan-tool-section">
                     <div class="scan-tool-header">
-                      <span class="scan-tool-title">Subfinder 被动枚举</span>
+                      <span class="scan-tool-title">{{ $t('task.subfinderPassiveEnum') }}</span>
                       <el-tag :type="form.domainscanSubfinder ? 'success' : 'info'" size="small">
-                        {{ form.domainscanSubfinder ? '已启用' : '未启用' }}
+                        {{ form.domainscanSubfinder ? $t('task.started') : $t('task.notStarted') }}
                       </el-tag>
                     </div>
                     <template v-if="form.domainscanSubfinder">
-                      <el-form-item label="超时时间(秒)">
+                      <el-form-item :label="$t('task.timeoutSeconds')">
                         <el-input-number v-model="form.domainscanTimeout" :min="60" :max="3600" style="width:100%" />
                       </el-form-item>
-                      <el-form-item label="最大枚举时间(分)">
+                      <el-form-item :label="$t('task.maxEnumTime') + '(' + $t('task.minutes') + ')'">
                         <el-input-number v-model="form.domainscanMaxEnumTime" :min="1" :max="60" style="width:100%" />
                       </el-form-item>
-                      <el-form-item label="速率限制">
+                      <el-form-item :label="$t('task.rateLimit')">
                         <el-input-number v-model="form.domainscanRateLimit" :min="0" :max="1000" style="width:100%" />
-                        <span class="form-hint">0=不限制</span>
+                        <span class="form-hint">0={{ $t('task.noLimit') }}</span>
                       </el-form-item>
-                      <el-form-item label="扫描选项">
-                        <el-checkbox v-model="form.domainscanRemoveWildcard">移除泛解析域名</el-checkbox>
+                      <el-form-item :label="$t('task.scanOptions')">
+                        <el-checkbox v-model="form.domainscanRemoveWildcard">{{ $t('task.removeWildcardDomain') }}</el-checkbox>
                       </el-form-item>
-                      <el-form-item label="DNS解析">
-                        <el-checkbox v-model="form.domainscanResolveDNS">使用Dnsx解析子域名DNS</el-checkbox>
-                        <span class="form-hint">并发数由Worker设置控制</span>
+                      <el-form-item :label="$t('task.dnsResolve')">
+                        <el-checkbox v-model="form.domainscanResolveDNS">{{ $t('task.resolveSubdomainDns') }}</el-checkbox>
+                        <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
                       </el-form-item>
                     </template>
                     <div v-else class="scan-tool-disabled-hint">
                       <el-icon><InfoFilled /></el-icon>
-                      <span>请先勾选启用 Subfinder</span>
+                      <span>{{ $t('task.enableSubfinderFirst') }}</span>
                     </div>
                   </div>
                 </el-col>
@@ -102,52 +89,52 @@
                 <el-col :span="12">
                   <div class="scan-tool-section">
                     <div class="scan-tool-header">
-                      <span class="scan-tool-title">Dnsx 字典爆破</span>
+                      <span class="scan-tool-title">{{ $t('task.dnsxDictBrute') }}</span>
                       <el-tag :type="form.domainscanBruteforce ? 'success' : 'info'" size="small">
-                        {{ form.domainscanBruteforce ? '已启用' : '未启用' }}
+                        {{ form.domainscanBruteforce ? $t('task.started') : $t('task.notStarted') }}
                       </el-tag>
                     </div>
                     <!-- 字典选择（始终显示，作为启用字典爆破的前提） -->
-                    <el-form-item label="暴力破解字典">
+                    <el-form-item :label="$t('task.bruteforceDict')">
                       <div class="selected-dict-summary">
                         <el-tag type="primary" size="small" v-if="form.subdomainDictIds && form.subdomainDictIds.length">
-                          已选择: {{ form.subdomainDictIds.length }} 个字典
+                          {{ $t('task.selectedCount', { count: form.subdomainDictIds.length }) }}
                         </el-tag>
-                        <span v-else style="color: #e6a23c; font-size: 12px">
-                          请先选择字典才能启用字典爆破
+                        <span v-else class="warning-hint">
+                          {{ $t('task.selectDictFirst') }}
                         </span>
-                        <el-button type="primary" link @click="showSubdomainDictSelectDialog">选择字典</el-button>
+                        <el-button type="primary" link @click="showSubdomainDictSelectDialog">{{ $t('task.selectDict') }}</el-button>
                       </div>
-                      <span class="form-hint">使用 Dnsx SDK 进行字典暴力破解</span>
+                      <span class="form-hint">{{ $t('task.dnsxBruteHint') }}</span>
                     </el-form-item>
                     <template v-if="form.domainscanBruteforce">
-                      <el-form-item label="增强功能">
+                      <el-form-item :label="$t('task.enhancedFeatures')">
                         <div style="display: flex; flex-direction: column; gap: 8px;">
                           <div style="display: flex; align-items: center; gap: 8px;">
                             <el-checkbox 
                               v-model="form.domainscanRecursiveBrute" 
                               :disabled="!form.recursiveDictIds || !form.recursiveDictIds.length"
-                            >递归爆破</el-checkbox>
-                            <el-button type="primary" link size="small" @click="showRecursiveDictSelectDialog">选择递归字典</el-button>
+                            >{{ $t('task.recursiveBrute') }}</el-checkbox>
+                            <el-button type="primary" link size="small" @click="showRecursiveDictSelectDialog">{{ $t('task.selectRecursiveDict') }}</el-button>
                             <el-tag type="primary" size="small" v-if="form.recursiveDictIds && form.recursiveDictIds.length">
-                              已选择: {{ form.recursiveDictIds.length }} 个字典
+                              {{ $t('task.selectedCount', { count: form.recursiveDictIds.length }) }}
                             </el-tag>
                           </div>
                           <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">
-                            {{ (!form.recursiveDictIds || !form.recursiveDictIds.length) ? '请先选择递归字典才能启用递归爆破' : '对发现的子域名继续进行爆破，发现更深层级的子域名' }}
+                            {{ (!form.recursiveDictIds || !form.recursiveDictIds.length) ? $t('task.selectRecursiveDictFirst') : $t('task.recursiveBruteHint') }}
                           </span>
-                          <el-checkbox v-model="form.domainscanWildcardDetect">泛解析检测</el-checkbox>
-                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">检测并过滤泛解析域名，提高结果准确性</span>
-                          <el-checkbox v-model="form.domainscanSubdomainCrawl">子域爬取</el-checkbox>
-                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">从已发现子域名的响应体和JS文件中提取新子域名</span>
-                          <el-checkbox v-model="form.domainscanTakeoverCheck">子域接管检查</el-checkbox>
-                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">检测子域名是否存在接管风险（如GitHub Pages、Heroku等）</span>
+                          <el-checkbox v-model="form.domainscanWildcardDetect">{{ $t('task.wildcardDetect') }}</el-checkbox>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">{{ $t('task.wildcardDetectHint') }}</span>
+                          <el-checkbox v-model="form.domainscanSubdomainCrawl">{{ $t('task.subdomainCrawl') }}</el-checkbox>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">{{ $t('task.subdomainCrawlHint') }}</span>
+                          <el-checkbox v-model="form.domainscanTakeoverCheck">{{ $t('task.takeoverCheck') }}</el-checkbox>
+                          <span class="form-hint" style="margin-left: 24px; margin-top: -4px;">{{ $t('task.takeoverCheckHint') }}</span>
                         </div>
                       </el-form-item>
                     </template>
                     <div v-if="!form.domainscanBruteforce && form.subdomainDictIds && form.subdomainDictIds.length" class="scan-tool-disabled-hint">
                       <el-icon><InfoFilled /></el-icon>
-                      <span>已选择字典，可勾选启用 Dnsx 字典爆破</span>
+                      <span>{{ $t('task.canEnableDnsx') }}</span>
                     </div>
                   </div>
                 </el-col>
@@ -158,41 +145,41 @@
           <!-- 端口扫描 -->
           <el-collapse-item name="portscan">
             <template #title>
-              <span class="collapse-title">端口扫描 <el-tag v-if="form.portscanEnable" type="success" size="small">开</el-tag></span>
+              <span class="collapse-title">{{ $t('task.portScan') }} <el-tag v-if="form.portscanEnable" type="success" size="small">{{ $t('task.started') }}</el-tag></span>
             </template>
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.portscanEnable" />
             </el-form-item>
             <template v-if="form.portscanEnable">
-              <el-form-item label="扫描工具">
+              <el-form-item :label="$t('task.scanTool')">
                 <el-radio-group v-model="form.portscanTool">
-                  <el-radio label="naabu">Naabu (推荐)</el-radio>
+                  <el-radio label="naabu">Naabu ({{ $t('task.recommended') }})</el-radio>
                   <el-radio label="masscan">Masscan</el-radio>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="端口范围">
+              <el-form-item :label="$t('task.portRange')">
                 <el-select v-model="form.ports" filterable allow-create default-first-option style="width: 100%">
-                  <el-option label="top100 - 常用100端口" value="top100" />
-                  <el-option label="top1000 - 常用1000端口" value="top1000" />
-                  <el-option label="80,443,8080,8443 - Web常用" value="80,443,8080,8443" />
-                  <el-option label="1-65535 - 全端口" value="1-65535" />
+                  <el-option :label="$t('task.top100Ports')" value="top100" />
+                  <el-option :label="$t('task.top1000Ports')" value="top1000" />
+                  <el-option :label="'80,443,8080,8443 - ' + $t('task.webCommon')" value="80,443,8080,8443" />
+                  <el-option :label="'1-65535 - ' + $t('task.allPorts')" value="1-65535" />
                 </el-select>
               </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="扫描速率">
+                  <el-form-item :label="$t('task.scanRate')">
                     <el-input-number v-model="form.portscanRate" :min="100" :max="100000" style="width:100%" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="端口阈值">
+                  <el-form-item :label="$t('task.portThreshold')">
                     <el-input-number v-model="form.portThreshold" :min="0" :max="65535" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item v-if="form.portscanTool === 'naabu'" label="扫描类型">
+                  <el-form-item v-if="form.portscanTool === 'naabu'" :label="$t('task.scanType')">
                     <el-radio-group v-model="form.scanType">
                       <el-radio label="c">CONNECT</el-radio>
                       <el-radio label="s">SYN</el-radio>
@@ -200,24 +187,24 @@
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="超时(秒)">
+                  <el-form-item :label="$t('task.timeoutSeconds')">
                     <el-input-number v-model="form.portscanTimeout" :min="5" :max="1200" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
-              <el-form-item label="高级选项">
+              <el-form-item :label="$t('task.advancedOptions')">
                 <div style="display: block; width: 100%">
-                  <el-checkbox v-model="form.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
-                  <span class="form-hint">跳过主机存活检测，直接扫描端口</span>
+                  <el-checkbox v-model="form.skipHostDiscovery">{{ $t('task.skipHostDiscovery') }} (-Pn)</el-checkbox>
+                  <span class="form-hint">{{ $t('task.skipHostDiscoveryHint') }}</span>
                 </div>
                 <div v-if="form.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
-                  <el-checkbox v-model="form.excludeCDN">排除 CDN/WAF (-ec)</el-checkbox>
-                  <span class="form-hint">CDN/WAF IP 仅扫描 80,443 端口</span>
+                  <el-checkbox v-model="form.excludeCDN">{{ $t('task.excludeCdnWaf') }} (-ec)</el-checkbox>
+                  <span class="form-hint">{{ $t('task.excludeCdnHint') }}</span>
                 </div>
               </el-form-item>
-              <el-form-item label="排除目标">
+              <el-form-item :label="$t('task.excludeTargets')">
                 <el-input v-model="form.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
-                <span class="form-hint">排除的 IP/CIDR，逗号分隔</span>
+                <span class="form-hint">{{ $t('task.excludeTargetsHint') }}</span>
               </el-form-item>
             </template>
           </el-collapse-item>
@@ -225,17 +212,17 @@
           <!-- 端口识别 -->
           <el-collapse-item name="portidentify">
             <template #title>
-              <span class="collapse-title">端口识别 <el-tag v-if="form.portidentifyEnable" type="success" size="small">开</el-tag></span>
+              <span class="collapse-title">{{ $t('task.portIdentify') }} <el-tag v-if="form.portidentifyEnable" type="success" size="small">{{ $t('task.started') }}</el-tag></span>
             </template>
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.portidentifyEnable" />
             </el-form-item>
             <template v-if="form.portidentifyEnable">
-              <el-form-item label="超时(秒)">
+              <el-form-item :label="$t('task.timeoutSeconds')">
                 <el-input-number v-model="form.portidentifyTimeout" :min="5" :max="300" />
-                <span class="form-hint">单个主机超时时间</span>
+                <span class="form-hint">{{ $t('task.singleHostTimeout') }}</span>
               </el-form-item>
-              <el-form-item label="Nmap参数">
+              <el-form-item :label="$t('task.nmapParams')">
                 <el-input v-model="form.portidentifyArgs" placeholder="-sV --version-intensity 5" />
               </el-form-item>
             </template>
@@ -244,39 +231,39 @@
           <!-- 指纹识别 -->
           <el-collapse-item name="fingerprint">
             <template #title>
-              <span class="collapse-title">指纹识别 <el-tag v-if="form.fingerprintEnable" type="success" size="small">开</el-tag></span>
+              <span class="collapse-title">{{ $t('task.fingerprintScan') }} <el-tag v-if="form.fingerprintEnable" type="success" size="small">{{ $t('task.started') }}</el-tag></span>
             </template>
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.fingerprintEnable" />
             </el-form-item>
             <template v-if="form.fingerprintEnable">
-              <el-form-item label="探测工具">
+              <el-form-item :label="$t('task.probeTool')">
                 <el-radio-group v-model="form.fingerprintTool">
                   <el-radio label="httpx">Httpx</el-radio>
-                  <el-radio label="builtin">内置引擎</el-radio>
+                  <el-radio label="builtin">{{ $t('task.builtinEngine') }}</el-radio>
                 </el-radio-group>
-                <span class="form-hint">{{ form.fingerprintTool === 'httpx' ? 'Httpx已集成Wappalyzer指纹库' : '使用sdk集成Wappalyzer指纹库' }}</span>
+                <span class="form-hint">{{ form.fingerprintTool === 'httpx' ? $t('task.httpxWappalyzer') : $t('task.sdkWappalyzer') }}</span>
               </el-form-item>
-              <el-form-item label="附加功能">
-                <el-checkbox v-model="form.fingerprintIconHash">Icon Hash</el-checkbox>
-                <el-checkbox v-model="form.fingerprintCustomEngine">自定义指纹</el-checkbox>
-                <el-checkbox v-model="form.fingerprintScreenshot">网页截图</el-checkbox>
+              <el-form-item :label="$t('task.additionalFeatures')">
+                <el-checkbox v-model="form.fingerprintIconHash">{{ $t('task.iconHash') }}</el-checkbox>
+                <el-checkbox v-model="form.fingerprintCustomEngine">{{ $t('task.customFingerprint') }}</el-checkbox>
+                <el-checkbox v-model="form.fingerprintScreenshot">{{ $t('task.screenshot') }}</el-checkbox>
               </el-form-item>
-              <el-form-item label="主动扫描">
-                <el-checkbox v-model="form.fingerprintActiveScan">启用主动指纹扫描</el-checkbox>
-                <span class="form-hint">访问特定路径识别应用（如/nacos/、/actuator等），启用后自动开启自定义指纹</span>
+              <el-form-item :label="$t('task.activeScan')">
+                <el-checkbox v-model="form.fingerprintActiveScan">{{ $t('task.enableActiveScan') }}</el-checkbox>
+                <span class="form-hint">{{ $t('task.activeScanHint') }}</span>
               </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="超时(秒)">
+                  <el-form-item :label="$t('task.timeoutSeconds')">
                     <el-input-number v-model="form.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
-                    <span class="form-hint">并发数由Worker设置控制</span>
+                    <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
                   </el-form-item>
                 </el-col>
                 <el-col :span="12" v-if="form.fingerprintActiveScan">
-                  <el-form-item label="主动超时(秒)">
+                  <el-form-item :label="$t('task.activeTimeoutSeconds')">
                     <el-input-number v-model="form.fingerprintActiveTimeout" :min="5" :max="60" style="width:100%" />
-                    <span class="form-hint">单个主动探测请求超时</span>
+                    <span class="form-hint">{{ $t('task.activeProbeTimeout') }}</span>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -286,37 +273,37 @@
           <!-- 目录扫描 -->
           <el-collapse-item name="dirscan">
             <template #title>
-              <span class="collapse-title">目录扫描 <el-tag v-if="form.dirscanEnable" type="success" size="small">开</el-tag></span>
+              <span class="collapse-title">{{ $t('task.dirScan') }} <el-tag v-if="form.dirscanEnable" type="success" size="small">{{ $t('task.started') }}</el-tag></span>
             </template>
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.dirscanEnable" />
-              <span class="form-hint">基于字典的目录/路径发现</span>
+              <span class="form-hint">{{ $t('task.dirScanHint') }}</span>
             </el-form-item>
             <template v-if="form.dirscanEnable">
-              <el-form-item label="扫描字典">
+              <el-form-item :label="$t('task.scanDict')">
                 <div class="selected-dict-summary">
                   <el-tag type="primary" size="small" v-if="form.dirscanDictIds.length">
-                    已选择: {{ form.dirscanDictIds.length }} 个字典
+                    {{ $t('task.selectedCount', { count: form.dirscanDictIds.length }) }}
                   </el-tag>
-                  <span v-if="!form.dirscanDictIds.length" style="color: #909399">
-                    未选择任何字典
+                  <span v-if="!form.dirscanDictIds.length" class="secondary-hint">
+                    {{ $t('task.noDictSelected') }}
                   </span>
-                  <el-button type="primary" link @click="showDictSelectDialog">选择字典</el-button>
+                  <el-button type="primary" link @click="showDictSelectDialog">{{ $t('task.selectDict') }}</el-button>
                 </div>
               </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="并发线程">
+                  <el-form-item :label="$t('task.concurrentThreads')">
                     <el-input-number v-model="form.dirscanThreads" :min="1" :max="200" style="width:100%" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="请求超时(秒)">
+                  <el-form-item :label="$t('task.requestTimeoutSeconds')">
                     <el-input-number v-model="form.dirscanTimeout" :min="1" :max="60" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
-              <el-form-item label="有效状态码">
+              <el-form-item :label="$t('task.validStatusCodes')">
                 <el-checkbox-group v-model="form.dirscanStatusCodes">
                   <el-checkbox :label="200">200</el-checkbox>
                   <el-checkbox :label="201">201</el-checkbox>
@@ -328,7 +315,7 @@
                   <el-checkbox :label="500">500</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
-              <el-form-item label="跟随重定向">
+              <el-form-item :label="$t('task.followRedirect')">
                 <el-switch v-model="form.dirscanFollowRedirect" />
               </el-form-item>
             </template>
@@ -337,51 +324,51 @@
           <!-- 漏洞扫描 -->
           <el-collapse-item name="pocscan">
             <template #title>
-              <span class="collapse-title">漏洞扫描 <el-tag v-if="form.pocscanEnable" type="success" size="small">开</el-tag></span>
+              <span class="collapse-title">{{ $t('task.vulScan') }} <el-tag v-if="form.pocscanEnable" type="success" size="small">{{ $t('task.started') }}</el-tag></span>
             </template>
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.pocscanEnable" />
-              <span class="form-hint">使用 Nuclei 引擎</span>
+              <span class="form-hint">{{ $t('task.useNucleiEngine') }}</span>
             </el-form-item>
             <template v-if="form.pocscanEnable">
-              <el-form-item label="POC来源">
+              <el-form-item :label="$t('task.pocSource')">
                 <el-radio-group v-model="form.pocscanMode" @change="handlePocModeChange">
-                  <el-radio value="auto">自动匹配</el-radio>
-                  <el-radio value="manual">手动选择</el-radio>
+                  <el-radio value="auto">{{ $t('task.autoMatch') }}</el-radio>
+                  <el-radio value="manual">{{ $t('task.manualSelect') }}</el-radio>
                 </el-radio-group>
               </el-form-item>
               
               <!-- 自动匹配模式 -->
               <template v-if="form.pocscanMode === 'auto'">
-                <el-form-item label="自动扫描">
-                  <el-checkbox v-model="form.pocscanAutoScan" :disabled="form.pocscanCustomOnly">自定义标签映射</el-checkbox>
-                  <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly || !form.fingerprintEnable">Web指纹自动匹配</el-checkbox>
-                  <span v-if="!form.fingerprintEnable && !form.pocscanCustomOnly" class="form-hint" style="color: #e6a23c">需启用指纹识别</span>
+                <el-form-item :label="$t('task.autoScan')">
+                  <el-checkbox v-model="form.pocscanAutoScan" :disabled="form.pocscanCustomOnly">{{ $t('task.customTagMapping') }}</el-checkbox>
+                  <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly || !form.fingerprintEnable">{{ $t('task.webFingerprintAutoMatch') }}</el-checkbox>
+                  <span v-if="!form.fingerprintEnable && !form.pocscanCustomOnly" class="form-hint warning-hint">{{ $t('task.needFingerprintScan') }}</span>
                 </el-form-item>
-                <el-form-item label="自定义POC">
-                  <el-checkbox v-model="form.pocscanCustomOnly">只使用自定义POC</el-checkbox>
+                <el-form-item :label="$t('task.customPoc')">
+                  <el-checkbox v-model="form.pocscanCustomOnly">{{ $t('task.onlyUseCustomPoc') }}</el-checkbox>
                 </el-form-item>
               </template>
               
               <!-- 手动选择模式 -->
               <template v-if="form.pocscanMode === 'manual'">
-                <el-form-item label="已选POC">
+                <el-form-item :label="$t('task.selectedPoc')">
                   <div class="selected-poc-summary">
                     <el-tag type="primary" size="small" v-if="form.pocscanNucleiTemplateIds.length">
-                      默认模板: {{ form.pocscanNucleiTemplateIds.length }} 个
+                      {{ $t('task.defaultTemplate') }}: {{ form.pocscanNucleiTemplateIds.length }}
                     </el-tag>
                     <el-tag type="warning" size="small" v-if="form.pocscanCustomPocIds.length">
-                      自定义POC: {{ form.pocscanCustomPocIds.length }} 个
+                      {{ $t('task.customPoc') }}: {{ form.pocscanCustomPocIds.length }}
                     </el-tag>
-                    <span v-if="!form.pocscanNucleiTemplateIds.length && !form.pocscanCustomPocIds.length" style="color: #909399">
-                      未选择任何POC
+                    <span v-if="!form.pocscanNucleiTemplateIds.length && !form.pocscanCustomPocIds.length" class="secondary-hint">
+                      {{ $t('task.noPocSelected') }}
                     </span>
-                    <el-button type="primary" link @click="showPocSelectDialog">选择POC</el-button>
+                    <el-button type="primary" link @click="showPocSelectDialog">{{ $t('task.selectPoc') }}</el-button>
                   </div>
                 </el-form-item>
               </template>
               
-              <el-form-item label="严重级别">
+              <el-form-item :label="$t('task.severityLevel')">
                 <el-checkbox-group v-model="form.pocscanSeverity">
                   <el-checkbox label="critical">Critical</el-checkbox>
                   <el-checkbox label="high">High</el-checkbox>
@@ -391,9 +378,9 @@
                   <el-checkbox label="unknown">Unknown</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
-              <el-form-item label="目标超时">
+              <el-form-item :label="$t('task.targetTimeout')">
                 <el-input-number v-model="form.pocscanTargetTimeout" :min="30" :max="600" />
-                <span class="form-hint">秒</span>
+                <span class="form-hint">{{ $t('task.seconds') }}</span>
               </el-form-item>
             </template>
           </el-collapse-item>
@@ -401,25 +388,25 @@
           <!-- 高级设置 -->
           <el-collapse-item name="advanced">
             <template #title>
-              <span class="collapse-title">高级设置</span>
+              <span class="collapse-title">{{ $t('task.advancedSettings') }}</span>
             </template>
-            <el-form-item label="任务拆分">
+            <el-form-item :label="$t('task.taskSplit')">
               <el-input-number v-model="form.batchSize" :min="0" :max="1000" :step="10" />
-              <span class="form-hint">每批目标数量，0=不拆分</span>
+              <span class="form-hint">{{ $t('task.batchTargetCount') }}</span>
             </el-form-item>
           </el-collapse-item>
         </el-collapse>
 
         <!-- 操作按钮 -->
         <div class="form-actions">
-          <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ isEdit ? '保存' : '创建任务' }}</el-button>
-          <el-button @click="handleCancel">取消</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ isEdit ? $t('common.save') : $t('task.createTask') }}</el-button>
+          <el-button @click="handleCancel">{{ $t('common.cancel') }}</el-button>
         </div>
       </el-form>
     </el-card>
 
     <!-- 目录扫描字典选择对话框 -->
-    <el-dialog v-model="dictSelectDialogVisible" title="选择目录扫描字典" width="800px" @open="handleDictDialogOpen">
+    <el-dialog v-model="dictSelectDialogVisible" :title="$t('task.selectDirScanDict')" width="800px" @open="handleDictDialogOpen">
       <el-table 
         ref="dictTableRef"
         :data="dictList" 
@@ -429,22 +416,22 @@
         row-key="id"
       >
         <el-table-column type="selection" width="45" :reserve-selection="true" />
-        <el-table-column prop="name" label="字典名称" min-width="150" />
-        <el-table-column prop="pathCount" label="路径数量" width="100" />
-        <el-table-column prop="isBuiltin" label="类型" width="80">
+        <el-table-column prop="name" :label="$t('task.dictName')" min-width="150" />
+        <el-table-column prop="pathCount" :label="$t('task.pathCount')" width="100" />
+        <el-table-column prop="isBuiltin" :label="$t('common.type')" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? '内置' : '自定义' }}</el-tag>
+            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? $t('task.builtin') : $t('task.custom') }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
       <template #footer>
-        <el-button @click="dictSelectDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmDictSelection">确定</el-button>
+        <el-button @click="dictSelectDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="confirmDictSelection">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 子域名字典选择对话框 -->
-    <el-dialog v-model="subdomainDictSelectDialogVisible" title="选择子域名暴力破解字典" width="800px" @open="handleSubdomainDictDialogOpen">
+    <el-dialog v-model="subdomainDictSelectDialogVisible" :title="$t('task.selectSubdomainDict')" width="800px" @open="handleSubdomainDictDialogOpen">
       <el-table 
         ref="subdomainDictTableRef"
         :data="subdomainDictList" 
@@ -454,22 +441,22 @@
         row-key="id"
       >
         <el-table-column type="selection" width="45" :reserve-selection="true" />
-        <el-table-column prop="name" label="字典名称" min-width="150" />
-        <el-table-column prop="wordCount" label="词条数量" width="100" />
-        <el-table-column prop="isBuiltin" label="类型" width="80">
+        <el-table-column prop="name" :label="$t('task.dictName')" min-width="150" />
+        <el-table-column prop="wordCount" :label="$t('task.wordCount')" width="100" />
+        <el-table-column prop="isBuiltin" :label="$t('common.type')" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? '内置' : '自定义' }}</el-tag>
+            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? $t('task.builtin') : $t('task.custom') }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
       <template #footer>
-        <el-button @click="subdomainDictSelectDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmSubdomainDictSelection">确定</el-button>
+        <el-button @click="subdomainDictSelectDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="confirmSubdomainDictSelection">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 递归爆破字典选择对话框 -->
-    <el-dialog v-model="recursiveDictSelectDialogVisible" title="选择递归爆破字典" width="800px" @open="handleRecursiveDictDialogOpen">
+    <el-dialog v-model="recursiveDictSelectDialogVisible" :title="$t('task.selectRecursiveDict')" width="800px" @open="handleRecursiveDictDialogOpen">
       <el-table 
         ref="recursiveDictTableRef"
         :data="recursiveDictList" 
@@ -479,34 +466,34 @@
         row-key="id"
       >
         <el-table-column type="selection" width="45" :reserve-selection="true" />
-        <el-table-column prop="name" label="字典名称" min-width="150" />
-        <el-table-column prop="wordCount" label="词条数量" width="100" />
-        <el-table-column prop="isBuiltin" label="类型" width="80">
+        <el-table-column prop="name" :label="$t('task.dictName')" min-width="150" />
+        <el-table-column prop="wordCount" :label="$t('task.wordCount')" width="100" />
+        <el-table-column prop="isBuiltin" :label="$t('common.type')" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? '内置' : '自定义' }}</el-tag>
+            <el-tag :type="row.isBuiltin ? 'info' : 'success'" size="small">{{ row.isBuiltin ? $t('task.builtin') : $t('task.custom') }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
       <template #footer>
-        <el-button @click="recursiveDictSelectDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmRecursiveDictSelection">确定</el-button>
+        <el-button @click="recursiveDictSelectDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="confirmRecursiveDictSelection">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- POC选择对话框 -->
-    <el-dialog v-model="pocSelectDialogVisible" title="选择POC" width="1200px" @open="handlePocDialogOpen">
+    <el-dialog v-model="pocSelectDialogVisible" :title="$t('task.selectPoc')" width="1200px" @open="handlePocDialogOpen">
       <div class="poc-select-container">
         <!-- 左侧：POC列表 -->
         <div class="poc-select-left">
           <el-tabs v-model="pocSelectTab">
             <!-- 默认模板 -->
-            <el-tab-pane label="默认模板" name="nuclei">
+            <el-tab-pane :label="$t('task.defaultTemplate')" name="nuclei">
               <el-form :inline="true" class="poc-filter-form">
                 <el-form-item>
-                  <el-input v-model="nucleiTemplateFilter.keyword" placeholder="名称/ID" clearable style="width: 150px" @keyup.enter="loadNucleiTemplatesForSelect" />
+                  <el-input v-model="nucleiTemplateFilter.keyword" :placeholder="$t('task.nameOrId')" clearable style="width: 150px" @keyup.enter="loadNucleiTemplatesForSelect" />
                 </el-form-item>
                 <el-form-item>
-                  <el-select v-model="nucleiTemplateFilter.severity" placeholder="级别" clearable style="width: 100px" @change="loadNucleiTemplatesForSelect">
+                  <el-select v-model="nucleiTemplateFilter.severity" :placeholder="$t('task.level')" clearable style="width: 100px" @change="loadNucleiTemplatesForSelect">
                     <el-option label="Critical" value="critical" />
                     <el-option label="High" value="high" />
                     <el-option label="Medium" value="medium" />
@@ -516,12 +503,12 @@
                   </el-select>
                 </el-form-item>
                 <el-form-item>
-                  <el-input v-model="nucleiTemplateFilter.tag" placeholder="标签" clearable style="width: 120px" @keyup.enter="loadNucleiTemplatesForSelect" />
+                  <el-input v-model="nucleiTemplateFilter.tag" :placeholder="$t('task.tags')" clearable style="width: 120px" @keyup.enter="loadNucleiTemplatesForSelect" />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" size="small" @click="loadNucleiTemplatesForSelect">搜索</el-button>
-                  <el-button type="success" size="small" @click="selectAllNucleiTemplates" :loading="selectAllNucleiLoading">选择全部</el-button>
-                  <el-button type="warning" size="small" @click="deselectAllNucleiTemplates" v-if="selectedNucleiTemplateIds.length > 0">取消选择</el-button>
+                  <el-button type="primary" size="small" @click="loadNucleiTemplatesForSelect">{{ $t('common.search') }}</el-button>
+                  <el-button type="success" size="small" @click="selectAllNucleiTemplates" :loading="selectAllNucleiLoading">{{ $t('task.selectAll') }}</el-button>
+                  <el-button type="warning" size="small" @click="deselectAllNucleiTemplates" v-if="selectedNucleiTemplateIds.length > 0">{{ $t('task.deselectAll') }}</el-button>
                 </el-form-item>
               </el-form>
               <el-table 
@@ -533,22 +520,22 @@
                 row-key="id"
               >
                 <el-table-column type="selection" width="45" :reserve-selection="true" />
-                <el-table-column prop="id" label="模板ID" width="180" show-overflow-tooltip />
-                <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
-                <el-table-column prop="severity" label="级别" width="80">
+                <el-table-column prop="id" :label="$t('task.templateId')" width="180" show-overflow-tooltip />
+                <el-table-column prop="name" :label="$t('common.name')" min-width="150" show-overflow-tooltip />
+                <el-table-column prop="severity" :label="$t('task.level')" width="80">
                   <template #default="{ row }">
                     <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="tags" label="标签" min-width="100">
+                <el-table-column prop="tags" :label="$t('task.tags')" min-width="100">
                   <template #default="{ row }">
                     <el-tag v-for="tag in (row.tags || []).slice(0, 2)" :key="tag" size="small" style="margin-right: 3px">{{ tag }}</el-tag>
-                    <span v-if="row.tags && row.tags.length > 2" style="color: #909399">+{{ row.tags.length - 2 }}</span>
+                    <span v-if="row.tags && row.tags.length > 2" class="secondary-hint">+{{ row.tags.length - 2 }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="60" fixed="right">
+                <el-table-column :label="$t('common.operation')" width="60" fixed="right">
                   <template #default="{ row }">
-                    <el-button type="primary" link size="small" @click="viewPocContent(row, 'nuclei')">查看</el-button>
+                    <el-button type="primary" link size="small" @click="viewPocContent(row, 'nuclei')">{{ $t('common.view') }}</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -565,13 +552,13 @@
             </el-tab-pane>
 
             <!-- 自定义POC -->
-            <el-tab-pane label="自定义POC" name="custom">
+            <el-tab-pane :label="$t('task.customPoc')" name="custom">
               <el-form :inline="true" class="poc-filter-form">
                 <el-form-item>
-                  <el-input v-model="customPocFilter.name" placeholder="名称" clearable style="width: 150px" @keyup.enter="loadCustomPocsForSelect" />
+                  <el-input v-model="customPocFilter.name" :placeholder="$t('common.name')" clearable style="width: 150px" @keyup.enter="loadCustomPocsForSelect" />
                 </el-form-item>
                 <el-form-item>
-                  <el-select v-model="customPocFilter.severity" placeholder="级别" clearable style="width: 100px" @change="loadCustomPocsForSelect">
+                  <el-select v-model="customPocFilter.severity" :placeholder="$t('task.level')" clearable style="width: 100px" @change="loadCustomPocsForSelect">
                     <el-option label="Critical" value="critical" />
                     <el-option label="High" value="high" />
                     <el-option label="Medium" value="medium" />
@@ -581,12 +568,12 @@
                   </el-select>
                 </el-form-item>
                 <el-form-item>
-                  <el-input v-model="customPocFilter.tag" placeholder="标签" clearable style="width: 120px" @keyup.enter="loadCustomPocsForSelect" />
+                  <el-input v-model="customPocFilter.tag" :placeholder="$t('task.tags')" clearable style="width: 120px" @keyup.enter="loadCustomPocsForSelect" />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" size="small" @click="loadCustomPocsForSelect">搜索</el-button>
-                  <el-button type="success" size="small" @click="selectAllCustomPocs" :loading="selectAllCustomLoading">选择全部</el-button>
-                  <el-button type="warning" size="small" @click="deselectAllCustomPocs" v-if="selectedCustomPocIds.length > 0">取消选择</el-button>
+                  <el-button type="primary" size="small" @click="loadCustomPocsForSelect">{{ $t('common.search') }}</el-button>
+                  <el-button type="success" size="small" @click="selectAllCustomPocs" :loading="selectAllCustomLoading">{{ $t('task.selectAll') }}</el-button>
+                  <el-button type="warning" size="small" @click="deselectAllCustomPocs" v-if="selectedCustomPocIds.length > 0">{{ $t('task.deselectAll') }}</el-button>
                 </el-form-item>
               </el-form>
               <el-table 
@@ -598,16 +585,16 @@
                 row-key="id"
               >
                 <el-table-column type="selection" width="45" :reserve-selection="true" />
-                <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
-                <el-table-column prop="templateId" label="模板ID" width="150" show-overflow-tooltip />
-                <el-table-column prop="severity" label="级别" width="80">
+                <el-table-column prop="name" :label="$t('common.name')" min-width="150" show-overflow-tooltip />
+                <el-table-column prop="templateId" :label="$t('task.templateId')" width="150" show-overflow-tooltip />
+                <el-table-column prop="severity" :label="$t('task.level')" width="80">
                   <template #default="{ row }">
                     <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="60" fixed="right">
+                <el-table-column :label="$t('common.operation')" width="60" fixed="right">
                   <template #default="{ row }">
-                    <el-button type="primary" link size="small" @click="viewPocContent(row, 'custom')">查看</el-button>
+                    <el-button type="primary" link size="small" @click="viewPocContent(row, 'custom')">{{ $t('common.view') }}</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -628,20 +615,20 @@
         <!-- 右侧：已选择列表 -->
         <div class="poc-select-right">
           <div class="selected-header">
-            <span>已选择 ({{ selectedNucleiTemplates.length + selectedCustomPocs.length }})</span>
+            <span>{{ $t('task.selected') }} ({{ selectedNucleiTemplates.length + selectedCustomPocs.length }})</span>
             <el-button type="danger" link size="small" @click="clearAllSelections" v-if="selectedNucleiTemplates.length + selectedCustomPocs.length > 0">
-              清空全部
+              {{ $t('task.clearAll') }}
             </el-button>
           </div>
           <div class="selected-search">
-            <el-input v-model="selectedPocSearchKeyword" placeholder="搜索名称/模板ID" clearable size="small" :prefix-icon="Search" />
+            <el-input v-model="selectedPocSearchKeyword" :placeholder="$t('task.searchSelected')" clearable size="small" :prefix-icon="Search" />
           </div>
           <div class="selected-list">
             <!-- 默认模板 -->
             <div v-if="filteredSelectedNucleiTemplates.length > 0" class="selected-group">
               <div class="group-header">
-                <span>默认模板 ({{ filteredSelectedNucleiTemplates.length }}<template v-if="selectedPocSearchKeyword">/{{ selectedNucleiTemplates.length }}</template>)</span>
-                <el-button type="danger" link size="small" @click="clearNucleiSelections">清空</el-button>
+                <span>{{ $t('task.defaultTemplate') }} ({{ filteredSelectedNucleiTemplates.length }}<template v-if="selectedPocSearchKeyword">/{{ selectedNucleiTemplates.length }}</template>)</span>
+                <el-button type="danger" link size="small" @click="clearNucleiSelections">{{ $t('task.clear') }}</el-button>
               </div>
               <div class="selected-items">
                 <div v-for="item in filteredSelectedNucleiTemplates" :key="item.id" class="selected-item">
@@ -653,8 +640,8 @@
             <!-- 自定义POC -->
             <div v-if="filteredSelectedCustomPocs.length > 0" class="selected-group">
               <div class="group-header">
-                <span>自定义POC ({{ filteredSelectedCustomPocs.length }}<template v-if="selectedPocSearchKeyword">/{{ selectedCustomPocs.length }}</template>)</span>
-                <el-button type="danger" link size="small" @click="clearCustomPocSelections">清空</el-button>
+                <span>{{ $t('task.customPoc') }} ({{ filteredSelectedCustomPocs.length }}<template v-if="selectedPocSearchKeyword">/{{ selectedCustomPocs.length }}</template>)</span>
+                <el-button type="danger" link size="small" @click="clearCustomPocSelections">{{ $t('task.clear') }}</el-button>
               </div>
               <div class="selected-items">
                 <div v-for="item in filteredSelectedCustomPocs" :key="item.id" class="selected-item">
@@ -665,32 +652,32 @@
             </div>
             <!-- 空状态 -->
             <div v-if="filteredSelectedNucleiTemplates.length === 0 && filteredSelectedCustomPocs.length === 0" class="selected-empty">
-              <span>{{ selectedPocSearchKeyword ? '无匹配结果' : '暂未选择POC' }}</span>
+              <span>{{ selectedPocSearchKeyword ? $t('task.noMatchingResults') : $t('task.noPocSelected') }}</span>
             </div>
           </div>
         </div>
       </div>
 
       <template #footer>
-        <el-button @click="pocSelectDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmPocSelection">确定</el-button>
+        <el-button @click="pocSelectDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="confirmPocSelection">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 查看POC内容对话框 -->
     <el-dialog v-model="pocContentDialogVisible" :title="pocContentTitle" width="800px">
       <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
-        <el-descriptions-item label="模板ID">{{ currentViewPoc.id || currentViewPoc.templateId }}</el-descriptions-item>
-        <el-descriptions-item label="名称">{{ currentViewPoc.name }}</el-descriptions-item>
-        <el-descriptions-item label="严重级别">
+        <el-descriptions-item :label="$t('task.templateId')">{{ currentViewPoc.id || currentViewPoc.templateId }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('common.name')">{{ currentViewPoc.name }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('task.severityLevel')">
           <el-tag :type="getSeverityType(currentViewPoc.severity)" size="small">{{ currentViewPoc.severity }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="作者">{{ currentViewPoc.author || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="标签" :span="2">
+        <el-descriptions-item :label="$t('task.author')">{{ currentViewPoc.author || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('task.tags')" :span="2">
           <el-tag v-for="tag in (currentViewPoc.tags || [])" :key="tag" size="small" style="margin-right: 5px">{{ tag }}</el-tag>
           <span v-if="!currentViewPoc.tags || currentViewPoc.tags.length === 0">-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="描述" :span="2">{{ currentViewPoc.description || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('common.description')" :span="2">{{ currentViewPoc.description || '-' }}</el-descriptions-item>
       </el-descriptions>
       <div class="poc-content-wrapper" v-loading="pocContentLoading">
         <el-input
@@ -701,8 +688,8 @@
         />
       </div>
       <template #footer>
-        <el-button @click="pocContentDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="copyPocContent">复制内容</el-button>
+        <el-button @click="pocContentDialogVisible = false">{{ $t('common.close') }}</el-button>
+        <el-button type="primary" @click="copyPocContent">{{ $t('task.copyContent') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -711,6 +698,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch, nextTick, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Close, Search, InfoFilled } from '@element-plus/icons-vue'
 import { createTask, updateTask, getTaskDetail, startTask, getWorkerList, getScanConfig, saveScanConfig } from '@/api/task'
@@ -722,6 +710,7 @@ import request from '@/api/request'
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const formRef = ref()
 const submitting = ref(false)
@@ -767,7 +756,7 @@ const isLoadingData = ref(false)
 // 查看POC内容相关
 const pocContentDialogVisible = ref(false)
 const pocContentLoading = ref(false)
-const pocContentTitle = ref('POC内容')
+const pocContentTitle = ref('')
 const currentViewPoc = ref({})
 const selectedNucleiTemplateIds = ref([])
 const selectedCustomPocIds = ref([])
@@ -815,8 +804,6 @@ const form = reactive({
   target: '',
   workspaceId: '',
   orgId: '',
-  isCron: false,
-  cronRule: '',
   workers: [],
   batchSize: 50,
   // 子域名扫描
@@ -887,8 +874,8 @@ const form = reactive({
 })
 
 const rules = {
-  name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  target: [{ required: true, message: '请输入扫描目标', trigger: 'blur' }]
+  name: [{ required: true, message: () => t('task.pleaseEnterTaskName'), trigger: 'blur' }],
+  target: [{ required: true, message: () => t('task.pleaseEnterTarget'), trigger: 'blur' }]
 }
 
 onMounted(async () => {
@@ -1227,8 +1214,6 @@ async function handleSubmit() {
       target: form.target,
       workspaceId: form.workspaceId,
       orgId: form.orgId,
-      isCron: form.isCron,
-      cronRule: form.cronRule,
       workers: form.workers,
       config: JSON.stringify(config)
     }
@@ -1242,14 +1227,14 @@ async function handleSubmit() {
     }
 
     if (res.code === 0) {
-      ElMessage.success(isEdit.value ? '任务更新成功' : '任务创建成功')
+      ElMessage.success(isEdit.value ? t('task.taskUpdateSuccess') : t('task.taskCreateSuccess'))
       if (!isEdit.value && res.id) {
         await startTask({ id: res.id, workspaceId: form.workspaceId })
-        ElMessage.success('任务已启动')
+        ElMessage.success(t('task.taskStarted'))
       }
       router.push('/task')
     } else {
-      ElMessage.error(res.msg || '操作失败')
+      ElMessage.error(res.msg || t('common.operationFailed'))
     }
   } finally {
     submitting.value = false
@@ -1479,7 +1464,7 @@ async function selectAllNucleiTemplates() {
     
     const total = firstRes.total || 0
     if (total === 0) {
-      ElMessage.warning('没有符合条件的模板')
+      ElMessage.warning(t('task.noMatchingTemplate'))
       return
     }
     
@@ -1520,10 +1505,11 @@ async function selectAllNucleiTemplates() {
         nucleiTableRef.value.toggleRowSelection(row, true)
       })
     }
-    ElMessage.success(`已选择 ${allTemplates.length} 个模板${addedCount < allTemplates.length ? `（新增 ${addedCount} 个）` : ''}`)
+    const addedText = addedCount < allTemplates.length ? t('task.newlyAdded', { count: addedCount }) : ''
+    ElMessage.success(t('task.selectedTemplatesCount', { total: allTemplates.length, added: addedText }))
   } catch (e) {
     console.error('选择全部失败:', e)
-    ElMessage.error('选择全部失败')
+    ElMessage.error(t('task.selectAllFailed'))
   } finally {
     selectAllNucleiLoading.value = false
     isSelectingAll.value = false
@@ -1550,7 +1536,7 @@ async function selectAllCustomPocs() {
     
     const total = firstRes.total || 0
     if (total === 0) {
-      ElMessage.warning('没有符合条件的POC')
+      ElMessage.warning(t('task.noMatchingPoc'))
       return
     }
     
@@ -1591,10 +1577,11 @@ async function selectAllCustomPocs() {
         customPocTableRef.value.toggleRowSelection(row, true)
       })
     }
-    ElMessage.success(`已选择 ${allPocs.length} 个POC${addedCount < allPocs.length ? `（新增 ${addedCount} 个）` : ''}`)
+    const addedText = addedCount < allPocs.length ? t('task.newlyAdded', { count: addedCount }) : ''
+    ElMessage.success(t('task.selectedPocsCount', { total: allPocs.length, added: addedText }))
   } catch (e) {
     console.error('选择全部失败:', e)
-    ElMessage.error('选择全部失败')
+    ElMessage.error(t('task.selectAllFailed'))
   } finally {
     selectAllCustomLoading.value = false
     isSelectingAll.value = false
@@ -1613,7 +1600,7 @@ function clearNucleiSelections() {
 // 取消选择全部Nuclei模板（按钮调用）
 function deselectAllNucleiTemplates() {
   clearNucleiSelections()
-  ElMessage.success('已取消所有模板选择')
+  ElMessage.success(t('task.allTemplatesDeselected'))
 }
 
 // 清除自定义POC选择
@@ -1628,7 +1615,7 @@ function clearCustomPocSelections() {
 // 取消选择全部自定义POC（按钮调用）
 function deselectAllCustomPocs() {
   clearCustomPocSelections()
-  ElMessage.success('已取消所有POC选择')
+  ElMessage.success(t('task.allPocsDeselected'))
 }
 
 // 移除单个Nuclei模板
@@ -1660,7 +1647,7 @@ function removeCustomPoc(id) {
 // 查看POC内容
 async function viewPocContent(row, type) {
   currentViewPoc.value = { ...row }
-  pocContentTitle.value = type === 'nuclei' ? '默认模板内容' : '自定义POC内容'
+  pocContentTitle.value = type === 'nuclei' ? t('task.defaultTemplateContent') : t('task.customPocContent')
   pocContentDialogVisible.value = true
   
   // 如果没有content字段，需要从后端获取
@@ -1673,15 +1660,15 @@ async function viewPocContent(row, type) {
         if (res.code === 0 && res.data) {
           currentViewPoc.value = { ...currentViewPoc.value, ...res.data }
         } else {
-          currentViewPoc.value.content = res.msg || '获取内容失败'
+          currentViewPoc.value.content = res.msg || t('task.getContentFailed')
         }
       } else {
         // 自定义POC通常在列表中已包含content
-        currentViewPoc.value.content = row.content || '暂无内容'
+        currentViewPoc.value.content = row.content || t('task.noContent')
       }
     } catch (e) {
       console.error('获取POC内容失败:', e)
-      currentViewPoc.value.content = '获取内容失败'
+      currentViewPoc.value.content = t('task.getContentFailed')
     } finally {
       pocContentLoading.value = false
     }
@@ -1692,9 +1679,9 @@ async function viewPocContent(row, type) {
 function copyPocContent() {
   if (currentViewPoc.value.content) {
     navigator.clipboard.writeText(currentViewPoc.value.content).then(() => {
-      ElMessage.success('已复制到剪贴板')
+      ElMessage.success(t('task.copiedToClipboard'))
     }).catch(() => {
-      ElMessage.error('复制失败')
+      ElMessage.error(t('task.copyFailed'))
     })
   }
 }
@@ -1904,6 +1891,15 @@ function confirmRecursiveDictSelection() {
   .form-hint {
     margin-left: 10px;
     color: var(--el-text-color-secondary);
+    font-size: 12px;
+  }
+
+  .secondary-hint {
+    color: var(--el-text-color-secondary);
+  }
+
+  .warning-hint {
+    color: var(--el-color-warning);
     font-size: 12px;
   }
 

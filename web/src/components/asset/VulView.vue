@@ -1,31 +1,31 @@
-<template>
+﻿<template>
   <div class="vul-view">
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :model="searchForm" inline>
-        <el-form-item label="目标">
-          <el-input v-model="searchForm.authority" placeholder="IP:端口" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('vul.target')">
+          <el-input v-model="searchForm.authority" :placeholder="$t('vul.targetPlaceholder')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="危害等级">
-          <el-select v-model="searchForm.severity" placeholder="全部" clearable style="width: 120px">
-            <el-option label="严重" value="critical" />
-            <el-option label="高危" value="high" />
-            <el-option label="中危" value="medium" />
-            <el-option label="低危" value="low" />
-            <el-option label="信息" value="info" />
-            <el-option label="未知" value="unknown" />
+        <el-form-item :label="$t('vul.severity')">
+          <el-select v-model="searchForm.severity" :placeholder="$t('common.all')" clearable style="width: 120px">
+            <el-option :label="$t('vul.critical')" value="critical" />
+            <el-option :label="$t('vul.high')" value="high" />
+            <el-option :label="$t('vul.medium')" value="medium" />
+            <el-option :label="$t('vul.low')" value="low" />
+            <el-option :label="$t('vul.info')" value="info" />
+            <el-option :label="$t('vul.unknown')" value="unknown" />
           </el-select>
         </el-form-item>
-        <el-form-item label="来源">
-          <el-select v-model="searchForm.source" placeholder="全部" clearable style="width: 120px">
+        <el-form-item :label="$t('vul.source')">
+          <el-select v-model="searchForm.source" :placeholder="$t('common.all')" clearable style="width: 120px">
             <el-option label="Nuclei" value="nuclei" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
           <el-button type="danger" plain @click="handleClear">
-            清空数据
+            {{ $t('vul.clearData') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -36,37 +36,37 @@
       <el-col :span="4">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.total }}</div>
-          <div class="stat-label">漏洞总数</div>
+          <div class="stat-label">{{ $t('vul.totalVuls') }}</div>
         </el-card>
       </el-col>
       <el-col :span="4">
         <el-card class="stat-card critical">
           <div class="stat-value">{{ stat.critical }}</div>
-          <div class="stat-label">严重</div>
+          <div class="stat-label">{{ $t('vul.critical') }}</div>
         </el-card>
       </el-col>
       <el-col :span="4">
         <el-card class="stat-card high">
           <div class="stat-value">{{ stat.high }}</div>
-          <div class="stat-label">高危</div>
+          <div class="stat-label">{{ $t('vul.high') }}</div>
         </el-card>
       </el-col>
       <el-col :span="4">
         <el-card class="stat-card medium">
           <div class="stat-value">{{ stat.medium }}</div>
-          <div class="stat-label">中危</div>
+          <div class="stat-label">{{ $t('vul.medium') }}</div>
         </el-card>
       </el-col>
       <el-col :span="4">
         <el-card class="stat-card low">
           <div class="stat-value">{{ stat.low }}</div>
-          <div class="stat-label">低危</div>
+          <div class="stat-label">{{ $t('vul.low') }}</div>
         </el-card>
       </el-col>
       <el-col :span="4">
         <el-card class="stat-card info">
           <div class="stat-value">{{ stat.info }}</div>
-          <div class="stat-label">信息</div>
+          <div class="stat-label">{{ $t('vul.info') }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -74,21 +74,22 @@
     <!-- 数据表格 -->
     <el-card class="table-card">
       <div class="table-header">
-        <span class="total-info">共 {{ pagination.total }} 条漏洞</span>
+        <span class="total-info">{{ $t('vul.totalVulsCount', { count: pagination.total }) }}</span>
         <div class="table-actions">
           <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            批量删除 ({{ selectedRows.length }})
+            {{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
           <el-dropdown style="margin-left: 10px" @command="handleExport">
             <el-button type="success" size="small">
-              导出<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              {{ $t('common.export') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="selected-target" :disabled="selectedRows.length === 0">导出选中目标 ({{ selectedRows.length }})</el-dropdown-item>
-                <el-dropdown-item command="selected-url" :disabled="selectedRows.length === 0">导出选中URL ({{ selectedRows.length }})</el-dropdown-item>
-                <el-dropdown-item divided command="all-target">导出全部目标</el-dropdown-item>
-                <el-dropdown-item command="all-url">导出全部URL</el-dropdown-item>
+                <el-dropdown-item command="selected-target" :disabled="selectedRows.length === 0">{{ $t('vul.exportSelectedTargets', { count: selectedRows.length }) }}</el-dropdown-item>
+                <el-dropdown-item command="selected-url" :disabled="selectedRows.length === 0">{{ $t('vul.exportSelectedUrls', { count: selectedRows.length }) }}</el-dropdown-item>
+                <el-dropdown-item divided command="all-target">{{ $t('vul.exportAllTargets') }}</el-dropdown-item>
+                <el-dropdown-item command="all-url">{{ $t('vul.exportAllUrls') }}</el-dropdown-item>
+                <el-dropdown-item command="csv">{{ $t('common.exportCsv') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -96,20 +97,20 @@
       </div>
       <el-table :data="tableData" v-loading="loading" stripe max-height="500" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="authority" label="目标" min-width="150" />
+        <el-table-column prop="authority" :label="$t('vul.target')" min-width="150" />
         <el-table-column prop="url" label="URL" min-width="250" show-overflow-tooltip />
         <el-table-column prop="pocFile" label="POC" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="severity" label="危害等级" width="100">
+        <el-table-column prop="severity" :label="$t('vul.severity')" width="100">
           <template #default="{ row }">
             <el-tag :type="getSeverityType(row.severity)" size="small">{{ getSeverityLabel(row.severity) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="source" label="来源" width="100" />
-        <el-table-column prop="createTime" label="发现时间" width="160" />
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column prop="source" :label="$t('vul.source')" width="100" />
+        <el-table-column prop="createTime" :label="$t('vul.discoveryTime')" width="160" />
+        <el-table-column :label="$t('common.operation')" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="showDetail(row)">{{ $t('common.detail') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -127,30 +128,30 @@
     </el-card>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="漏洞详情" width="800px">
+    <el-dialog v-model="detailVisible" :title="$t('vul.vulDetail')" width="800px">
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="目标">{{ currentVul.authority }}</el-descriptions-item>
-        <el-descriptions-item label="危害等级">
+        <el-descriptions-item :label="$t('vul.target')">{{ currentVul.authority }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vul.severity')">
           <el-tag :type="getSeverityType(currentVul.severity)">{{ getSeverityLabel(currentVul.severity) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="URL" :span="2">{{ currentVul.url }}</el-descriptions-item>
-        <el-descriptions-item label="POC文件" :span="2">{{ currentVul.pocFile }}</el-descriptions-item>
-        <el-descriptions-item label="来源">{{ currentVul.source }}</el-descriptions-item>
-        <el-descriptions-item label="发现时间">{{ currentVul.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="验证结果" :span="2">
+        <el-descriptions-item :label="$t('vul.pocFile')" :span="2">{{ currentVul.pocFile }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vul.source')">{{ currentVul.source }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vul.discoveryTime')">{{ currentVul.createTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('vul.verifyResult')" :span="2">
           <pre class="result-pre">{{ currentVul.result }}</pre>
         </el-descriptions-item>
       </el-descriptions>
       <template v-if="currentVul.evidence">
-        <el-divider content-position="left">证据链</el-divider>
+        <el-divider content-position="left">{{ $t('vul.evidence') }}</el-divider>
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="cURL命令" v-if="currentVul.evidence.curlCommand">
+          <el-descriptions-item :label="$t('vul.curlCommand')" v-if="currentVul.evidence.curlCommand">
             <pre class="result-pre">{{ currentVul.evidence.curlCommand }}</pre>
           </el-descriptions-item>
-          <el-descriptions-item label="请求内容" v-if="currentVul.evidence.request">
+          <el-descriptions-item :label="$t('vul.requestContent')" v-if="currentVul.evidence.request">
             <pre class="result-pre">{{ currentVul.evidence.request }}</pre>
           </el-descriptions-item>
-          <el-descriptions-item label="响应内容" v-if="currentVul.evidence.response">
+          <el-descriptions-item :label="$t('vul.responseContent')" v-if="currentVul.evidence.response">
             <pre class="result-pre">{{ currentVul.evidence.response }}</pre>
           </el-descriptions-item>
         </el-descriptions>
@@ -161,10 +162,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
+const { t } = useI18n()
 const emit = defineEmits(['data-changed'])
 
 const loading = ref(false)
@@ -223,7 +226,14 @@ function getSeverityType(severity) {
 }
 
 function getSeverityLabel(severity) {
-  const map = { critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息', unknown: '未知' }
+  const map = { 
+    critical: t('vul.critical'), 
+    high: t('vul.high'), 
+    medium: t('vul.medium'), 
+    low: t('vul.low'), 
+    info: t('vul.info'), 
+    unknown: t('vul.unknown') 
+  }
   return map[severity] || severity
 }
 
@@ -236,24 +246,24 @@ async function showDetail(row) {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该漏洞记录吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('vul.confirmDeleteVul'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/vul/delete', { id: row.id })
-  if (res.code === 0) { ElMessage.success('删除成功'); loadData(); loadStat() }
+  if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); loadData(); loadStat() }
 }
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 条漏洞记录吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('vul.confirmBatchDelete', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ids = selectedRows.value.map(row => row.id)
   const res = await request.post('/vul/batchDelete', { ids })
-  if (res.code === 0) { ElMessage.success('删除成功'); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
+  if (res.code === 0) { ElMessage.success(t('common.deleteSuccess')); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
 }
 
 async function handleClear() {
-  await ElMessageBox.confirm('确定清空所有漏洞数据吗？此操作不可恢复！', '警告', { type: 'error', confirmButtonText: '确定清空', cancelButtonText: '取消' })
+  await ElMessageBox.confirm(t('vul.confirmClearAll'), t('common.warning'), { type: 'error', confirmButtonText: t('vul.confirmClearBtn'), cancelButtonText: t('common.cancel') })
   const res = await request.post('/vul/clear', {})
-  if (res.code === 0) { ElMessage.success(res.msg || '清空成功'); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
-  else { ElMessage.error(res.msg || '清空失败') }
+  if (res.code === 0) { ElMessage.success(res.msg || t('vul.clearSuccess')); selectedRows.value = []; loadData(); loadStat(); emit('data-changed') }
+  else { ElMessage.error(res.msg || t('vul.clearFailed')) }
 }
 
 // 导出功能
@@ -263,13 +273,14 @@ async function handleExport(command) {
   
   if (command === 'selected-target' || command === 'selected-url') {
     if (selectedRows.value.length === 0) {
-      ElMessage.warning('请先选择要导出的漏洞')
+      ElMessage.warning(t('vul.pleaseSelectVuls'))
       return
     }
     data = selectedRows.value
     filename = command === 'selected-target' ? 'vul_targets_selected.txt' : 'vul_urls_selected.txt'
-  } else {
-    ElMessage.info('正在获取全部数据...')
+  } else if (command === 'csv') {
+    // CSV导出所有字段
+    ElMessage.info(t('asset.gettingAllData'))
     try {
       const res = await request.post('/vul/list', {
         ...searchForm, page: 1, pageSize: 10000
@@ -277,18 +288,69 @@ async function handleExport(command) {
       if (res.code === 0) {
         data = res.list || []
       } else {
-        ElMessage.error('获取数据失败')
+        ElMessage.error(t('asset.getDataFailed'))
         return
       }
     } catch (e) {
-      ElMessage.error('获取数据失败')
+      ElMessage.error(t('asset.getDataFailed'))
+      return
+    }
+    
+    if (data.length === 0) {
+      ElMessage.warning(t('asset.noDataToExport'))
+      return
+    }
+    
+    const headers = ['Target', 'URL', 'POC', 'Severity', 'Source', 'Result', 'CreateTime']
+    const csvRows = [headers.join(',')]
+    
+    for (const row of data) {
+      const values = [
+        escapeCsvField(row.authority || ''),
+        escapeCsvField(row.url || ''),
+        escapeCsvField(row.pocFile || ''),
+        escapeCsvField(row.severity || ''),
+        escapeCsvField(row.source || ''),
+        escapeCsvField(row.result || ''),
+        escapeCsvField(row.createTime || '')
+      ]
+      csvRows.push(values.join(','))
+    }
+    
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `vulnerabilities_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success(t('asset.exportSuccess', { count: data.length }))
+    return
+  } else {
+    ElMessage.info(t('asset.gettingAllData'))
+    try {
+      const res = await request.post('/vul/list', {
+        ...searchForm, page: 1, pageSize: 10000
+      })
+      if (res.code === 0) {
+        data = res.list || []
+      } else {
+        ElMessage.error(t('asset.getDataFailed'))
+        return
+      }
+    } catch (e) {
+      ElMessage.error(t('asset.getDataFailed'))
       return
     }
     filename = command === 'all-target' ? 'vul_targets_all.txt' : 'vul_urls_all.txt'
   }
   
   if (data.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('asset.noDataToExport'))
     return
   }
   
@@ -313,7 +375,7 @@ async function handleExport(command) {
   }
   
   if (exportData.length === 0) {
-    ElMessage.warning('没有可导出的数据')
+    ElMessage.warning(t('asset.noDataToExport'))
     return
   }
   
@@ -328,7 +390,17 @@ async function handleExport(command) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   
-  ElMessage.success(`成功导出 ${exportData.length} 条数据`)
+  ElMessage.success(t('asset.exportSuccess', { count: exportData.length }))
+}
+
+// CSV字段转义
+function escapeCsvField(field) {
+  if (field == null) return ''
+  const str = String(field)
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"'
+  }
+  return str
 }
 
 function refresh() { loadData(); loadStat() }
@@ -336,7 +408,7 @@ function refresh() { loadData(); loadStat() }
 defineExpose({ refresh })
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .vul-view {
   .search-card { margin-bottom: 16px; }
   .stat-row {
@@ -367,3 +439,4 @@ defineExpose({ refresh })
   }
 }
 </style>
+

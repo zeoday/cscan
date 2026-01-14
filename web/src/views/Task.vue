@@ -3,12 +3,12 @@
     <!-- 操作栏 -->
     <el-card class="action-card">
       <el-button type="primary" @click="goToCreateTask">
-        <el-icon><Plus /></el-icon>新建任务
+        <el-icon><Plus /></el-icon>{{ $t('task.newTask') }}
       </el-button>
       <el-switch
         v-model="autoRefresh"
         style="margin-left: 20px"
-        active-text="自动刷新(间隔30秒)"
+        :active-text="$t('task.autoRefresh')"
         inactive-text=""
         @change="handleAutoRefreshChange"
       />
@@ -18,57 +18,51 @@
     <el-card class="table-card">
       <div style="margin-bottom: 15px">
         <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-          <el-icon><Delete /></el-icon>批量删除 ({{ selectedRows.length }})
+          <el-icon><Delete /></el-icon>{{ $t('task.batchDelete') }} ({{ selectedRows.length }})
         </el-button>
       </div>
       <el-table :data="tableData" v-loading="loading" stripe max-height="500" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="name" label="任务名称" min-width="150" />
-        <el-table-column prop="target" label="扫描目标" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="120">
+        <el-table-column prop="name" :label="$t('task.taskName')" min-width="150" />
+        <el-table-column prop="target" :label="$t('task.scanTarget')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="status" :label="$t('task.status')" width="120">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status, row)">{{ getStatusText(row) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="progress" label="进度" width="150">
+        <el-table-column prop="progress" :label="$t('task.progress')" width="150">
           <template #default="{ row }">
             <div>
-              <el-progress :percentage="row.progress" :stroke-width="6" />
+              <el-progress :percentage="Math.min(row.progress || 0, 100)" :stroke-width="6" />
               <div v-if="row.subTaskCount > 1" class="sub-task-info">
-                子任务: {{ row.subTaskDone }}/{{ row.subTaskCount }}
+                {{ $t('task.subTask') }}: {{ row.subTaskDone }}/{{ row.subTaskCount }}
               </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="定时任务" width="100">
-          <template #default="{ row }">
-            <el-tag v-if="row.isCron" type="success" size="small">{{ row.cronRule }}</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column prop="startTime" label="开始时间" width="160">
+        <el-table-column prop="createTime" :label="$t('common.createTime')" width="160" />
+        <el-table-column prop="startTime" :label="$t('task.startTime')" width="160">
           <template #default="{ row }">
             {{ row.startTime || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="endTime" label="结束时间" width="160">
+        <el-table-column prop="endTime" :label="$t('task.endTime')" width="160">
           <template #default="{ row }">
             {{ row.endTime || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="320" fixed="right">
+        <el-table-column :label="$t('common.operation')" width="320" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'CREATED' || !row.status" type="success" link size="small" @click="handleStart(row)">启动</el-button>
-            <el-button v-if="row.status === 'CREATED' || !row.status" type="warning" link size="small" @click="goToEditTask(row)">编辑</el-button>
-            <el-button v-if="['STARTED', 'PENDING'].includes(row.status)" type="warning" link size="small" @click="handlePause(row)">暂停</el-button>
-            <el-button v-if="row.status === 'PAUSED'" type="success" link size="small" @click="handleResume(row)">继续</el-button>
-            <el-button v-if="['STARTED', 'PAUSED', 'PENDING', 'CREATED', ''].includes(row.status) && row.status !== 'SUCCESS' && row.status !== 'FAILURE' && row.status !== 'STOPPED'" type="danger" link size="small" @click="handleStop(row)">停止</el-button>
-            <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
-            <el-button type="info" link size="small" @click="showLogs(row)">日志</el-button>
-            <el-button type="info" link size="small" @click="viewReport(row)">报告</el-button>
-            <el-button v-if="['SUCCESS', 'FAILURE', 'STOPPED'].includes(row.status)" type="warning" link size="small" @click="handleRetry(row)">重新执行</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'CREATED' || !row.status" type="success" link size="small" @click="handleStart(row)">{{ $t('task.start') }}</el-button>
+            <el-button v-if="row.status === 'CREATED' || !row.status" type="warning" link size="small" @click="goToEditTask(row)">{{ $t('task.edit') }}</el-button>
+            <el-button v-if="['STARTED', 'PENDING'].includes(row.status)" type="warning" link size="small" @click="handlePause(row)">{{ $t('task.pause') }}</el-button>
+            <el-button v-if="row.status === 'PAUSED'" type="success" link size="small" @click="handleResume(row)">{{ $t('task.resume') }}</el-button>
+            <el-button v-if="['STARTED', 'PAUSED', 'PENDING', 'CREATED', ''].includes(row.status) && row.status !== 'SUCCESS' && row.status !== 'FAILURE' && row.status !== 'STOPPED'" type="danger" link size="small" @click="handleStop(row)">{{ $t('task.stop') }}</el-button>
+            <el-button type="primary" link size="small" @click="showDetail(row)">{{ $t('task.detail') }}</el-button>
+            <el-button type="info" link size="small" @click="showLogs(row)">{{ $t('task.logs') }}</el-button>
+            <el-button type="info" link size="small" @click="viewReport(row)">{{ $t('task.report') }}</el-button>
+            <el-button v-if="['SUCCESS', 'FAILURE', 'STOPPED'].includes(row.status)" type="warning" link size="small" @click="handleRetry(row)">{{ $t('task.retry') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('task.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -85,161 +79,161 @@
     </el-card>
 
     <!-- 任务详情对话框 -->
-    <el-dialog v-model="detailVisible" title="任务详情" width="850px">
+    <el-dialog v-model="detailVisible" :title="$t('task.taskDetail')" width="850px">
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="任务名称">{{ currentTask.name }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
+        <el-descriptions-item :label="$t('task.taskName')">{{ currentTask.name }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('task.status')">
           <el-tag :type="getStatusType(currentTask.status, currentTask)">{{ getStatusText(currentTask) }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="进度">
+        <el-descriptions-item :label="$t('task.progress')">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <el-progress :percentage="currentTask.progress" :stroke-width="10" style="width: 120px" />
-            <span style="color: #909399; font-size: 12px;">{{ currentTask.subTaskDone || 0 }}/{{ currentTask.subTaskCount || 0 }}</span>
+            <el-progress :percentage="Math.min(currentTask.progress || 0, 100)" :stroke-width="10" style="width: 120px" />
+            <span class="progress-hint">{{ currentTask.subTaskDone || 0 }}/{{ currentTask.subTaskCount || 0 }}</span>
           </div>
         </el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ currentTask.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="开始时间">{{ currentTask.startTime || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="结束时间">
+        <el-descriptions-item :label="$t('common.createTime')">{{ currentTask.createTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('task.startTime')">{{ currentTask.startTime || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('task.endTime')">
           {{ (currentTask.status === 'SUCCESS' || currentTask.status === 'FAILURE' || currentTask.status === 'STOPPED') ? (currentTask.endTime || '-') : '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="扫描目标" :span="2">
+        <el-descriptions-item :label="$t('task.scanTarget')" :span="2">
           <div style="max-height: 100px; overflow-y: auto; white-space: pre-wrap">{{ currentTask.target }}</div>
         </el-descriptions-item>
-        <el-descriptions-item label="执行结果" :span="2">
+        <el-descriptions-item :label="$t('task.executionResult')" :span="2">
           <div style="max-height: 100px; overflow-y: auto">{{ currentTask.result || '-' }}</div>
         </el-descriptions-item>
       </el-descriptions>
       
       <!-- 任务配置详情 -->
       <div v-if="parsedConfig" class="config-section">
-        <h4 style="margin: 15px 0 10px">扫描配置</h4>
+        <h4 style="margin: 15px 0 10px">{{ $t('task.scanConfig') }}</h4>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="子域名扫描">
+          <el-descriptions-item :label="$t('task.subdomainScan')">
             <el-tag :type="parsedConfig.domainscan?.enable ? 'success' : 'info'" size="small">
-              {{ parsedConfig.domainscan?.enable ? '开启' : '关闭' }}
+              {{ parsedConfig.domainscan?.enable ? $t('task.enabled') : $t('task.disabled') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="端口扫描">
+          <el-descriptions-item :label="$t('task.portScan')">
             <el-tag :type="parsedConfig.portscan?.enable !== false ? 'success' : 'info'" size="small">
-              {{ parsedConfig.portscan?.enable !== false ? '开启' : '关闭' }}
+              {{ parsedConfig.portscan?.enable !== false ? $t('task.enabled') : $t('task.disabled') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="端口识别">
+          <el-descriptions-item :label="$t('task.portIdentify')">
             <el-tag :type="parsedConfig.portidentify?.enable ? 'success' : 'info'" size="small">
-              {{ parsedConfig.portidentify?.enable ? '开启' : '关闭' }}
+              {{ parsedConfig.portidentify?.enable ? $t('task.enabled') : $t('task.disabled') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="指纹识别">
+          <el-descriptions-item :label="$t('task.fingerprintScan')">
             <el-tag :type="parsedConfig.fingerprint?.enable ? 'success' : 'info'" size="small">
-              {{ parsedConfig.fingerprint?.enable ? '开启' : '关闭' }}
+              {{ parsedConfig.fingerprint?.enable ? $t('task.enabled') : $t('task.disabled') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="漏洞扫描">
+          <el-descriptions-item :label="$t('task.vulScan')">
             <el-tag :type="parsedConfig.pocscan?.enable ? 'success' : 'info'" size="small">
-              {{ parsedConfig.pocscan?.enable ? '开启' : '关闭' }}
+              {{ parsedConfig.pocscan?.enable ? $t('task.enabled') : $t('task.disabled') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="目录扫描">
+          <el-descriptions-item :label="$t('task.dirScan')">
             <el-tag :type="parsedConfig.dirscan?.enable ? 'success' : 'info'" size="small">
-              {{ parsedConfig.dirscan?.enable ? '开启' : '关闭' }}
+              {{ parsedConfig.dirscan?.enable ? $t('task.enabled') : $t('task.disabled') }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="任务拆分">
-            {{ parsedConfig.batchSize === 0 ? '不拆分' : ((parsedConfig.batchSize || 50) + ' 个/批') }}
+          <el-descriptions-item :label="$t('task.taskSplit')">
+            {{ parsedConfig.batchSize === 0 ? $t('task.noSplit') : ((parsedConfig.batchSize || 50) + $t('task.targetsPerBatch')) }}
           </el-descriptions-item>
         </el-descriptions>
         
         <!-- 子域名扫描配置 -->
         <div v-if="parsedConfig.domainscan?.enable" class="config-detail">
-          <el-descriptions :column="4" border size="small" title="子域名扫描配置">
-            <el-descriptions-item label="使用Subfinder">{{ parsedConfig.domainscan?.subfinder !== false ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="超时时间">{{ parsedConfig.domainscan?.timeout || 300 }}秒</el-descriptions-item>
-            <el-descriptions-item label="并发线程">{{ parsedConfig.domainscan?.threads || 10 }}</el-descriptions-item>
-            <el-descriptions-item label="DNS解析">{{ parsedConfig.domainscan?.resolveDNS ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="去除泛解析">{{ parsedConfig.domainscan?.removeWildcard ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="并发数">{{ parsedConfig.domainscan?.concurrent || 50 }}</el-descriptions-item>
-            <el-descriptions-item label="速率限制">{{ parsedConfig.domainscan?.rateLimit || 0 }}</el-descriptions-item>
-            <el-descriptions-item label="字典爆破">{{ parsedConfig.domainscan?.subdomainDictIds?.length ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.domainscan?.subdomainDictIds?.length" label="爆破字典数" :span="2">
-              {{ parsedConfig.domainscan.subdomainDictIds.length }} 个
+          <el-descriptions :column="4" border size="small" :title="$t('task.subdomainScan')">
+            <el-descriptions-item :label="$t('task.useSubfinder')">{{ parsedConfig.domainscan?.subfinder !== false ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.timeout')">{{ parsedConfig.domainscan?.timeout || 300 }}{{ $t('task.seconds') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.concurrentThreads')">{{ parsedConfig.domainscan?.threads || 10 }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.dnsResolve')">{{ parsedConfig.domainscan?.resolveDNS ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.removeWildcard')">{{ parsedConfig.domainscan?.removeWildcard ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.concurrent')">{{ parsedConfig.domainscan?.concurrent || 50 }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.rateLimit')">{{ parsedConfig.domainscan?.rateLimit || 0 }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.dictBrute')">{{ parsedConfig.domainscan?.subdomainDictIds?.length ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.domainscan?.subdomainDictIds?.length" :label="$t('task.dictCount')" :span="2">
+              {{ parsedConfig.domainscan.subdomainDictIds.length }}
             </el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.domainscan?.recursiveBrute" label="递归爆破">是</el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.domainscan?.wildcardDetect" label="泛解析检测">是</el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.domainscan?.subdomainCrawl" label="子域名爬取">是</el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.domainscan?.takeoverCheck" label="接管检测">是</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.domainscan?.recursiveBrute" :label="$t('task.recursiveBrute')">{{ $t('common.yes') }}</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.domainscan?.wildcardDetect" :label="$t('task.wildcardDetect')">{{ $t('common.yes') }}</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.domainscan?.subdomainCrawl" :label="$t('task.subdomainCrawl')">{{ $t('common.yes') }}</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.domainscan?.takeoverCheck" :label="$t('task.takeoverCheck')">{{ $t('common.yes') }}</el-descriptions-item>
           </el-descriptions>
         </div>
         
         <!-- 端口扫描配置 -->
         <div v-if="parsedConfig.portscan?.enable !== false" class="config-detail">
-          <el-descriptions :column="4" border size="small" title="端口扫描配置">
-            <el-descriptions-item label="扫描工具">{{ parsedConfig.portscan?.tool || 'naabu' }}</el-descriptions-item>
-            <el-descriptions-item label="端口范围">{{ parsedConfig.portscan?.ports || 'top100' }}</el-descriptions-item>
-            <el-descriptions-item label="扫描速率">{{ parsedConfig.portscan?.rate || 1000 }}</el-descriptions-item>
-            <el-descriptions-item label="端口阈值">{{ parsedConfig.portscan?.portThreshold || 100 }}</el-descriptions-item>
-            <el-descriptions-item label="扫描类型">{{ parsedConfig.portscan?.scanType === 's' ? 'SYN' : 'CONNECT' }}</el-descriptions-item>
-            <el-descriptions-item label="超时时间">{{ parsedConfig.portscan?.timeout || 60 }}秒</el-descriptions-item>
-            <el-descriptions-item label="跳过主机发现">{{ parsedConfig.portscan?.skipHostDiscovery ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="排除CDN/WAF">{{ parsedConfig.portscan?.excludeCDN ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="排除目标">{{ parsedConfig.portscan?.excludeHosts || '-' }}</el-descriptions-item>
+          <el-descriptions :column="4" border size="small" :title="$t('task.portScan')">
+            <el-descriptions-item :label="$t('task.scanTool')">{{ parsedConfig.portscan?.tool || 'naabu' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.portRange')">{{ parsedConfig.portscan?.ports || 'top100' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.scanRate')">{{ parsedConfig.portscan?.rate || 1000 }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.portThreshold')">{{ parsedConfig.portscan?.portThreshold || 100 }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.scanType')">{{ parsedConfig.portscan?.scanType === 's' ? 'SYN' : 'CONNECT' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.timeout')">{{ parsedConfig.portscan?.timeout || 60 }}{{ $t('task.seconds') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.skipHostDiscovery')">{{ parsedConfig.portscan?.skipHostDiscovery ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.excludeCdnWaf')">{{ parsedConfig.portscan?.excludeCDN ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.excludeTargets')">{{ parsedConfig.portscan?.excludeHosts || '-' }}</el-descriptions-item>
           </el-descriptions>
         </div>
         
         <!-- 端口识别配置 -->
         <div v-if="parsedConfig.portidentify?.enable" class="config-detail">
-          <el-descriptions :column="3" border size="small" title="端口识别配置">
-            <el-descriptions-item label="超时时间">{{ parsedConfig.portidentify?.timeout || 30 }}秒</el-descriptions-item>
-            <el-descriptions-item label="额外参数">{{ parsedConfig.portidentify?.args || '-' }}</el-descriptions-item>
+          <el-descriptions :column="3" border size="small" :title="$t('task.portIdentify')">
+            <el-descriptions-item :label="$t('task.timeout')">{{ parsedConfig.portidentify?.timeout || 30 }}{{ $t('task.seconds') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.extraParams')">{{ parsedConfig.portidentify?.args || '-' }}</el-descriptions-item>
           </el-descriptions>
         </div>
         
         <!-- 指纹识别配置 -->
         <div v-if="parsedConfig.fingerprint?.enable" class="config-detail">
-          <el-descriptions :column="4" border size="small" title="指纹识别配置">
-            <el-descriptions-item label="探测工具">
+          <el-descriptions :column="4" border size="small" :title="$t('task.fingerprintScan')">
+            <el-descriptions-item :label="$t('task.probeTool')">
               <el-tag :type="parsedConfig.fingerprint?.tool === 'httpx' ? 'primary' : 'success'" size="small">
-                {{ parsedConfig.fingerprint?.tool === 'httpx' ? 'Httpx' : 'Wappalyzer (内置)' }}
+                {{ parsedConfig.fingerprint?.tool === 'httpx' ? 'Httpx' : 'Wappalyzer (' + $t('task.builtinEngine') + ')' }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="Icon Hash">{{ parsedConfig.fingerprint?.iconHash ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="自定义指纹">{{ parsedConfig.fingerprint?.customEngine ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="网页截图">{{ parsedConfig.fingerprint?.screenshot ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="主动探测">{{ parsedConfig.fingerprint?.activeScan ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="超时时间">{{ parsedConfig.fingerprint?.targetTimeout || parsedConfig.fingerprint?.timeout || 30 }}秒</el-descriptions-item>
-            <el-descriptions-item label="并发数">{{ parsedConfig.fingerprint?.concurrency || 10 }}</el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.fingerprint?.activeScan" label="主动探测超时">{{ parsedConfig.fingerprint?.activeTimeout || 5 }}秒</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.iconHash')">{{ parsedConfig.fingerprint?.iconHash ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.customFingerprint')">{{ parsedConfig.fingerprint?.customEngine ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.screenshot')">{{ parsedConfig.fingerprint?.screenshot ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.activeScan')">{{ parsedConfig.fingerprint?.activeScan ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.timeout')">{{ parsedConfig.fingerprint?.targetTimeout || parsedConfig.fingerprint?.timeout || 30 }}{{ $t('task.seconds') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.concurrent')">{{ parsedConfig.fingerprint?.concurrency || 10 }}</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.fingerprint?.activeScan" :label="$t('task.activeTimeout')">{{ parsedConfig.fingerprint?.activeTimeout || 5 }}{{ $t('task.seconds') }}</el-descriptions-item>
           </el-descriptions>
         </div>
         
         <!-- 漏洞扫描配置 -->
         <div v-if="parsedConfig.pocscan?.enable" class="config-detail">
-          <el-descriptions :column="3" border size="small" title="漏洞扫描配置">
-            <el-descriptions-item label="POC来源">
-              {{ parsedConfig.pocscan?.customPocOnly ? '仅自定义POC' : '默认模板+自定义POC' }}
+          <el-descriptions :column="3" border size="small" :title="$t('task.vulScan')">
+            <el-descriptions-item :label="$t('task.pocSource')">
+              {{ parsedConfig.pocscan?.customPocOnly ? $t('task.customPocOnly') : $t('task.defaultAndCustom') }}
             </el-descriptions-item>
-            <el-descriptions-item label="自动扫描(自定义标签)">{{ parsedConfig.pocscan?.autoScan ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="自动扫描(内置映射)">{{ parsedConfig.pocscan?.automaticScan ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="严重级别">{{ parsedConfig.pocscan?.severity || 'critical,high,medium' }}</el-descriptions-item>
-            <el-descriptions-item label="目标超时">{{ parsedConfig.pocscan?.targetTimeout || 600 }}秒</el-descriptions-item>
-            <el-descriptions-item label="并发数">{{ parsedConfig.pocscan?.concurrency || 25 }}</el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.pocscan?.nucleiTemplateIds?.length" label="指定Nuclei模板" :span="3">
-              {{ parsedConfig.pocscan.nucleiTemplateIds.length }} 个
+            <el-descriptions-item :label="$t('task.autoScanCustomTag')">{{ parsedConfig.pocscan?.autoScan ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.autoScanBuiltinMapping')">{{ parsedConfig.pocscan?.automaticScan ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.severityLevel')">{{ parsedConfig.pocscan?.severity || 'critical,high,medium' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.targetTimeout')">{{ parsedConfig.pocscan?.targetTimeout || 600 }}{{ $t('task.seconds') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.concurrent')">{{ parsedConfig.pocscan?.concurrency || 25 }}</el-descriptions-item>
+            <el-descriptions-item v-if="parsedConfig.pocscan?.nucleiTemplateIds?.length" :label="$t('task.specifyNucleiTemplate')" :span="3">
+              {{ parsedConfig.pocscan.nucleiTemplateIds.length }} {{ $t('task.dictCount') }}
             </el-descriptions-item>
-            <el-descriptions-item v-if="parsedConfig.pocscan?.customPocIds?.length" label="指定自定义POC" :span="3">
-              {{ parsedConfig.pocscan.customPocIds.length }} 个
+            <el-descriptions-item v-if="parsedConfig.pocscan?.customPocIds?.length" :label="$t('task.specifyCustomPoc')" :span="3">
+              {{ parsedConfig.pocscan.customPocIds.length }} {{ $t('task.dictCount') }}
             </el-descriptions-item>
           </el-descriptions>
         </div>
         
         <!-- 目录扫描配置 -->
         <div v-if="parsedConfig.dirscan?.enable" class="config-detail">
-          <el-descriptions :column="4" border size="small" title="目录扫描配置">
-            <el-descriptions-item label="并发数">{{ parsedConfig.dirscan?.threads || parsedConfig.dirscan?.concurrency || 10 }}</el-descriptions-item>
-            <el-descriptions-item label="超时时间">{{ parsedConfig.dirscan?.timeout || 10 }}秒</el-descriptions-item>
-            <el-descriptions-item label="跟随重定向">{{ parsedConfig.dirscan?.followRedirect ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="状态码过滤">{{ parsedConfig.dirscan?.statusCodes || '200,301,302,403' }}</el-descriptions-item>
-            <el-descriptions-item label="使用字典">
-              {{ parsedConfig.dirscan?.dictIds?.length ? (parsedConfig.dirscan.dictIds.length + ' 个') : '默认字典' }}
+          <el-descriptions :column="4" border size="small" :title="$t('task.dirScan')">
+            <el-descriptions-item :label="$t('task.concurrent')">{{ parsedConfig.dirscan?.threads || parsedConfig.dirscan?.concurrency || 10 }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.timeout')">{{ parsedConfig.dirscan?.timeout || 10 }}{{ $t('task.seconds') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.followRedirect')">{{ parsedConfig.dirscan?.followRedirect ? $t('common.yes') : $t('common.no') }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.statusCodeFilter')">{{ parsedConfig.dirscan?.statusCodes || '200,301,302,403' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('task.useDict')">
+              {{ parsedConfig.dirscan?.dictIds?.length ? (parsedConfig.dirscan.dictIds.length + ' ' + $t('task.dictCount')) : $t('task.defaultDict') }}
             </el-descriptions-item>
           </el-descriptions>
         </div>
@@ -247,98 +241,86 @@
     </el-dialog>
 
     <!-- 新建/编辑任务对话框 - Tab页布局 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑任务' : '新建任务'" width="720px" top="5vh" class="task-dialog">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? $t('task.editTask') : $t('task.newTask')" width="720px" top="5vh" class="task-dialog">
       <el-tabs v-model="activeTab" class="task-tabs">
         <!-- 基本信息 Tab -->
-        <el-tab-pane label="基本信息" name="basic">
+        <el-tab-pane :label="$t('task.basicInfo')" name="basic">
           <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="tab-form">
-            <el-form-item label="任务名称" prop="name">
-              <el-input v-model="form.name" placeholder="请输入任务名称" />
+            <el-form-item :label="$t('task.taskName')" prop="name">
+              <el-input v-model="form.name" :placeholder="$t('task.pleaseEnterTaskName')" />
             </el-form-item>
-            <el-form-item label="扫描目标" prop="target">
-              <el-input v-model="form.target" type="textarea" :rows="6" placeholder="每行一个目标，支持格式:&#10;• IP: 192.168.1.1&#10;• CIDR: 192.168.1.0/24&#10;• IP范围: 192.168.1.1-192.168.1.100&#10;• 域名: example.com" />
+            <el-form-item :label="$t('task.scanTarget')" prop="target">
+              <el-input v-model="form.target" type="textarea" :rows="6" :placeholder="$t('task.targetPlaceholder')" />
             </el-form-item>
             <el-row :gutter="20">
               <el-col :span="12">
-                <el-form-item label="工作空间">
-                  <el-select v-model="form.workspaceId" placeholder="选择工作空间" clearable style="width: 100%">
+                <el-form-item :label="$t('task.workspace')">
+                  <el-select v-model="form.workspaceId" :placeholder="$t('task.selectWorkspace')" clearable style="width: 100%">
                     <el-option v-for="ws in workspaceStore.workspaces" :key="ws.id" :label="ws.name" :value="ws.id" />
                   </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="所属组织">
-                  <el-select v-model="form.orgId" placeholder="选择组织" clearable style="width: 100%">
+                <el-form-item :label="$t('task.organization')">
+                  <el-select v-model="form.orgId" :placeholder="$t('task.selectOrganization')" clearable style="width: 100%">
                     <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
                   </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
-            <el-form-item label="指定Worker">
-              <el-select v-model="form.workers" multiple placeholder="不选则任意Worker执行" clearable style="width: 100%">
+            <el-form-item :label="$t('task.specifyWorker')">
+              <el-select v-model="form.workers" multiple :placeholder="$t('task.anyWorkerExecute')" clearable style="width: 100%">
                 <el-option v-for="w in workers" :key="w.name" :label="`${w.name} (${w.ip})`" :value="w.name" />
               </el-select>
             </el-form-item>
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="定时任务">
-                  <el-switch v-model="form.isCron" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item v-if="form.isCron" label="Cron表达式">
-                  <el-input v-model="form.cronRule" placeholder="0 0 * * *" />
-                </el-form-item>
-              </el-col>
-            </el-row>
           </el-form>
         </el-tab-pane>
 
         <!-- 子域名扫描 Tab -->
         <el-tab-pane name="domainscan">
           <template #label>
-            <span>子域名扫描 <el-tag v-if="form.domainscanEnable" type="success" size="small" style="margin-left:4px">开</el-tag></span>
+            <span>{{ $t('task.subdomainScan') }} <el-tag v-if="form.domainscanEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
           </template>
           <el-form label-width="120px" class="tab-form">
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.domainscanEnable" />
-              <span class="form-hint">针对域名目标进行子域名枚举</span>
+              <span class="form-hint">{{ $t('task.subdomainEnumHint') }}</span>
             </el-form-item>
             <template v-if="form.domainscanEnable">
-              <el-form-item label="使用Subfinder">
+              <el-form-item :label="$t('task.useSubfinder')">
                 <el-switch v-model="form.domainscanSubfinder" />
-                <span class="form-hint">使用Subfinder进行子域名枚举</span>
+                <span class="form-hint">{{ $t('task.subfinderPassiveEnum') }}</span>
               </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="超时时间(秒)">
+                  <el-form-item :label="$t('task.timeoutSeconds')">
                     <el-input-number v-model="form.domainscanTimeout" :min="60" :max="3600" style="width:100%" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="最大枚举时间(分)">
+                  <el-form-item :label="$t('task.maxEnumTime')">
                     <el-input-number v-model="form.domainscanMaxEnumTime" :min="1" :max="60" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="速率限制">
+                  <el-form-item :label="$t('task.rateLimit')">
                     <el-input-number v-model="form.domainscanRateLimit" :min="0" :max="1000" style="width:100%" />
-                    <span class="form-hint">0=不限制</span>
+                    <span class="form-hint">0={{ $t('task.noLimit') }}</span>
                   </el-form-item>
                 </el-col>
               </el-row>
-              <el-form-item label="扫描选项">
-                <el-checkbox v-model="form.domainscanRemoveWildcard">移除泛解析域名</el-checkbox>
+              <el-form-item :label="$t('task.scanOptions')">
+                <el-checkbox v-model="form.domainscanRemoveWildcard">{{ $t('task.removeWildcardDomain') }}</el-checkbox>
               </el-form-item>
-              <el-form-item label="DNS解析">
-                <el-checkbox v-model="form.domainscanResolveDNS">解析子域名DNS</el-checkbox>
-                <span class="form-hint">并发数由Worker设置控制</span>
+              <el-form-item :label="$t('task.dnsResolve')">
+                <el-checkbox v-model="form.domainscanResolveDNS">{{ $t('task.resolveSubdomainDns') }}</el-checkbox>
+                <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
               </el-form-item>
             </template>
             <el-alert v-if="!form.domainscanEnable" type="info" :closable="false" show-icon>
-              <template #title>子域名扫描使用 Subfinder 对域名目标进行子域名枚举，发现的子域名将自动加入扫描目标</template>
+              <template #title>{{ $t('task.subdomainEnumDesc') }}</template>
             </el-alert>
           </el-form>
         </el-tab-pane>
@@ -346,44 +328,44 @@
         <!-- 端口扫描 Tab -->
         <el-tab-pane name="portscan">
           <template #label>
-            <span>端口扫描 <el-tag v-if="form.portscanEnable" type="success" size="small" style="margin-left:4px">开</el-tag></span>
+            <span>{{ $t('task.portScan') }} <el-tag v-if="form.portscanEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
           </template>
           <el-form label-width="100px" class="tab-form">
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.portscanEnable" />
             </el-form-item>
             <template v-if="form.portscanEnable">
-              <el-form-item label="扫描工具">
+              <el-form-item :label="$t('task.scanTool')">
                 <el-radio-group v-model="form.portscanTool">
-                  <el-radio label="naabu">Naabu (推荐)</el-radio>
+                  <el-radio label="naabu">Naabu ({{ $t('task.recommended') }})</el-radio>
                   <el-radio label="masscan" :disabled="!availableTools.masscan">
-                    Masscan <span v-if="!availableTools.masscan" class="tool-tip">(未安装)</span>
+                    Masscan <span v-if="!availableTools.masscan" class="tool-tip">({{ $t('task.notInstalled') }})</span>
                   </el-radio>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="端口范围">
+              <el-form-item :label="$t('task.portRange')">
                 <el-select v-model="form.ports" filterable allow-create default-first-option style="width: 100%">
-                  <el-option label="top100 - 常用100端口" value="top100" />
-                  <el-option label="top1000 - 常用1000端口" value="top1000" />
-                  <el-option label="80,443,8080,8443 - Web常用" value="80,443,8080,8443" />
-                  <el-option label="1-65535 - 全端口" value="1-65535" />
+                  <el-option :label="$t('task.top100Ports')" value="top100" />
+                  <el-option :label="$t('task.top1000Ports')" value="top1000" />
+                  <el-option :label="'80,443,8080,8443 - ' + $t('task.webCommon')" value="80,443,8080,8443" />
+                  <el-option :label="'1-65535 - ' + $t('task.allPorts')" value="1-65535" />
                 </el-select>
               </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="扫描速率">
+                  <el-form-item :label="$t('task.scanRate')">
                     <el-input-number v-model="form.portscanRate" :min="100" :max="100000" style="width:100%" />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="端口阈值">
+                  <el-form-item :label="$t('task.portThreshold')">
                     <el-input-number v-model="form.portThreshold" :min="0" :max="65535" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item v-if="form.portscanTool === 'naabu'" label="扫描类型">
+                  <el-form-item v-if="form.portscanTool === 'naabu'" :label="$t('task.scanType')">
                     <el-radio-group v-model="form.scanType">
                       <el-radio label="c">CONNECT</el-radio>
                       <el-radio label="s">SYN</el-radio>
@@ -391,24 +373,24 @@
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="超时(秒)">
+                  <el-form-item :label="$t('task.timeoutSeconds')">
                     <el-input-number v-model="form.portscanTimeout" :min="5" :max="1200" style="width:100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
-              <el-form-item label="高级选项">
+              <el-form-item :label="$t('task.advancedOptions')">
                 <div style="display: block; width: 100%">
-                  <el-checkbox v-model="form.skipHostDiscovery">跳过主机发现 (-Pn)</el-checkbox>
-                  <span class="form-hint">跳过主机存活检测，直接扫描端口</span>
+                  <el-checkbox v-model="form.skipHostDiscovery">{{ $t('task.skipHostDiscovery') }} (-Pn)</el-checkbox>
+                  <span class="form-hint">{{ $t('task.skipHostDiscoveryHint') }}</span>
                 </div>
                 <div v-if="form.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
-                  <el-checkbox v-model="form.excludeCDN">排除 CDN/WAF (-ec)</el-checkbox>
-                  <span class="form-hint">CDN/WAF IP 仅扫描 80,443 端口</span>
+                  <el-checkbox v-model="form.excludeCDN">{{ $t('task.excludeCdnWaf') }} (-ec)</el-checkbox>
+                  <span class="form-hint">{{ $t('task.excludeCdnHint') }}</span>
                 </div>
               </el-form-item>
-              <el-form-item label="排除目标">
+              <el-form-item :label="$t('task.excludeTargets')">
                 <el-input v-model="form.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
-                <span class="form-hint">排除的 IP/CIDR，逗号分隔</span>
+                <span class="form-hint">{{ $t('task.excludeTargetsHint') }}</span>
               </el-form-item>
             </template>
           </el-form>
@@ -417,24 +399,24 @@
         <!-- 端口识别 Tab -->
         <el-tab-pane name="portidentify">
           <template #label>
-            <span>端口识别 <el-tag v-if="form.portidentifyEnable" type="success" size="small" style="margin-left:4px">开</el-tag></span>
+            <span>{{ $t('task.portIdentify') }} <el-tag v-if="form.portidentifyEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
           </template>
           <el-form label-width="100px" class="tab-form">
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.portidentifyEnable" :disabled="!availableTools.nmap" />
-              <span v-if="!availableTools.nmap" class="tool-tip" style="margin-left:10px">(Nmap 未安装)</span>
+              <span v-if="!availableTools.nmap" class="tool-tip" style="margin-left:10px">(Nmap {{ $t('task.notInstalled') }})</span>
             </el-form-item>
             <template v-if="form.portidentifyEnable">
-              <el-form-item label="超时(秒)">
+              <el-form-item :label="$t('task.timeoutSeconds')">
                 <el-input-number v-model="form.portidentifyTimeout" :min="5" :max="300" />
-                <span class="form-hint">单个主机超时时间</span>
+                <span class="form-hint">{{ $t('task.singleHostTimeout') }}</span>
               </el-form-item>
-              <el-form-item label="Nmap参数">
+              <el-form-item :label="$t('task.nmapParams')">
                 <el-input v-model="form.portidentifyArgs" placeholder="-sV --version-intensity 5" />
               </el-form-item>
             </template>
             <el-alert v-if="!form.portidentifyEnable" type="info" :closable="false" show-icon>
-              <template #title>端口识别使用 Nmap 对开放端口进行服务版本探测</template>
+              <template #title>{{ $t('task.portIdentifyDesc') }}</template>
             </el-alert>
           </el-form>
         </el-tab-pane>
@@ -442,29 +424,29 @@
         <!-- 指纹识别 Tab -->
         <el-tab-pane name="fingerprint">
           <template #label>
-            <span>指纹识别 <el-tag v-if="form.fingerprintEnable" type="success" size="small" style="margin-left:4px">开</el-tag></span>
+            <span>{{ $t('task.fingerprintScan') }} <el-tag v-if="form.fingerprintEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
           </template>
           <el-form label-width="100px" class="tab-form">
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.fingerprintEnable" />
             </el-form-item>
             <template v-if="form.fingerprintEnable">
-              <el-form-item label="探测工具">
+              <el-form-item :label="$t('task.probeTool')">
                 <el-radio-group v-model="form.fingerprintTool">
-                  <el-radio label="httpx">Httpx (推荐)</el-radio>
-                  <el-radio label="builtin">Wappalyzer (内置)</el-radio>
+                  <el-radio label="httpx">Httpx ({{ $t('task.recommended') }})</el-radio>
+                  <el-radio label="builtin">Wappalyzer ({{ $t('task.builtinEngine') }})</el-radio>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="附加功能">
-                <el-checkbox v-model="form.fingerprintIconHash">Icon Hash</el-checkbox>
-                <el-checkbox v-model="form.fingerprintCustomEngine">自定义指纹</el-checkbox>
-                <el-checkbox v-model="form.fingerprintScreenshot">网页截图</el-checkbox>
+              <el-form-item :label="$t('task.additionalFeatures')">
+                <el-checkbox v-model="form.fingerprintIconHash">{{ $t('task.iconHash') }}</el-checkbox>
+                <el-checkbox v-model="form.fingerprintCustomEngine">{{ $t('task.customFingerprint') }}</el-checkbox>
+                <el-checkbox v-model="form.fingerprintScreenshot">{{ $t('task.screenshot') }}</el-checkbox>
               </el-form-item>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item label="超时(秒)">
+                  <el-form-item :label="$t('task.timeoutSeconds')">
                     <el-input-number v-model="form.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
-                    <span class="form-hint">并发数由Worker设置控制</span>
+                    <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -475,22 +457,22 @@
         <!-- 漏洞扫描 Tab -->
         <el-tab-pane name="pocscan">
           <template #label>
-            <span>漏洞扫描 <el-tag v-if="form.pocscanEnable" type="success" size="small" style="margin-left:4px">开</el-tag></span>
+            <span>{{ $t('task.vulScan') }} <el-tag v-if="form.pocscanEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
           </template>
           <el-form label-width="100px" class="tab-form">
-            <el-form-item label="启用">
+            <el-form-item :label="$t('task.enable')">
               <el-switch v-model="form.pocscanEnable" />
-              <span class="form-hint">使用 Nuclei 引擎</span>
+              <span class="form-hint">{{ $t('task.useNucleiEngine') }}</span>
             </el-form-item>
             <template v-if="form.pocscanEnable">
-              <el-form-item label="自动扫描">
-                <el-checkbox v-model="form.pocscanAutoScan" :disabled="form.pocscanCustomOnly">自定义标签映射</el-checkbox>
-                <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly">Web指纹自动匹配</el-checkbox>
+              <el-form-item :label="$t('task.autoScan')">
+                <el-checkbox v-model="form.pocscanAutoScan" :disabled="form.pocscanCustomOnly">{{ $t('task.customTagMapping') }}</el-checkbox>
+                <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly">{{ $t('task.webFingerprintAutoMatch') }}</el-checkbox>
               </el-form-item>
-              <el-form-item label="自定义POC">
-                <el-checkbox v-model="form.pocscanCustomOnly">只使用自定义POC</el-checkbox>
+              <el-form-item :label="$t('task.customPoc')">
+                <el-checkbox v-model="form.pocscanCustomOnly">{{ $t('task.onlyUseCustomPoc') }}</el-checkbox>
               </el-form-item>
-              <el-form-item label="严重级别">
+              <el-form-item :label="$t('task.severityLevel')">
                 <el-checkbox-group v-model="form.pocscanSeverity">
                   <el-checkbox label="critical">Critical</el-checkbox>
                   <el-checkbox label="high">High</el-checkbox>
@@ -499,61 +481,61 @@
                   <el-checkbox label="info">Info</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
-              <el-form-item label="目标超时">
+              <el-form-item :label="$t('task.targetTimeout')">
                 <el-input-number v-model="form.pocscanTargetTimeout" :min="30" :max="600" />
-                <span class="form-hint">秒</span>
+                <span class="form-hint">{{ $t('task.seconds') }}</span>
               </el-form-item>
             </template>
           </el-form>
         </el-tab-pane>
 
         <!-- 高级设置 Tab -->
-        <el-tab-pane label="高级设置" name="advanced">
+        <el-tab-pane :label="$t('task.advancedSettings')" name="advanced">
           <el-form label-width="100px" class="tab-form">
-            <el-form-item label="任务拆分">
+            <el-form-item :label="$t('task.taskSplit')">
               <el-input-number v-model="form.batchSize" :min="0" :max="1000" :step="10" />
-              <span class="form-hint">每批目标数量，0=不拆分</span>
+              <span class="form-hint">{{ $t('task.batchTargetCount') }}</span>
             </el-form-item>
           </el-form>
         </el-tab-pane>
       </el-tabs>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ isEdit ? '保存' : '创建任务' }}</el-button>
+          <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ isEdit ? $t('common.save') : $t('task.createTask') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- 任务日志对话框 -->
-    <el-dialog v-model="logDialogVisible" title="任务日志" width="1000px" @close="closeLogDialog">
+    <el-dialog v-model="logDialogVisible" :title="$t('task.taskLog')" width="1000px" @close="closeLogDialog">
       <div class="log-progress" v-if="currentLogTask">
         <div class="progress-info">
           <span class="task-name">{{ currentLogTask.name }}</span>
           <el-tag :type="getStatusType(currentLogTask.status, currentLogTask)" size="small">{{ getStatusText(currentLogTask) }}</el-tag>
         </div>
-        <el-progress :percentage="currentLogTask.progress" :status="currentLogTask.status === 'SUCCESS' ? 'success' : (currentLogTask.status === 'FAILURE' ? 'exception' : '')" :stroke-width="12" />
+        <el-progress :percentage="Math.min(currentLogTask.progress || 0, 100)" :status="currentLogTask.status === 'SUCCESS' ? 'success' : (currentLogTask.status === 'FAILURE' ? 'exception' : '')" :stroke-width="12" />
       </div>
       <div class="log-filter">
-        <el-input v-model="logSearchKeyword" placeholder="搜索日志..." clearable size="small" style="width: 180px; margin-right: 10px">
+        <el-input v-model="logSearchKeyword" :placeholder="$t('task.searchLogs')" clearable size="small" style="width: 180px; margin-right: 10px">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-select v-model="logWorkerFilter" placeholder="筛选Worker" clearable size="small" style="width: 150px">
-          <el-option label="全部Worker" value="" />
+        <el-select v-model="logWorkerFilter" :placeholder="$t('task.filterWorker')" clearable size="small" style="width: 150px">
+          <el-option :label="$t('task.allWorkers')" value="" />
           <el-option v-for="w in logWorkers" :key="w" :label="w" :value="w" />
         </el-select>
-        <el-select v-model="logLevelFilter" placeholder="筛选级别" clearable size="small" style="width: 120px; margin-left: 10px">
-          <el-option label="全部级别" value="" />
+        <el-select v-model="logLevelFilter" :placeholder="$t('task.filterLevel')" clearable size="small" style="width: 120px; margin-left: 10px">
+          <el-option :label="$t('task.allLevels')" value="" />
           <el-option label="DEBUG" value="DEBUG" />
           <el-option label="INFO" value="INFO" />
           <el-option label="WARN" value="WARN" />
           <el-option label="ERROR" value="ERROR" />
         </el-select>
-        <el-switch v-model="logAutoRefresh" size="small" active-text="自动刷新" style="margin-left: 15px" @change="handleLogAutoRefreshChange" />
-        <span class="log-stats">共 {{ filteredLogs.length }} 条日志</span>
+        <el-switch v-model="logAutoRefresh" size="small" :active-text="$t('task.autoRefreshLogs')" style="margin-left: 15px" @change="handleLogAutoRefreshChange" />
+        <span class="log-stats">{{ $t('task.totalLogs', { count: filteredLogs.length }) }}</span>
       </div>
       <div class="log-container" ref="logContainerRef">
-        <div v-if="filteredLogs.length === 0" class="log-empty">暂无日志</div>
+        <div v-if="filteredLogs.length === 0" class="log-empty">{{ $t('task.noLogs') }}</div>
         <div v-for="(log, index) in filteredLogs" :key="index" class="log-entry" :class="'log-' + log.level.toLowerCase()">
           <span class="log-time">{{ formatLogTime(log.timestamp) }}</span>
           <span class="log-level">[{{ log.level }}]</span>
@@ -562,8 +544,8 @@
         </div>
       </div>
       <template #footer>
-        <el-button @click="closeLogDialog">关闭</el-button>
-        <el-button type="primary" @click="refreshLogs">刷新</el-button>
+        <el-button @click="closeLogDialog">{{ $t('common.close') }}</el-button>
+        <el-button type="primary" @click="refreshLogs">{{ $t('common.refresh') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -572,6 +554,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Search } from '@element-plus/icons-vue'
 import { getTaskList, createTask, deleteTask, batchDeleteTask, retryTask, startTask, pauseTask, resumeTask, stopTask, updateTask, getTaskLogs, getWorkerList, saveScanConfig, getScanConfig } from '@/api/task'
@@ -580,6 +563,7 @@ import { validateTargets, formatValidationErrors } from '@/utils/target'
 import request from '@/api/request'
 
 const router = useRouter()
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const submitting = ref(false)
@@ -616,8 +600,6 @@ const form = reactive({
   target: '',
   workspaceId: '',
   orgId: '',
-  isCron: false,
-  cronRule: '',
   workers: [],
   batchSize: 50,
   // 子域名扫描
@@ -659,14 +641,14 @@ const form = reactive({
 })
 
 const targetValidator = (rule, value, callback) => {
-  if (!value) { callback(new Error('请输入扫描目标')); return }
+  if (!value) { callback(new Error(t('task.pleaseEnterTarget'))); return }
   const errors = validateTargets(value)
   errors.length > 0 ? callback(new Error(formatValidationErrors(errors))) : callback()
 }
 
 const rules = {
-  name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  target: [{ required: true, message: '请输入扫描目标', trigger: 'blur' }, { validator: targetValidator, trigger: 'blur' }]
+  name: [{ required: true, message: t('task.pleaseEnterTaskName'), trigger: 'blur' }],
+  target: [{ required: true, message: t('task.pleaseEnterTarget'), trigger: 'blur' }, { validator: targetValidator, trigger: 'blur' }]
 }
 
 const logWorkers = computed(() => {
@@ -788,14 +770,14 @@ function getStatusType(status, row) {
 // 获取状态显示文本（简化状态显示，不按扫描模块显示）
 function getStatusText(row) {
   const statusMap = {
-    CREATED: '待启动',
-    PENDING: '等待执行',
-    STARTED: '执行中',
-    PAUSED: '已暂停',
-    SUCCESS: '已完成',
-    FAILURE: '执行失败',
-    STOPPED: '已停止',
-    REVOKED: '已取消'
+    CREATED: t('task.created'),
+    PENDING: t('task.pendingExec'),
+    STARTED: t('task.executing'),
+    PAUSED: t('task.paused'),
+    SUCCESS: t('task.completed'),
+    FAILURE: t('task.execFailed'),
+    STOPPED: t('task.stopped'),
+    REVOKED: t('task.revoked')
   }
   
   // 如果有状态值，直接返回映射
@@ -806,15 +788,15 @@ function getStatusText(row) {
   // 如果状态为空，根据进度推断状态
   if (!row?.status) {
     if (row?.progress >= 100 || (row?.subTaskCount > 0 && row?.subTaskDone >= row?.subTaskCount)) {
-      return '已完成'
+      return t('task.completed')
     }
     if (row?.progress > 0 || row?.subTaskDone > 0) {
-      return '执行中'
+      return t('task.executing')
     }
-    return '待启动'
+    return t('task.created')
   }
   
-  return row?.status || '未知'
+  return row?.status || t('task.unknown')
 }
 
 // 解析任务配置
@@ -829,7 +811,7 @@ const parsedConfig = computed(() => {
 
 function resetForm() {
   Object.assign(form, {
-    id: '', name: '', target: '', workspaceId: '', orgId: '', isCron: false, cronRule: '', workers: [],
+    id: '', name: '', target: '', workspaceId: '', orgId: '', workers: [],
     batchSize: 50,
     // 子域名扫描
     domainscanEnable: false, domainscanSubfinder: true, domainscanTimeout: 300, domainscanMaxEnumTime: 10,
@@ -989,7 +971,7 @@ async function handleSubmit() {
   try {
     const config = buildConfig()
     const configStr = JSON.stringify(config)
-    const data = { name: form.name, target: form.target, workspaceId: form.workspaceId, orgId: form.orgId, isCron: form.isCron, cronRule: form.cronRule, workers: form.workers, config: configStr }
+    const data = { name: form.name, target: form.target, workspaceId: form.workspaceId, orgId: form.orgId, workers: form.workers, config: configStr }
     let res
     if (isEdit.value) {
       res = await updateTask({ id: form.id, ...data })
@@ -997,7 +979,7 @@ async function handleSubmit() {
       res = await createTask(data)
     }
     if (res.code === 0) {
-      ElMessage.success(isEdit.value ? '任务更新成功' : '任务创建成功')
+      ElMessage.success(isEdit.value ? t('task.taskUpdateSuccess') : t('task.taskCreateSuccess'))
       dialogVisible.value = false
       loadData()
     } else { ElMessage.error(res.msg) }
@@ -1005,9 +987,9 @@ async function handleSubmit() {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该任务吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('task.confirmDeleteTask'), t('common.tip'), { type: 'warning' })
   const res = await deleteTask({ id: row.id, workspaceId: row.workspaceId })
-  res.code === 0 ? (ElMessage.success('删除成功'), loadData()) : ElMessage.error(res.msg)
+  res.code === 0 ? (ElMessage.success(t('task.deleteSuccess')), loadData()) : ElMessage.error(res.msg)
 }
 
 function handleSelectionChange(rows) { selectedRows.value = rows }
@@ -1017,19 +999,19 @@ async function handleBatchDelete() {
   // 检查是否所有选中的任务都在同一个工作空间
   const workspaceIds = [...new Set(selectedRows.value.map(row => row.workspaceId))]
   if (workspaceIds.length > 1) {
-    ElMessage.warning('批量删除只能删除同一工作空间的任务，请分别删除')
+    ElMessage.warning(t('task.batchDeleteSameWorkspace'))
     return
   }
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 条任务吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('task.confirmBatchDelete', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const res = await batchDeleteTask({ ids: selectedRows.value.map(row => row.id), workspaceId: workspaceIds[0] })
-  res.code === 0 ? (ElMessage.success('删除成功'), selectedRows.value = [], loadData()) : ElMessage.error(res.msg)
+  res.code === 0 ? (ElMessage.success(t('task.deleteSuccess')), selectedRows.value = [], loadData()) : ElMessage.error(res.msg)
 }
 
 async function handleRetry(row) {
-  await ElMessageBox.confirm('确定重新执行该任务吗？将创建一个新任务来执行。', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('task.confirmRetry'), t('common.tip'), { type: 'warning' })
   const res = await retryTask({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success(res.msg || '已创建新任务并开始执行')
+    ElMessage.success(res.msg || t('task.newTaskCreated'))
     loadData()
   } else {
     ElMessage.error(res.msg)
@@ -1039,7 +1021,7 @@ async function handleRetry(row) {
 async function handleStart(row) {
   const res = await startTask({ id: row.id, workspaceId: row.workspaceId })
   if (res.code === 0) {
-    ElMessage.success('任务已启动')
+    ElMessage.success(t('task.taskStarted'))
     loadData()
     // 延迟再刷新一次，等待 Worker 拉取任务后状态更新
     setTimeout(() => loadData(), 2000)
@@ -1049,20 +1031,20 @@ async function handleStart(row) {
 }
 
 async function handlePause(row) {
-  await ElMessageBox.confirm('确定暂停该任务吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('task.confirmPause'), t('common.tip'), { type: 'warning' })
   const res = await pauseTask({ id: row.id, workspaceId: row.workspaceId })
-  res.code === 0 ? (ElMessage.success('任务已暂停'), loadData()) : ElMessage.error(res.msg)
+  res.code === 0 ? (ElMessage.success(t('task.taskPaused')), loadData()) : ElMessage.error(res.msg)
 }
 
 async function handleResume(row) {
   const res = await resumeTask({ id: row.id, workspaceId: row.workspaceId })
-  res.code === 0 ? (ElMessage.success('任务已继续'), loadData()) : ElMessage.error(res.msg)
+  res.code === 0 ? (ElMessage.success(t('task.taskResumed')), loadData()) : ElMessage.error(res.msg)
 }
 
 async function handleStop(row) {
-  await ElMessageBox.confirm('确定停止该任务吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('task.confirmStop'), t('common.tip'), { type: 'warning' })
   const res = await stopTask({ id: row.id, workspaceId: row.workspaceId })
-  res.code === 0 ? (ElMessage.success('任务已停止'), loadData()) : ElMessage.error(res.msg)
+  res.code === 0 ? (ElMessage.success(t('task.taskStopped')), loadData()) : ElMessage.error(res.msg)
 }
 
 function viewReport(row) { router.push({ path: '/report', query: { taskId: row.id } }) }
@@ -1147,7 +1129,8 @@ function closeLogDialog() {
   .pagination { margin-top: 20px; justify-content: flex-end; }
   .form-hint { margin-left: 10px; color: var(--el-text-color-secondary); font-size: 12px; }
   .sub-task-info { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 2px; }
-  .tool-tip { color: #f56c6c; font-size: 12px; }
+  .tool-tip { color: var(--el-color-danger); font-size: 12px; }
+  .progress-hint { color: var(--el-text-color-secondary); font-size: 12px; }
 }
 
 .task-dialog {
@@ -1193,7 +1176,7 @@ function closeLogDialog() {
 .log-container {
   max-height: 450px;
   overflow-y: auto;
-  background-color: #1e1e1e;
+  background-color: var(--el-fill-color-darker, #1e1e1e);
   border-radius: 4px;
   padding: 10px;
   font-family: 'Consolas', 'Monaco', monospace;
@@ -1203,14 +1186,14 @@ function closeLogDialog() {
 
 .log-empty { color: var(--el-text-color-secondary); text-align: center; padding: 20px; }
 .log-entry { padding: 2px 0; white-space: pre-wrap; word-break: break-all; }
-.log-time { color: #6a9955; margin-right: 8px; font-size: 11px; }
+.log-time { color: var(--el-color-success); margin-right: 8px; font-size: 11px; }
 .log-level { font-weight: bold; margin-right: 6px; min-width: 45px; display: inline-block; font-size: 11px; }
-.log-worker { color: #569cd6; margin-right: 6px; font-size: 11px; }
-.log-message { color: #d4d4d4; }
-.log-debug .log-level { color: #9e9e9e; }
-.log-info .log-level { color: #4fc3f7; }
-.log-warn .log-level, .log-warning .log-level { color: #ffb74d; }
-.log-error .log-level { color: #ef5350; }
+.log-worker { color: var(--el-color-primary); margin-right: 6px; font-size: 11px; }
+.log-message { color: var(--el-text-color-primary); }
+.log-debug .log-level { color: var(--el-text-color-secondary); }
+.log-info .log-level { color: var(--el-color-info); }
+.log-warn .log-level, .log-warning .log-level { color: var(--el-color-warning); }
+.log-error .log-level { color: var(--el-color-danger); }
 
 .config-section {
   margin-top: 15px;

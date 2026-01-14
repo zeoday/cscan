@@ -378,6 +378,41 @@ func HttpServiceMappingDeleteV2Handler(svcCtx *svc.ServiceContext) http.HandlerF
 	}
 }
 
+// HttpServiceExportHandler 导出HTTP服务映射
+func HttpServiceExportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HttpServiceExportReq
+		httpx.Parse(r, &req)
+
+		l := logic.NewHttpServiceExportLogic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceExport(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// HttpServiceImportHandler 导入HTTP服务映射
+func HttpServiceImportHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.HttpServiceImportReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewHttpServiceImportLogic(r.Context(), svcCtx)
+		resp, err := l.HttpServiceImport(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
 
 // FingerprintMatchAssetsHandler 验证指纹匹配现有资产
 func FingerprintMatchAssetsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {

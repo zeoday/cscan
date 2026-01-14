@@ -88,11 +88,19 @@ func (l *GetTemplatesByTagsLogic) GetTemplatesByTags(in *pb.GetTemplatesByTagsRe
 		}
 	}
 
-	// 获取自定义POC（按标签）
+	// 获取自定义POC（按标签和严重级别）
 	if len(in.Tags) > 0 {
-		customPocs, err := l.svcCtx.CustomPocModel.FindByTags(l.ctx, in.Tags)
+		// 构建自定义POC查询条件，同时考虑标签和严重级别
+		customFilter := bson.M{
+			"enabled": true,
+			"tags":    bson.M{"$in": in.Tags},
+		}
+		if len(in.Severities) > 0 {
+			customFilter["severity"] = bson.M{"$in": in.Severities}
+		}
+		customPocs, err := l.svcCtx.CustomPocModel.FindWithFilter(l.ctx, customFilter, 0, 0)
 		if err != nil {
-			l.Logger.Errorf("FindByTags for custom pocs failed: %v", err)
+			l.Logger.Errorf("FindWithFilter for custom pocs failed: %v", err)
 			// 不返回错误，继续使用已获取的模板
 		} else {
 			for _, p := range customPocs {

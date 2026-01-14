@@ -1,51 +1,51 @@
-<template>
+﻿<template>
   <div class="worker-console">
-    <el-page-header @back="goBack" :title="'返回Worker列表'">
+    <el-page-header @back="goBack" :title="$t('workerConsole.backToWorkerList')">
       <template #content>
-        <span class="worker-title">{{ workerName }} - 探针控制台</span>
+        <span class="worker-title">{{ workerName }} - {{ $t('workerConsole.probeConsole') }}</span>
         <el-tag :type="workerStatus === 'running' ? 'success' : 'danger'" style="margin-left: 10px">
-          {{ workerStatus === 'running' ? '在线' : '离线' }}
+          {{ workerStatus === 'running' ? $t('workerConsole.online') : $t('workerConsole.offline') }}
         </el-tag>
       </template>
     </el-page-header>
 
     <el-tabs v-model="activeTab" type="border-card" style="margin-top: 20px">
       <!-- 系统信息 -->
-      <el-tab-pane label="系统信息" name="info">
+      <el-tab-pane :label="$t('workerConsole.systemInfo')" name="info">
         <div v-loading="infoLoading">
           <el-descriptions :column="2" border v-if="workerInfo">
-            <el-descriptions-item label="Worker名称">{{ workerInfo.name }}</el-descriptions-item>
-            <el-descriptions-item label="IP地址">{{ workerInfo.ip }}</el-descriptions-item>
-            <el-descriptions-item label="操作系统">{{ workerInfo.os }}</el-descriptions-item>
-            <el-descriptions-item label="架构">{{ workerInfo.arch }}</el-descriptions-item>
-            <el-descriptions-item label="版本">{{ workerInfo.version || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="运行时长">{{ formatUptime(workerInfo.uptime) }}</el-descriptions-item>
-            <el-descriptions-item label="CPU使用率">
+            <el-descriptions-item :label="$t('workerConsole.workerName')">{{ workerInfo.name }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('workerConsole.ipAddress')">{{ workerInfo.ip }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('workerConsole.os')">{{ workerInfo.os }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('workerConsole.arch')">{{ workerInfo.arch }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('workerConsole.version')">{{ workerInfo.version || '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('workerConsole.uptime')">{{ formatUptime(workerInfo.uptime) }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('workerConsole.cpuUsage')">
               <el-progress :percentage="Math.round(workerInfo.cpuLoad || 0)" :color="getLoadColor(workerInfo.cpuLoad)" />
             </el-descriptions-item>
-            <el-descriptions-item label="内存使用">
+            <el-descriptions-item :label="$t('workerConsole.memUsage')">
               <el-progress :percentage="getMemPercent(workerInfo)" :color="getLoadColor(getMemPercent(workerInfo))" />
-              <span style="margin-left: 8px; font-size: 12px; color: #909399">
+              <span class="secondary-text">
                 {{ formatBytes(workerInfo.memUsed) }} / {{ formatBytes(workerInfo.memTotal) }}
               </span>
             </el-descriptions-item>
-            <el-descriptions-item label="磁盘使用">
+            <el-descriptions-item :label="$t('workerConsole.diskUsage')">
               <el-progress :percentage="getDiskPercent(workerInfo)" :color="getLoadColor(getDiskPercent(workerInfo))" />
-              <span style="margin-left: 8px; font-size: 12px; color: #909399">
+              <span class="secondary-text">
                 {{ formatBytes(workerInfo.diskUsed) }} / {{ formatBytes(workerInfo.diskTotal) }}
               </span>
             </el-descriptions-item>
-            <el-descriptions-item label="任务统计">
-              已执行: {{ workerInfo.taskStarted || 0 }} | 运行中: {{ workerInfo.taskRunning || 0 }}
+            <el-descriptions-item :label="$t('workerConsole.taskStats')">
+              {{ $t('workerConsole.executed') }} {{ workerInfo.taskStarted || 0 }} | {{ $t('workerConsole.running') }} {{ workerInfo.taskRunning || 0 }}
             </el-descriptions-item>
           </el-descriptions>
 
-          <el-empty v-if="!workerInfo" description="无法获取Worker信息，请确保Worker在线" />
+          <el-empty v-if="!workerInfo" :description="$t('workerConsole.cannotGetWorkerInfo')" />
         </div>
       </el-tab-pane>
 
       <!-- 文件管理 -->
-      <el-tab-pane label="文件管理" name="files">
+      <el-tab-pane :label="$t('workerConsole.fileManagement')" name="files">
         <div class="file-manager">
           <div class="file-toolbar">
             <el-breadcrumb separator="/">
@@ -55,15 +55,15 @@
                 @click="navigateToPath(index)"
                 class="path-item"
               >
-                {{ part || '根目录' }}
+                {{ part || $t('workerConsole.rootDir') }}
               </el-breadcrumb-item>
             </el-breadcrumb>
             <div class="file-actions">
               <el-button size="small" @click="refreshFiles" :loading="filesLoading">
-                <el-icon><Refresh /></el-icon>刷新
+                <el-icon><Refresh /></el-icon>{{ $t('workerConsole.refresh') }}
               </el-button>
               <el-button size="small" type="primary" @click="showCreateDirDialog">
-                <el-icon><FolderAdd /></el-icon>新建文件夹
+                <el-icon><FolderAdd /></el-icon>{{ $t('workerConsole.newFolder') }}
               </el-button>
               <el-upload
                 :show-file-list="false"
@@ -71,14 +71,14 @@
                 :disabled="filesLoading"
               >
                 <el-button size="small" type="success">
-                  <el-icon><Upload /></el-icon>上传文件
+                  <el-icon><Upload /></el-icon>{{ $t('workerConsole.uploadFile') }}
                 </el-button>
               </el-upload>
             </div>
           </div>
 
           <el-table :data="fileList" v-loading="filesLoading" @row-dblclick="handleFileClick" stripe>
-            <el-table-column prop="name" label="名称" min-width="200">
+            <el-table-column prop="name" :label="$t('workerConsole.name')" min-width="200">
               <template #default="{ row }">
                 <span class="file-name" :class="{ 'is-dir': row.isDir }">
                   <el-icon v-if="row.isDir"><Folder /></el-icon>
@@ -87,28 +87,28 @@
                 </span>
               </template>
             </el-table-column>
-            <el-table-column prop="size" label="大小" width="120">
+            <el-table-column prop="size" :label="$t('workerConsole.size')" width="120">
               <template #default="{ row }">
                 {{ row.isDir ? '-' : formatBytes(row.size) }}
               </template>
             </el-table-column>
-            <el-table-column prop="mode" label="权限" width="120" />
-            <el-table-column prop="modTime" label="修改时间" width="180">
+            <el-table-column prop="mode" :label="$t('workerConsole.permission')" width="120" />
+            <el-table-column prop="modTime" :label="$t('workerConsole.modifyTime')" width="180">
               <template #default="{ row }">
                 {{ formatTime(row.modTime) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
+            <el-table-column :label="$t('common.operation')" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button v-if="!row.isDir" size="small" type="primary" link @click="downloadFileHandler(row)">
-                  下载
+                  {{ $t('workerConsole.download') }}
                 </el-button>
                 <el-popconfirm
-                  :title="`确定要删除 ${row.name} 吗？`"
+                  :title="$t('workerConsole.confirmDelete', { name: row.name })"
                   @confirm="deleteFileHandler(row)"
                 >
                   <template #reference>
-                    <el-button size="small" type="danger" link>删除</el-button>
+                    <el-button size="small" type="danger" link>{{ $t('workerConsole.delete') }}</el-button>
                   </template>
                 </el-popconfirm>
               </template>
@@ -118,18 +118,18 @@
       </el-tab-pane>
 
       <!-- 终端 -->
-      <el-tab-pane label="终端" name="terminal">
+      <el-tab-pane :label="$t('workerConsole.terminal')" name="terminal">
         <div class="terminal-container">
           <div class="terminal-toolbar">
             <el-button size="small" type="primary" @click="connectTerminal" :disabled="terminalConnected">
-              {{ terminalConnected ? '已连接' : '连接终端' }}
+              {{ terminalConnected ? $t('workerConsole.connected') : $t('workerConsole.connectTerminal') }}
             </el-button>
             <el-button size="small" @click="disconnectTerminal" :disabled="!terminalConnected">
-              断开连接
+              {{ $t('workerConsole.disconnect') }}
             </el-button>
-            <el-button size="small" @click="clearTerminal">清屏</el-button>
-            <span v-if="terminalConnected" style="margin-left: 10px; color: #67c23a; font-size: 12px">
-              <el-icon><CircleCheck /></el-icon> 终端已连接
+            <el-button size="small" @click="clearTerminal">{{ $t('workerConsole.clearScreen') }}</el-button>
+            <span v-if="terminalConnected" class="terminal-status connected">
+              <el-icon><CircleCheck /></el-icon> {{ $t('workerConsole.terminalConnected') }}
             </span>
           </div>
           <div ref="terminalRef" class="terminal-output"></div>
@@ -137,7 +137,7 @@
             <span class="prompt">$</span>
             <el-input
               v-model="terminalInput"
-              placeholder="输入命令..."
+              :placeholder="$t('workerConsole.enterCommand')"
               @keyup.enter="sendCommand"
               :disabled="!terminalConnected"
             />
@@ -146,52 +146,52 @@
       </el-tab-pane>
 
       <!-- 审计日志 -->
-      <el-tab-pane label="审计日志" name="audit">
+      <el-tab-pane :label="$t('workerConsole.auditLog')" name="audit">
         <div style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
           <el-popconfirm
-            title="确定要清空所有审计日志吗？此操作不可恢复！"
-            confirm-button-text="确定"
-            cancel-button-text="取消"
+            :title="$t('workerConsole.confirmClearLog')"
+            :confirm-button-text="$t('common.confirm')"
+            :cancel-button-text="$t('common.cancel')"
             @confirm="clearAuditLogsHandler"
           >
             <template #reference>
-              <el-button type="danger" size="small" :loading="auditClearing">清空日志</el-button>
+              <el-button type="danger" size="small" :loading="auditClearing">{{ $t('workerConsole.clearLog') }}</el-button>
             </template>
           </el-popconfirm>
         </div>
         <el-table :data="auditLogs" v-loading="auditLoading" stripe>
-          <el-table-column prop="createTime" label="时间" width="180">
+          <el-table-column prop="createTime" :label="$t('workerConsole.time')" width="180">
             <template #default="{ row }">
               {{ formatAuditTime(row.createTime) }}
             </template>
           </el-table-column>
-          <el-table-column prop="username" label="操作者" width="120">
+          <el-table-column prop="username" :label="$t('workerConsole.operator')" width="120">
             <template #default="{ row }">
               {{ row.username || row.clientIp || '-' }}
             </template>
           </el-table-column>
-          <el-table-column prop="type" label="操作类型" width="140">
+          <el-table-column prop="type" :label="$t('workerConsole.actionType')" width="140">
             <template #default="{ row }">
               <el-tag :type="getActionType(row.type)" size="small">{{ getActionLabel(row.type) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="目标" min-width="200">
+          <el-table-column :label="$t('workerConsole.actionTarget')" min-width="200">
             <template #default="{ row }">
               {{ row.path || row.command || row.sessionId || '-' }}
             </template>
           </el-table-column>
-          <el-table-column prop="success" label="结果" width="100">
+          <el-table-column prop="success" :label="$t('workerConsole.actionResult')" width="100">
             <template #default="{ row }">
               <el-tag :type="row.success ? 'success' : 'danger'" size="small">
-                {{ row.success ? '成功' : '失败' }}
+                {{ row.success ? $t('workerConsole.success') : $t('workerConsole.failed') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="详情" min-width="200" show-overflow-tooltip>
+          <el-table-column :label="$t('workerConsole.detail')" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
-              <span v-if="row.error" style="color: #f56c6c">{{ row.error }}</span>
-              <span v-else-if="row.duration">耗时 {{ row.duration }}ms</span>
-              <span v-else style="color: #909399">-</span>
+              <span v-if="row.error" class="error-text">{{ row.error }}</span>
+              <span v-else-if="row.duration">{{ $t('workerConsole.duration') }} {{ row.duration }}ms</span>
+              <span v-else class="secondary-text">-</span>
             </template>
           </el-table-column>
         </el-table>
@@ -207,11 +207,11 @@
     </el-tabs>
 
     <!-- 新建文件夹对话框 -->
-    <el-dialog v-model="createDirDialogVisible" title="新建文件夹" width="400px">
-      <el-input v-model="newDirName" placeholder="请输入文件夹名称" />
+    <el-dialog v-model="createDirDialogVisible" :title="$t('workerConsole.createFolder')" width="400px">
+      <el-input v-model="newDirName" :placeholder="$t('workerConsole.enterFolderName')" />
       <template #footer>
-        <el-button @click="createDirDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="createDirHandler" :loading="createDirLoading">确定</el-button>
+        <el-button @click="createDirDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="createDirHandler" :loading="createDirLoading">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -224,12 +224,14 @@ import { ElMessage } from 'element-plus'
 import { 
   Refresh, FolderAdd, Upload, Folder, Document, CircleCheck 
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { 
   getWorkerInfo, listFiles, uploadFile, downloadFile, deleteFile, createDir,
   openTerminal, closeTerminal, execCommand, getAuditLogs, clearAuditLogs 
 } from '@/api/worker'
 import { useUserStore } from '@/stores/user'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -273,7 +275,7 @@ const pathParts = computed(() => {
 onMounted(() => {
   workerName.value = route.params.name || route.query.name
   if (!workerName.value) {
-    ElMessage.error('未指定Worker名称')
+    ElMessage.error(t('workerConsole.workerNotSpecified'))
     router.push('/worker')
     return
   }
@@ -286,7 +288,7 @@ onUnmounted(() => {
 
 watch(activeTab, (tab) => {
   if (tab === 'files') {
-    // 文件管理：首次加载
+    // 文件管理：首次加?
     if (fileList.value.length === 0) {
       loadFiles()
     }
@@ -309,11 +311,11 @@ async function loadWorkerInfo() {
       workerStatus.value = 'running'
     } else {
       workerStatus.value = 'offline'
-      ElMessage.warning(res.message || '获取Worker信息失败')
+      ElMessage.warning(res.message || t('workerConsole.getWorkerInfoFailed'))
     }
   } catch (e) {
     workerStatus.value = 'offline'
-    ElMessage.error('获取Worker信息失败: ' + e.message)
+    ElMessage.error(t('workerConsole.getWorkerInfoFailed') + ': ' + e.message)
   } finally {
     infoLoading.value = false
   }
@@ -326,10 +328,10 @@ async function loadFiles() {
     if (res.code === 0 && res.data) {
       fileList.value = res.data.files || []
     } else {
-      ElMessage.error(res.message || '获取文件列表失败')
+      ElMessage.error(res.message || t('workerConsole.getFileListFailed'))
     }
   } catch (e) {
-    ElMessage.error('获取文件列表失败: ' + e.message)
+    ElMessage.error(t('workerConsole.getFileListFailed') + ': ' + e.message)
   } finally {
     filesLoading.value = false
   }
@@ -364,7 +366,7 @@ function showCreateDirDialog() {
 
 async function createDirHandler() {
   if (!newDirName.value.trim()) {
-    ElMessage.warning('请输入文件夹名称')
+    ElMessage.warning(t('workerConsole.enterFolderName'))
     return
   }
   createDirLoading.value = true
@@ -374,14 +376,14 @@ async function createDirHandler() {
       : `${currentPath.value}/${newDirName.value}`
     const res = await createDir(workerName.value, path)
     if (res.code === 0) {
-      ElMessage.success('创建成功')
+      ElMessage.success(t('workerConsole.createSuccess'))
       createDirDialogVisible.value = false
       loadFiles()
     } else {
-      ElMessage.error(res.message || '创建失败')
+      ElMessage.error(res.message || t('workerConsole.createFailed'))
     }
   } catch (e) {
-    ElMessage.error('创建失败: ' + e.message)
+    ElMessage.error(t('workerConsole.createFailed') + ': ' + e.message)
   } finally {
     createDirLoading.value = false
   }
@@ -391,13 +393,13 @@ async function handleUpload(file) {
   try {
     const res = await uploadFile(workerName.value, currentPath.value, file)
     if (res.code === 0) {
-      ElMessage.success('上传成功')
+      ElMessage.success(t('workerConsole.uploadSuccess'))
       loadFiles()
     } else {
-      ElMessage.error(res.message || '上传失败')
+      ElMessage.error(res.message || t('workerConsole.uploadFailed'))
     }
   } catch (e) {
-    ElMessage.error('上传失败: ' + e.message)
+    ElMessage.error(t('workerConsole.uploadFailed') + ': ' + e.message)
   }
   return false
 }
@@ -407,7 +409,7 @@ async function downloadFileHandler(row) {
     const path = currentPath.value === '.' ? row.name : `${currentPath.value}/${row.name}`
     const res = await downloadFile(workerName.value, path)
     if (res.code === 0 && res.data) {
-      // 将 Base64 转为 Blob 并下载
+      // 将Base64 转为 Blob 并下载
       const byteCharacters = atob(res.data.data)
       const byteNumbers = new Array(byteCharacters.length)
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -422,10 +424,10 @@ async function downloadFileHandler(row) {
       link.click()
       window.URL.revokeObjectURL(url)
     } else {
-      ElMessage.error(res.message || '下载失败')
+      ElMessage.error(res.message || t('workerConsole.downloadFailed'))
     }
   } catch (e) {
-    ElMessage.error('下载失败: ' + e.message)
+    ElMessage.error(t('workerConsole.downloadFailed') + ': ' + e.message)
   }
 }
 
@@ -434,13 +436,13 @@ async function deleteFileHandler(row) {
     const path = currentPath.value === '.' ? row.name : `${currentPath.value}/${row.name}`
     const res = await deleteFile(workerName.value, path)
     if (res.code === 0) {
-      ElMessage.success('删除成功')
+      ElMessage.success(t('workerConsole.deleteSuccess'))
       loadFiles()
     } else {
-      ElMessage.error(res.message || '删除失败')
+      ElMessage.error(res.message || t('workerConsole.deleteFailed'))
     }
   } catch (e) {
-    ElMessage.error('删除失败: ' + e.message)
+    ElMessage.error(t('workerConsole.deleteFailed') + ': ' + e.message)
   }
 }
 
@@ -452,7 +454,7 @@ async function connectTerminal() {
 
 function connectTerminalWS() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  // 生成一个 sessionId
+  // 生成一?sessionId
   terminalSessionId.value = Date.now().toString()
   
   // 获取 token 用于 WebSocket 认证
@@ -466,7 +468,7 @@ function connectTerminalWS() {
   terminalWs.onopen = () => {
     console.log('[Terminal] WebSocket connected')
     terminalConnected.value = true
-    appendTerminalOutput('终端已连接\n', 'info')
+    appendTerminalOutput(t('workerConsole.terminalConnected') + '\n', 'info')
   }
   
   terminalWs.onmessage = (event) => {
@@ -478,10 +480,10 @@ function connectTerminalWS() {
       } else if (data.type === 'error') {
         appendTerminalOutput(data.error || data.data, 'error')
       } else if (data.type === 'pong') {
-        // 心跳响应，忽略
+        // 心跳响应，忽?
       }
     } catch (e) {
-      // 非 JSON 数据，直接显示
+      // ?JSON 数据，直接显?
       appendTerminalOutput(event.data)
     }
   }
@@ -489,12 +491,12 @@ function connectTerminalWS() {
   terminalWs.onclose = (event) => {
     console.log('[Terminal] WebSocket closed:', event.code, event.reason)
     terminalConnected.value = false
-    appendTerminalOutput('\n终端已断开\n', 'info')
+    appendTerminalOutput('\n' + t('workerConsole.terminalDisconnected') + '\n', 'info')
   }
   
   terminalWs.onerror = (error) => {
     console.error('[Terminal] WebSocket error:', error)
-    ElMessage.error('终端连接错误')
+    ElMessage.error(t('workerConsole.terminalConnectError'))
   }
 }
 
@@ -503,7 +505,7 @@ function disconnectTerminal() {
     terminalWs.close()
     terminalWs = null
   }
-  // WebSocket 断开时服务端会自动关闭会话，无需再调用 closeTerminal API
+  // WebSocket 断开时服务端会自动关闭会话，无需再调?closeTerminal API
   terminalSessionId.value = ''
   terminalConnected.value = false
 }
@@ -548,10 +550,10 @@ async function loadAuditLogs() {
       auditLogs.value = res.list || res.data?.list || []
       auditTotal.value = res.total || res.data?.total || 0
     } else {
-      ElMessage.error(res.message || '获取审计日志失败')
+      ElMessage.error(res.message || t('workerConsole.getAuditLogFailed'))
     }
   } catch (e) {
-    ElMessage.error('获取审计日志失败: ' + e.message)
+    ElMessage.error(t('workerConsole.getAuditLogFailed') + ': ' + e.message)
   } finally {
     auditLoading.value = false
   }
@@ -563,15 +565,15 @@ async function clearAuditLogsHandler() {
   try {
     const res = await clearAuditLogs(workerName.value)
     if (res.code === 0) {
-      ElMessage.success(res.msg || res.data?.msg || '审计日志已清空')
+      ElMessage.success(res.msg || res.data?.msg || t('workerConsole.auditLogCleared'))
       auditLogs.value = []
       auditTotal.value = 0
       auditPage.value = 1
     } else {
-      ElMessage.error(res.message || '清空审计日志失败')
+      ElMessage.error(res.message || t('workerConsole.clearAuditLogFailed'))
     }
   } catch (e) {
-    ElMessage.error('清空审计日志失败: ' + e.message)
+    ElMessage.error(t('workerConsole.clearAuditLogFailed') + ': ' + e.message)
   } finally {
     auditClearing.value = false
   }
@@ -583,9 +585,9 @@ function formatUptime(seconds) {
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   const mins = Math.floor((seconds % 3600) / 60)
-  if (days > 0) return `${days}天${hours}小时`
-  if (hours > 0) return `${hours}小时${mins}分钟`
-  return `${mins}分钟`
+  if (days > 0) return `${days} ${t('workerConsole.days')} ${hours} ${t('workerConsole.hours')}`
+  if (hours > 0) return `${hours} ${t('workerConsole.hours')} ${mins} ${t('workerConsole.minutes')}`
+  return `${mins} ${t('workerConsole.minutes')}`
 }
 
 function formatBytes(bytes) {
@@ -609,9 +611,9 @@ function formatAuditTime(timeStr) {
 }
 
 function getLoadColor(value) {
-  if (value < 50) return '#67C23A'
-  if (value < 80) return '#E6A23C'
-  return '#F56C6C'
+  if (value < 50) return 'var(--el-color-success)'
+  if (value < 80) return 'var(--el-color-warning)'
+  return 'var(--el-color-danger)'
 }
 
 function getMemPercent(info) {
@@ -641,26 +643,48 @@ function getActionType(action) {
 
 function getActionLabel(action) {
   const labels = {
-    'file_upload': '上传文件',
-    'file_download': '下载文件',
-    'file_delete': '删除文件',
-    'file_list': '浏览目录',
-    'file_mkdir': '创建目录',
-    'terminal_exec': '执行命令',
-    'terminal_open': '打开终端',
-    'terminal_close': '关闭终端',
-    'console_info': '查看信息'
+    'file_upload': t('workerConsole.fileUpload'),
+    'file_download': t('workerConsole.fileDownload'),
+    'file_delete': t('workerConsole.fileDelete'),
+    'file_list': t('workerConsole.fileList'),
+    'file_mkdir': t('workerConsole.fileMkdir'),
+    'terminal_exec': t('workerConsole.terminalExec'),
+    'terminal_open': t('workerConsole.terminalOpen'),
+    'terminal_close': t('workerConsole.terminalClose'),
+    'console_info': t('workerConsole.consoleInfo')
   }
   return labels[action] || action
 }
 </script>
 
 
-<style lang="scss" scoped>
+<style scoped>
 .worker-console {
   .worker-title {
     font-size: 16px;
     font-weight: 600;
+  }
+
+  .secondary-text {
+    margin-left: 8px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .error-text {
+    color: var(--el-color-danger);
+  }
+
+  .terminal-status {
+    margin-left: 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    
+    &.connected {
+      color: var(--el-color-success);
+    }
   }
 
   .file-manager {
@@ -670,13 +694,13 @@ function getActionLabel(action) {
       align-items: center;
       margin-bottom: 15px;
       padding: 10px;
-      background: #f5f7fa;
+      background: var(--el-fill-color-light);
       border-radius: 4px;
 
       .path-item {
         cursor: pointer;
         &:hover {
-          color: #409eff;
+          color: var(--el-color-primary);
         }
       }
 
@@ -693,12 +717,12 @@ function getActionLabel(action) {
       cursor: pointer;
 
       &.is-dir {
-        color: #409eff;
+        color: var(--el-color-primary);
         font-weight: 500;
       }
 
       &:hover {
-        color: #409eff;
+        color: var(--el-color-primary);
       }
     }
   }
@@ -713,30 +737,30 @@ function getActionLabel(action) {
 
     .terminal-output {
       height: 400px;
-      background: #1e1e1e;
+      background: var(--el-fill-color-darker, #1e1e1e);
       border-radius: 4px;
       padding: 10px;
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 13px;
-      color: #d4d4d4;
+      color: var(--el-text-color-primary);
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
 
       :deep(.terminal-output) {
-        color: #d4d4d4;
+        color: var(--el-text-color-primary);
       }
 
       :deep(.terminal-command) {
-        color: #569cd6;
+        color: var(--el-color-primary);
       }
 
       :deep(.terminal-error) {
-        color: #f14c4c;
+        color: var(--el-color-danger);
       }
 
       :deep(.terminal-info) {
-        color: #6a9955;
+        color: var(--el-color-success);
       }
     }
 
@@ -744,12 +768,12 @@ function getActionLabel(action) {
       display: flex;
       align-items: center;
       margin-top: 10px;
-      background: #1e1e1e;
+      background: var(--el-fill-color-darker, #1e1e1e);
       border-radius: 4px;
       padding: 5px 10px;
 
       .prompt {
-        color: #569cd6;
+        color: var(--el-color-primary);
         font-family: 'Consolas', 'Monaco', monospace;
         margin-right: 8px;
       }
@@ -760,10 +784,11 @@ function getActionLabel(action) {
       }
 
       :deep(.el-input__inner) {
-        color: #d4d4d4;
+        color: var(--el-text-color-primary);
         font-family: 'Consolas', 'Monaco', monospace;
       }
     }
   }
 }
 </style>
+

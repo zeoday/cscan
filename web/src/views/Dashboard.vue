@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="workspace">
     <el-row :gutter="20">
       <!-- 左侧主区域 -->
@@ -7,29 +7,29 @@
         <!-- 资产统计 -->
         <div class="dark-card">
           <div class="card-header">
-            <span class="card-title">资产统计</span>
+            <span class="card-title">{{ $t('dashboard.assetStats') }}</span>
             <el-icon class="card-icon"><Monitor /></el-icon>
           </div>
           <div class="asset-stats">
             <div class="asset-stat-item">
               <span class="asset-count">{{ assetStats.totalAsset }}</span>
-              <span class="asset-label">资产</span>
+              <span class="asset-label">{{ $t('dashboard.asset') }}</span>
             </div>
             <div class="asset-stat-item">
               <span class="asset-count">{{ assetStats.totalHost }}</span>
-              <span class="asset-label">主机</span>
+              <span class="asset-label">{{ $t('dashboard.host') }}</span>
             </div>
             <div class="asset-stat-item">
               <span class="asset-count">{{ assetStats.totalService }}</span>
-              <span class="asset-label">服务</span>
+              <span class="asset-label">{{ $t('dashboard.service') }}</span>
             </div>
             <div class="asset-stat-item">
               <span class="asset-count">{{ assetStats.totalApp }}</span>
-              <span class="asset-label">应用</span>
+              <span class="asset-label">{{ $t('dashboard.application') }}</span>
             </div>
           </div>
           <div class="asset-category-section">
-            <div class="chart-title">资产分类</div>
+            <div class="chart-title">{{ $t('dashboard.assetCategory') }}</div>
             <div class="category-list">
               <div v-for="item in assetCategories" :key="item.name" class="category-item">
                 <span class="category-name">{{ item.name }}</span>
@@ -40,72 +40,72 @@
               </div>
             </div>
           </div>
-          <div class="view-all-btn" @click="$router.push('/asset')">查看全部</div>
+          <div class="view-all-btn" @click="$router.push('/asset')">{{ $t('dashboard.viewAll') }}</div>
         </div>
         
         <!-- 漏洞统计 -->
         <div class="dark-card">
           <div class="card-header">
-            <span class="card-title">漏洞统计</span>
+            <span class="card-title">{{ $t('dashboard.vulStats') }}</span>
             <el-icon class="card-icon"><Warning /></el-icon>
           </div>
           <div class="vul-stats">
             <div class="vul-stat-item">
               <span class="vul-count total">{{ vulStats.total }}</span>
-              <span class="vul-label">总数</span>
+              <span class="vul-label">{{ $t('dashboard.total') }}</span>
             </div>
             <div class="vul-stat-item">
               <span class="vul-count critical">{{ vulStats.critical }}</span>
-              <span class="vul-label">严重</span>
+              <span class="vul-label">{{ $t('dashboard.critical') }}</span>
             </div>
             <div class="vul-stat-item">
               <span class="vul-count high">{{ vulStats.high }}</span>
-              <span class="vul-label">高危</span>
+              <span class="vul-label">{{ $t('dashboard.high') }}</span>
             </div>
             <div class="vul-stat-item">
               <span class="vul-count medium">{{ vulStats.medium }}</span>
-              <span class="vul-label">中危</span>
+              <span class="vul-label">{{ $t('dashboard.medium') }}</span>
             </div>
             <div class="vul-stat-item">
               <span class="vul-count low">{{ vulStats.low }}</span>
-              <span class="vul-label">低危</span>
+              <span class="vul-label">{{ $t('dashboard.low') }}</span>
             </div>
             <div class="vul-stat-item">
               <span class="vul-count info">{{ vulStats.info }}</span>
-              <span class="vul-label">信息</span>
+              <span class="vul-label">{{ $t('dashboard.info') }}</span>
             </div>
           </div>
           <div class="vul-chart-section">
-            <div class="chart-title">漏洞分类统计</div>
-            <div v-if="vulStats.total === 0" class="no-data">暂无漏洞数据</div>
+            <div class="chart-title">{{ $t('dashboard.vulCategory') }}</div>
+            <div v-if="vulStats.total === 0" class="no-data">{{ $t('dashboard.noVulData') }}</div>
             <div v-else ref="vulCategoryChartRef" class="chart-container"></div>
           </div>
-          <div class="view-all-btn" @click="$router.push('/vul')">查看全部</div>
+          <div class="view-all-btn" @click="$router.push('/vul')">{{ $t('dashboard.viewAll') }}</div>
         </div>
 
 
-        <!-- 任务效率统计 -->
+        <!-- 任务统计 -->
         <div class="dark-card">
           <div class="card-header">
-            <span class="card-title">任务统计 (近30天)</span>
+            <span class="card-title">{{ $t('dashboard.taskStats') }}</span>
             <el-icon class="card-icon"><List /></el-icon>
           </div>
           <div class="task-stats">
             <div class="task-stat-item">
               <span class="task-count">{{ taskStats.total }}</span>
-              <span class="task-label">总任务</span>
+              <span class="task-label">{{ $t('dashboard.totalTasks') }}</span>
             </div>
             <div class="task-stat-item">
               <span class="task-count success">{{ taskStats.completed }}</span>
-              <span class="task-label">已完成</span>
+              <span class="task-label">{{ $t('dashboard.completed') }}</span>
             </div>
             <div class="task-stat-item">
               <span class="task-count warning">{{ taskStats.running }}</span>
-              <span class="task-label">进行中</span>
+              <span class="task-label">{{ $t('dashboard.running') }}</span>
             </div>
             <div class="task-stat-item">
               <span class="task-count error">{{ taskStats.failed }}</span>
-              <span class="task-label">失败</span>
+              <span class="task-label">{{ $t('dashboard.failed') }}</span>
             </div>
           </div>
           <div class="task-chart-section">
@@ -114,12 +114,12 @@
         </div>
       </el-col>
 
-      <!-- 右侧信息区 -->
+      <!-- 右侧信息区域 -->
       <el-col :span="8">
         <!-- 安全评分 -->
         <div class="dark-card score-card">
           <div class="card-header">
-            <span class="card-title">安全评分</span>
+            <span class="card-title">{{ $t('dashboard.securityScore') }}</span>
             <el-icon class="card-icon"><Aim /></el-icon>
           </div>
           <div class="score-display">
@@ -136,10 +136,10 @@
         <!-- 最新漏洞 -->
         <div class="dark-card">
           <div class="card-header">
-            <span class="card-title">最新漏洞</span>
+            <span class="card-title">{{ $t('dashboard.recentVuls') }}</span>
             <div class="header-stats">
-              <span class="stat-item"><strong>{{ recentVulStats.week }}</strong> 近7天</span>
-              <span class="stat-item"><strong>{{ recentVulStats.month }}</strong> 近30天</span>
+              <span class="stat-item"><strong>{{ recentVulStats.week }}</strong></span>
+              <span class="stat-item"><strong>{{ recentVulStats.month }}</strong> </span>
             </div>
           </div>
           <div class="recent-vul-list">
@@ -150,53 +150,53 @@
               <span class="vul-name" :title="vul.name">{{ vul.name }}</span>
               <span class="vul-time">{{ vul.time }}</span>
             </div>
-            <div v-if="recentVuls.length === 0" class="no-data">暂无漏洞</div>
+            <div v-if="recentVuls.length === 0" class="no-data">{{ $t('dashboard.noVuls') }}</div>
           </div>
-          <div class="view-all-btn" @click="$router.push('/vul')">查看全部</div>
+          <div class="view-all-btn" @click="$router.push('/vul')">{{ $t('dashboard.viewAll') }}</div>
         </div>
 
         <!-- Worker状态 -->
         <div class="dark-card">
           <div class="card-header">
-            <span class="card-title">Worker状态</span>
+            <span class="card-title">{{ $t('dashboard.workerStatus') }}</span>
             <el-icon class="card-icon"><Connection /></el-icon>
           </div>
           <div class="worker-stats">
             <div class="worker-stat-item">
               <div class="worker-indicator online"></div>
-              <span class="worker-label">在线</span>
+              <span class="worker-label">{{ $t('dashboard.online') }}</span>
               <span class="worker-count">{{ workerStats.online }}</span>
             </div>
             <div class="worker-stat-item">
               <div class="worker-indicator offline"></div>
-              <span class="worker-label">离线</span>
+              <span class="worker-label">{{ $t('dashboard.offline') }}</span>
               <span class="worker-count">{{ workerStats.offline }}</span>
             </div>
           </div>
-          <div class="view-all-btn" @click="$router.push('/worker')">管理Worker</div>
+          <div class="view-all-btn" @click="$router.push('/worker')">{{ $t('dashboard.manageWorker') }}</div>
         </div>
 
         <!-- 快捷操作 -->
         <div class="dark-card">
           <div class="card-header">
-            <span class="card-title">快捷操作</span>
+            <span class="card-title">{{ $t('dashboard.quickActions') }}</span>
           </div>
           <div class="quick-actions">
             <div class="action-btn" @click="$router.push('/task')">
               <el-icon><Plus /></el-icon>
-              <span>新建任务</span>
+              <span>{{ $t('dashboard.newTask') }}</span>
             </div>
             <div class="action-btn" @click="$router.push('/asset')">
               <el-icon><Monitor /></el-icon>
-              <span>资产管理</span>
+              <span>{{ $t('dashboard.assetManagement') }}</span>
             </div>
             <div class="action-btn" @click="$router.push('/poc')">
               <el-icon><Aim /></el-icon>
-              <span>POC管理</span>
+              <span>{{ $t('dashboard.pocManagement') }}</span>
             </div>
             <div class="action-btn" @click="$router.push('/online-search')">
               <el-icon><Search /></el-icon>
-              <span>在线搜索</span>
+              <span>{{ $t('dashboard.onlineSearch') }}</span>
             </div>
           </div>
         </div>
@@ -207,15 +207,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
-import { useUserStore } from '@/stores/user'
-import { useWorkspaceStore } from '@/stores/workspace'
+import { useI18n } from 'vue-i18n'
 import * as echarts from 'echarts'
 import { getAssetStat } from '@/api/asset'
-import { getTaskList } from '@/api/task'
 import request from '@/api/request'
 
-const userStore = useUserStore()
-const workspaceStore = useWorkspaceStore()
+const { t } = useI18n()
 const currentTime = ref('')
 
 // 漏洞统计
@@ -263,7 +260,7 @@ const workerStats = reactive({
   offline: 0
 })
 
-// 安全评分 - 一个严重或高危漏洞扣一分，最低为0分
+// 安全评分 - 一个严重或高危漏洞扣一分，最低为0
 const securityScore = computed(() => {
   if (vulStats.total === 0) return 100
   const deduction = vulStats.critical + vulStats.high
@@ -360,7 +357,7 @@ async function loadVulStats() {
       recentVulStats.month = statRes.month || 0
     }
     
-    // 获取最新漏洞列表
+    // 获取最新漏洞
     const listRes = await request.post('/vul/list', { page: 1, pageSize: 5 })
     if (listRes.code === 0) {
       const list = listRes.list || []
@@ -419,11 +416,11 @@ function initCharts() {
         radius: ['45%', '70%'],
         center: ['50%', '50%'],
         data: [
-          { value: vulStats.critical, name: '严重', itemStyle: { color: '#f56c6c' } },
-          { value: vulStats.high, name: '高危', itemStyle: { color: '#e6a23c' } },
-          { value: vulStats.medium, name: '中危', itemStyle: { color: '#409eff' } },
-          { value: vulStats.low, name: '低危', itemStyle: { color: '#67c23a' } },
-          { value: vulStats.info, name: '信息', itemStyle: { color: '#909399' } }
+          { value: vulStats.critical, name: t('dashboard.critical'), itemStyle: { color: '#f56c6c' } },
+          { value: vulStats.high, name: t('dashboard.high'), itemStyle: { color: '#e6a23c' } },
+          { value: vulStats.medium, name: t('dashboard.medium'), itemStyle: { color: '#409eff' } },
+          { value: vulStats.low, name: t('dashboard.low'), itemStyle: { color: '#67c23a' } },
+          { value: vulStats.info, name: t('dashboard.info'), itemStyle: { color: '#909399' } }
         ].filter(d => d.value > 0),
         label: { color: '#a3a6ad', fontSize: 12 },
         labelLine: { lineStyle: { color: '#444' } }
@@ -444,8 +441,8 @@ function initCharts() {
       xAxis: { type: 'category', data: days, axisLine: { lineStyle: { color: '#444' } }, axisLabel: { color: '#a3a6ad' } },
       yAxis: { type: 'value', axisLine: { lineStyle: { color: '#444' } }, axisLabel: { color: '#a3a6ad' }, splitLine: { lineStyle: { color: '#333' } } },
       series: [
-        { name: '完成', type: 'line', smooth: true, data: completedData, itemStyle: { color: '#67c23a' }, areaStyle: { color: 'rgba(103, 194, 58, 0.1)' } },
-        { name: '失败', type: 'line', smooth: true, data: failedData, itemStyle: { color: '#f56c6c' }, areaStyle: { color: 'rgba(245, 108, 108, 0.1)' } }
+        { name: t('dashboard.completed'), type: 'line', smooth: true, data: completedData, itemStyle: { color: '#67c23a' }, areaStyle: { color: 'rgba(103, 194, 58, 0.1)' } },
+        { name: t('dashboard.failed'), type: 'line', smooth: true, data: failedData, itemStyle: { color: '#f56c6c' }, areaStyle: { color: 'rgba(245, 108, 108, 0.1)' } }
       ]
     })
   }
@@ -456,10 +453,10 @@ function formatTime(timeStr) {
   const date = new Date(timeStr)
   const now = new Date()
   const diff = now - date
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
-  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
-  return Math.floor(diff / 86400000) + '天前'
+  if (diff < 60000) return t('dashboard.justNow')
+  if (diff < 3600000) return Math.floor(diff / 60000) + t('dashboard.minutesAgo')
+  if (diff < 86400000) return Math.floor(diff / 3600000) + t('dashboard.hoursAgo')
+  return Math.floor(diff / 86400000) + t('dashboard.daysAgo')
 }
 
 function getSeverityType(severity) {
@@ -475,10 +472,10 @@ function getScoreClass(score) {
 }
 
 function getScoreLevel(score) {
-  if (score >= 80) return '安全'
-  if (score >= 60) return '良好'
-  if (score >= 40) return '警告'
-  return '危险'
+  if (score >= 80) return t('dashboard.excellent')
+  if (score >= 60) return t('dashboard.good')
+  if (score >= 40) return t('dashboard.warning')
+  return t('dashboard.danger')
 }
 
 function getScoreColor(score) {
@@ -489,7 +486,7 @@ function getScoreColor(score) {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .workspace {
   min-height: 100%;
 }
@@ -536,6 +533,7 @@ function getScoreColor(score) {
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
+  color: var(--el-text-color-primary);
   
   .card-header {
     display: flex;
@@ -571,7 +569,7 @@ function getScoreColor(score) {
   }
 }
 
-// 漏洞统计
+/* 漏洞统计 */
 .vul-stats {
   display: flex;
   justify-content: space-between;
@@ -614,7 +612,7 @@ function getScoreColor(score) {
   }
 }
 
-// 资产统计
+/* 资产统计 */
 .asset-stats {
   display: flex;
   justify-content: space-between;
@@ -687,7 +685,7 @@ function getScoreColor(score) {
   }
 }
 
-// 任务统计
+/* 任务统计 */
 .task-stats {
   display: flex;
   justify-content: space-between;
@@ -716,7 +714,7 @@ function getScoreColor(score) {
   }
 }
 
-// 安全评分
+/* 安全评分 */
 .score-card {
   .score-display {
     text-align: center;
@@ -775,7 +773,6 @@ function getScoreColor(score) {
   }
 }
 
-// 最新漏洞
 .recent-vul-list {
   .vul-item {
     display: flex;
@@ -809,7 +806,7 @@ function getScoreColor(score) {
   }
 }
 
-// Worker状态
+/* Worker状态 */
 .worker-stats {
   display: flex;
   justify-content: space-around;
@@ -842,7 +839,7 @@ function getScoreColor(score) {
   }
 }
 
-// 快捷操作
+/* 快捷操作 */
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -877,7 +874,7 @@ function getScoreColor(score) {
   }
 }
 
-// 通用
+/* 通用 */
 .view-all-btn {
   text-align: center;
   padding: 12px 0 0;
@@ -897,3 +894,4 @@ function getScoreColor(score) {
   font-size: 14px;
 }
 </style>
+

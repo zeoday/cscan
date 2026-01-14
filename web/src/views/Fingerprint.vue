@@ -2,29 +2,29 @@
   <div class="fingerprint-page">
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <!-- 内置指纹 -->
-      <el-tab-pane label="内置指纹" name="builtin">
+      <el-tab-pane :label="$t('fingerprint.builtinFingerprint')" name="builtin">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>Wappalyzer 内置指纹库</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ stats.builtin || 0 }} 个指纹
+              <span>{{ $t('fingerprint.wappalyzerBuiltinLib') }}</span>
+              <span class="card-header-hint">
+                {{ $t('fingerprint.totalFingerprints', { count: stats.builtin || 0 }) }}
               </span>
               <div style="margin-left: auto; display: flex; gap: 8px;">
                 <el-button type="warning" size="small" @click="showBatchValidateDialog">
-                  <el-icon><Search /></el-icon>批量验证
+                  <el-icon><Search /></el-icon>{{ $t('fingerprint.batchValidate') }}
                 </el-button>
                 <el-button type="success" size="small" @click="showBuiltinImportDialog">
-                  <el-icon><Upload /></el-icon>导入指纹
+                  <el-icon><Upload /></el-icon>{{ $t('fingerprint.importFingerprint') }}
                 </el-button>
                 <el-dropdown @command="handleSyncCommand">
                   <el-button type="primary" size="small" :loading="syncLoading">
-                    <el-icon><Refresh /></el-icon>同步指纹<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                    <el-icon><Refresh /></el-icon>{{ $t('fingerprint.syncFingerprint') }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item command="sync">增量同步（从wappalyzergo库）</el-dropdown-item>
-                      <el-dropdown-item command="force">强制重新同步</el-dropdown-item>
+                      <el-dropdown-item command="sync">{{ $t('fingerprint.incrementalSync') }}</el-dropdown-item>
+                      <el-dropdown-item command="force">{{ $t('fingerprint.forceResync') }}</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
@@ -32,40 +32,40 @@
             </div>
           </template>
           <p class="tip-text">
-            Wappalyzer 内置指纹已同步到数据库，可以编辑启用/禁用状态。支持上传 Wappalyzer technologies.json 格式文件导入。
+            {{ $t('fingerprint.builtinTip') }}
           </p>
           <!-- 筛选条件 -->
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="分类">
-              <el-select v-model="builtinFilter.category" placeholder="全部分类" clearable style="width: 150px" @change="loadBuiltinFingerprints">
+            <el-form-item :label="$t('fingerprint.category')">
+              <el-select v-model="builtinFilter.category" :placeholder="$t('fingerprint.allCategories')" clearable style="width: 150px" @change="loadBuiltinFingerprints">
                 <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
               </el-select>
             </el-form-item>
-            <el-form-item label="搜索">
-              <el-input v-model="builtinFilter.keyword" placeholder="应用名称" clearable style="width: 180px" @keyup.enter="loadBuiltinFingerprints" />
+            <el-form-item :label="$t('fingerprint.search')">
+              <el-input v-model="builtinFilter.keyword" :placeholder="$t('fingerprint.appName')" clearable style="width: 180px" @keyup.enter="loadBuiltinFingerprints" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="loadBuiltinFingerprints">搜索</el-button>
+              <el-button type="primary" @click="loadBuiltinFingerprints">{{ $t('fingerprint.search') }}</el-button>
             </el-form-item>
           </el-form>
           <!-- 统计信息 -->
           <div class="stats-bar">
-            <el-tag type="success" size="small">启用: {{ stats.enabled || 0 }}</el-tag>
-            <el-tag type="info" size="small">被动: {{ stats.passive || 0 }}</el-tag>
-            <el-tag type="warning" size="small">主动: {{ stats.active || 0 }}</el-tag>
-            <el-tag size="small">总计: {{ stats.total || 0 }}</el-tag>
+            <el-tag type="success" size="small">{{ $t('fingerprint.enabled') }}: {{ stats.enabled || 0 }}</el-tag>
+            <el-tag type="info" size="small">{{ $t('fingerprint.passive') }}: {{ stats.passive || 0 }}</el-tag>
+            <el-tag type="warning" size="small">{{ $t('fingerprint.active') }}: {{ stats.active || 0 }}</el-tag>
+            <el-tag size="small">{{ $t('fingerprint.total') }}: {{ stats.total || 0 }}</el-tag>
           </div>
           <!-- 指纹列表 -->
           <el-table :data="builtinFingerprints" stripe v-loading="builtinLoading" max-height="500">
-            <el-table-column prop="name" label="应用名称" width="180" show-overflow-tooltip />
-            <el-table-column prop="category" label="分类" width="100" />
-            <el-table-column prop="website" label="官网" min-width="200" show-overflow-tooltip>
+            <el-table-column prop="name" :label="$t('fingerprint.appName')" width="180" show-overflow-tooltip />
+            <el-table-column prop="category" :label="$t('fingerprint.category')" width="100" />
+            <el-table-column prop="website" :label="$t('fingerprint.website')" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
-                <a v-if="row.website" :href="row.website" target="_blank" style="color: #409eff">{{ row.website }}</a>
+                <a v-if="row.website" :href="row.website" target="_blank" class="link-primary">{{ row.website }}</a>
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column label="匹配规则" min-width="250">
+            <el-table-column :label="$t('fingerprint.matchRules')" min-width="250">
               <template #default="{ row }">
                 <el-tag v-if="row.headers && Object.keys(row.headers).length" size="small" style="margin-right: 3px">Headers</el-tag>
                 <el-tag v-if="row.cookies && Object.keys(row.cookies).length" size="small" style="margin-right: 3px">Cookies</el-tag>
@@ -77,18 +77,18 @@
                 <el-tag v-if="row.css && row.css.length" size="small" style="margin-right: 3px">CSS</el-tag>
                 <el-tag v-if="row.url && row.url.length" size="small" style="margin-right: 3px">URL</el-tag>
                 <el-tag v-if="row.dom" size="small" style="margin-right: 3px">DOM</el-tag>
-                <span v-if="!hasAnyRule(row)" style="color: #909399">-</span>
+                <span v-if="!hasAnyRule(row)" class="text-secondary">-</span>
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" :label="$t('fingerprint.status')" width="80">
               <template #default="{ row }">
                 <el-switch v-model="row.enabled" @change="handleToggleEnabled(row)" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column :label="$t('fingerprint.operation')" width="120" fixed="right">
               <template #default="{ row }">
-                <el-button type="success" link size="small" @click="showValidateDialog(row)">验证</el-button>
-                <el-button type="primary" link size="small" @click="showFingerprintDetail(row)">查看</el-button>
+                <el-button type="success" link size="small" @click="showValidateDialog(row)">{{ $t('fingerprint.validate') }}</el-button>
+                <el-button type="primary" link size="small" @click="showFingerprintDetail(row)">{{ $t('fingerprint.view') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -106,37 +106,37 @@
       </el-tab-pane>
 
       <!-- 自定义指纹 -->
-      <el-tab-pane label="自定义指纹" name="custom">
+      <el-tab-pane :label="$t('fingerprint.customFingerprint')" name="custom">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>自定义指纹规则</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ customPagination.total || 0 }} 条规则
+              <span>{{ $t('fingerprint.customFingerprintRules') }}</span>
+              <span class="card-header-hint">
+                {{ $t('fingerprint.totalRules', { count: customPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto; display: flex; gap: 8px;">
                 <el-dropdown @command="handleBatchEnabledCommand">
                   <el-button type="info" size="small" :loading="batchEnabledLoading">
-                    <el-icon><Operation /></el-icon>批量操作<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                    <el-icon><Operation /></el-icon>{{ $t('fingerprint.batchOperation') }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item command="enableAll">全部启用</el-dropdown-item>
-                      <el-dropdown-item command="disableAll">全部禁用</el-dropdown-item>
+                      <el-dropdown-item command="enableAll">{{ $t('fingerprint.enableAll') }}</el-dropdown-item>
+                      <el-dropdown-item command="disableAll">{{ $t('fingerprint.disableAll') }}</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
                 <el-button type="danger" size="small" @click="handleClearCustomFingerprints">
-                  <el-icon><Delete /></el-icon>清空
+                  <el-icon><Delete /></el-icon>{{ $t('fingerprint.clear') }}
                 </el-button>
                 <el-button type="warning" size="small" @click="handleExportFingerprints" :loading="exportLoading">
-                  <el-icon><Download /></el-icon>导出指纹
+                  <el-icon><Download /></el-icon>{{ $t('fingerprint.exportFingerprint') }}
                 </el-button>
                 <el-button type="success" size="small" @click="showImportDialog">
-                  <el-icon><Upload /></el-icon>导入指纹
+                  <el-icon><Upload /></el-icon>{{ $t('fingerprint.importFingerprint') }}
                 </el-button>
                 <el-button type="primary" size="small" @click="showFingerprintForm()">
-                  <el-icon><Plus /></el-icon>新增指纹
+                  <el-icon><Plus /></el-icon>{{ $t('fingerprint.addFingerprint') }}
                 </el-button>
               </div>
             </div>
@@ -144,44 +144,44 @@
 
           <!-- 筛选条件 -->
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="搜索">
-              <el-input v-model="customFilter.keyword" placeholder="应用名称或ID" clearable style="width: 200px" @keyup.enter="loadCustomFingerprints" />
+            <el-form-item :label="$t('fingerprint.search')">
+              <el-input v-model="customFilter.keyword" :placeholder="$t('fingerprint.appNameOrId')" clearable style="width: 200px" @keyup.enter="loadCustomFingerprints" />
             </el-form-item>
-            <el-form-item label="状态">
-              <el-select v-model="customFilter.enabled" placeholder="全部状态" clearable style="width: 100px" @change="loadCustomFingerprints">
-                <el-option label="启用" :value="true" />
-                <el-option label="禁用" :value="false" />
+            <el-form-item :label="$t('fingerprint.status')">
+              <el-select v-model="customFilter.enabled" :placeholder="$t('fingerprint.allStatus')" clearable style="width: 100px" @change="loadCustomFingerprints">
+                <el-option :label="$t('fingerprint.enabled')" :value="true" />
+                <el-option :label="$t('common.disabled')" :value="false" />
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="loadCustomFingerprints">搜索</el-button>
-              <el-button @click="resetCustomFilter">重置</el-button>
+              <el-button type="primary" @click="loadCustomFingerprints">{{ $t('fingerprint.search') }}</el-button>
+              <el-button @click="resetCustomFilter">{{ $t('fingerprint.reset') }}</el-button>
             </el-form-item>
           </el-form>
           <el-table :data="customFingerprints" stripe v-loading="customLoading" max-height="500">
-            <el-table-column prop="id" label="ID" width="220">
+            <el-table-column prop="id" :label="$t('fingerprint.id')" width="220">
               <template #default="{ row }">
-                <el-tooltip :content="'点击复制'" placement="top">
+                <el-tooltip :content="$t('fingerprint.clickToCopy')" placement="top">
                   <span class="fingerprint-id" @click="copyToClipboard(row.id)">{{ row.id }}</span>
                 </el-tooltip>
               </template>
             </el-table-column>
-            <el-table-column prop="name" label="应用名称" width="180" />
-            <el-table-column prop="type" label="类型" width="100">
+            <el-table-column prop="name" :label="$t('fingerprint.appName')" width="180" />
+            <el-table-column prop="type" :label="$t('fingerprint.type')" width="100">
               <template #default="{ row }">
-                <el-tag v-if="row.type === 'active'" type="warning" size="small">主动</el-tag>
-                <el-tag v-else type="info" size="small">被动</el-tag>
+                <el-tag v-if="row.type === 'active'" type="warning" size="small">{{ $t('fingerprint.active') }}</el-tag>
+                <el-tag v-else type="info" size="small">{{ $t('fingerprint.passive') }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="匹配规则" min-width="300">
+            <el-table-column :label="$t('fingerprint.matchRules')" min-width="300">
               <template #default="{ row }">
                 <template v-if="row.type === 'active' && row.activePaths && row.activePaths.length">
-                  <el-tag size="small" type="success">{{ row.activePaths.length }}个路径</el-tag>
-                  <span style="margin-left: 5px; color: #909399; font-size: 12px">{{ row.activePaths[0] }}{{ row.activePaths.length > 1 ? '...' : '' }}</span>
+                  <el-tag size="small" type="success">{{ row.activePaths.length }}{{ $t('fingerprint.paths') }}</el-tag>
+                  <span class="hint-secondary" style="margin-left: 5px">{{ row.activePaths[0] }}{{ row.activePaths.length > 1 ? '...' : '' }}</span>
                 </template>
                 <template v-else-if="row.rule">
-                  <el-tag size="small" type="warning">自定义规则</el-tag>
-                  <span style="margin-left: 5px; color: #909399; font-size: 12px">{{ truncateRule(row.rule) }}</span>
+                  <el-tag size="small" type="warning">{{ $t('fingerprint.customRule') }}</el-tag>
+                  <span class="hint-secondary" style="margin-left: 5px">{{ truncateRule(row.rule) }}</span>
                 </template>
                 <template v-else>
                   <el-tag v-if="row.headers && Object.keys(row.headers).length" size="small" style="margin-right: 3px">Headers</el-tag>
@@ -192,17 +192,17 @@
                 </template>
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" :label="$t('fingerprint.status')" width="80">
               <template #default="{ row }">
                 <el-switch v-model="row.enabled" @change="handleToggleEnabled(row)" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="250">
+            <el-table-column :label="$t('fingerprint.operation')" width="250">
               <template #default="{ row }">
-                <el-button type="success" link size="small" @click="showValidateDialog(row)">验证</el-button>
-                <el-button type="warning" link size="small" @click="showMatchAssetsDialog(row)">匹配资产</el-button>
-                <el-button type="primary" link size="small" @click="showFingerprintForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteFingerprint(row)">删除</el-button>
+                <el-button type="success" link size="small" @click="showValidateDialog(row)">{{ $t('fingerprint.validate') }}</el-button>
+                <el-button type="warning" link size="small" @click="showMatchAssetsDialog(row)">{{ $t('fingerprint.matchAssets') }}</el-button>
+                <el-button type="primary" link size="small" @click="showFingerprintForm(row)">{{ $t('fingerprint.edit') }}</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteFingerprint(row)">{{ $t('fingerprint.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -220,60 +220,60 @@
       </el-tab-pane>
 
       <!-- 主动扫描指纹 -->
-      <el-tab-pane label="主动扫描指纹" name="activeFingerprint">
+      <el-tab-pane :label="$t('fingerprint.activeFingerprint')" name="activeFingerprint">
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>主动扫描指纹规则</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
-                共 {{ activeFingerprintStats.total || 0 }} 条规则
+              <span>{{ $t('fingerprint.activeFingerprintRules') }}</span>
+              <span class="card-header-hint">
+                {{ $t('fingerprint.totalRules', { count: activeFingerprintStats.total || 0 }) }}
               </span>
               <div style="margin-left: auto; display: flex; gap: 8px;">
                 <el-button type="danger" size="small" @click="handleClearActiveFingerprints">
-                  <el-icon><Delete /></el-icon>清空
+                  <el-icon><Delete /></el-icon>{{ $t('fingerprint.clear') }}
                 </el-button>
                 <el-button type="warning" size="small" @click="handleExportActiveFingerprints" :loading="activeExportLoading">
-                  <el-icon><Download /></el-icon>导出YAML
+                  <el-icon><Download /></el-icon>{{ $t('fingerprint.exportYaml') }}
                 </el-button>
                 <el-button type="success" size="small" @click="showActiveImportDialog">
-                  <el-icon><Upload /></el-icon>导入YAML
+                  <el-icon><Upload /></el-icon>{{ $t('fingerprint.importYaml') }}
                 </el-button>
                 <el-button type="primary" size="small" @click="showActiveFingerprintForm()">
-                  <el-icon><Plus /></el-icon>新增规则
+                  <el-icon><Plus /></el-icon>{{ $t('fingerprint.addRule') }}
                 </el-button>
               </div>
             </div>
           </template>
           <p class="tip-text">
-            主动扫描指纹通过访问特定路径来识别应用。
+            {{ $t('fingerprint.activeTip') }}
             <br/>
-            <span style="color: #e6a23c">关联规则：主动指纹会自动关联同名的被动指纹，扫描时先通过主动路径探测，再使用被动指纹规则匹配响应内容。</span>
+            <span class="text-warning">{{ $t('fingerprint.activeRelatedTip') }}</span>
           </p>
           <!-- 筛选条件 -->
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="搜索">
-              <el-input v-model="activeFingerprintFilter.keyword" placeholder="应用名称" clearable style="width: 200px" @keyup.enter="loadActiveFingerprints" />
+            <el-form-item :label="$t('fingerprint.search')">
+              <el-input v-model="activeFingerprintFilter.keyword" :placeholder="$t('fingerprint.appName')" clearable style="width: 200px" @keyup.enter="loadActiveFingerprints" />
             </el-form-item>
-            <el-form-item label="状态">
-              <el-select v-model="activeFingerprintFilter.enabled" placeholder="全部状态" clearable style="width: 100px" @change="loadActiveFingerprints">
-                <el-option label="启用" :value="true" />
-                <el-option label="禁用" :value="false" />
+            <el-form-item :label="$t('fingerprint.status')">
+              <el-select v-model="activeFingerprintFilter.enabled" :placeholder="$t('fingerprint.allStatus')" clearable style="width: 100px" @change="loadActiveFingerprints">
+                <el-option :label="$t('fingerprint.enabled')" :value="true" />
+                <el-option :label="$t('common.disabled')" :value="false" />
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="loadActiveFingerprints">搜索</el-button>
-              <el-button @click="resetActiveFingerprintFilter">重置</el-button>
+              <el-button type="primary" @click="loadActiveFingerprints">{{ $t('fingerprint.search') }}</el-button>
+              <el-button @click="resetActiveFingerprintFilter">{{ $t('fingerprint.reset') }}</el-button>
             </el-form-item>
           </el-form>
           <!-- 统计信息 -->
           <div class="stats-bar">
-            <el-tag type="success" size="small">启用: {{ activeFingerprintStats.enabled || 0 }}</el-tag>
-            <el-tag size="small">总计: {{ activeFingerprintStats.total || 0 }}</el-tag>
+            <el-tag type="success" size="small">{{ $t('fingerprint.enabled') }}: {{ activeFingerprintStats.enabled || 0 }}</el-tag>
+            <el-tag size="small">{{ $t('fingerprint.total') }}: {{ activeFingerprintStats.total || 0 }}</el-tag>
           </div>
           <!-- 主动指纹列表 -->
           <el-table :data="activeFingerprints" stripe v-loading="activeFingerprintLoading" max-height="500">
-            <el-table-column prop="name" label="应用名称" width="200" />
-            <el-table-column label="探测路径" min-width="300">
+            <el-table-column prop="name" :label="$t('fingerprint.appName')" width="200" />
+            <el-table-column :label="$t('fingerprint.probePaths')" min-width="300">
               <template #default="{ row }">
                 <div class="paths-preview">
                   <el-tag v-for="(path, idx) in (row.paths || []).slice(0, 3)" :key="idx" size="small" style="margin-right: 5px; margin-bottom: 3px">
@@ -285,25 +285,25 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="关联被动指纹" width="150">
+            <el-table-column :label="$t('fingerprint.relatedPassive')" width="150">
               <template #default="{ row }">
                 <el-tag v-if="row.relatedCount > 0" type="success" size="small">
-                  {{ row.relatedCount }} 个关联
+                  {{ $t('fingerprint.relatedCount', { count: row.relatedCount }) }}
                 </el-tag>
-                <el-tag v-else type="info" size="small">无关联</el-tag>
+                <el-tag v-else type="info" size="small">{{ $t('fingerprint.noRelated') }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" :label="$t('fingerprint.status')" width="80">
               <template #default="{ row }">
                 <el-switch v-model="row.enabled" @change="handleToggleActiveFingerprintEnabled(row)" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200">
+            <el-table-column :label="$t('fingerprint.operation')" width="200">
               <template #default="{ row }">
-                <el-button type="success" link size="small" @click="showActiveValidateDialog(row)">验证</el-button>
-                <el-button type="info" link size="small" @click="showActiveFingerprintDetail(row)">详情</el-button>
-                <el-button type="primary" link size="small" @click="showActiveFingerprintForm(row)">编辑</el-button>
-                <el-button type="danger" link size="small" @click="handleDeleteActiveFingerprint(row)">删除</el-button>
+                <el-button type="success" link size="small" @click="showActiveValidateDialog(row)">{{ $t('fingerprint.validate') }}</el-button>
+                <el-button type="info" link size="small" @click="showActiveFingerprintDetail(row)">{{ $t('fingerprint.detail') }}</el-button>
+                <el-button type="primary" link size="small" @click="showActiveFingerprintForm(row)">{{ $t('fingerprint.edit') }}</el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteActiveFingerprint(row)">{{ $t('fingerprint.delete') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -321,65 +321,73 @@
       </el-tab-pane>
 
       <!-- HTTP映射 -->
-      <el-tab-pane label="HTTP映射" name="httpServiceMapping" >
+      <el-tab-pane :label="$t('fingerprint.httpMapping')" name="httpServiceMapping" >
         <el-tabs v-model="httpServiceSubTab" type="card" @tab-change="handleHttpServiceSubTabChange">
           <!-- 服务映射 -->
-          <el-tab-pane label="服务映射" name="serviceMapping">
+          <el-tab-pane :label="$t('fingerprint.serviceMapping')" name="serviceMapping">
             <el-card>
               <template #header>
                 <div class="card-header">
-                  <span>服务映射配置</span>
-                  <el-button type="primary" size="small" @click="showHttpServiceMappingForm()">
-                    <el-icon><Plus /></el-icon>新增映射
-                  </el-button>
+                  <span>{{ $t('fingerprint.serviceMappingConfig') }}</span>
+                  <div class="header-actions">
+                    <el-button size="small" @click="handleExportHttpService">
+                      <el-icon><Download /></el-icon>{{ $t('fingerprint.export') }}
+                    </el-button>
+                    <el-button size="small" @click="showHttpServiceImportDialog">
+                      <el-icon><Upload /></el-icon>{{ $t('fingerprint.import') }}
+                    </el-button>
+                    <el-button type="primary" size="small" @click="showHttpServiceMappingForm()">
+                      <el-icon><Plus /></el-icon>{{ $t('fingerprint.addMapping') }}
+                    </el-button>
+                  </div>
                 </div>
               </template>
               <p class="tip-text">
-                配置端口扫描识别的 Service 名称与 HTTP/非HTTP 服务的映射关系。指纹识别时会根据此配置判断是否对该端口进行 HTTP 探测。
+                {{ $t('fingerprint.serviceMappingTip') }}
                 <br/>
-                <span style="color: #e6a23c">注意：每次扫描前会实时从数据库获取最新配置，修改后立即生效。</span>
+                <span class="text-warning">{{ $t('fingerprint.serviceMappingNote') }}</span>
               </p>
               <!-- 筛选条件 -->
               <el-form :inline="true" class="filter-form">
-                <el-form-item label="类型">
-                  <el-select v-model="httpServiceFilter.isHttp" placeholder="全部类型" clearable style="width: 150px" @change="loadHttpServiceMappings">
-                    <el-option label="HTTP服务" :value="true" />
-                    <el-option label="非HTTP服务" :value="false" />
+                <el-form-item :label="$t('fingerprint.type')">
+                  <el-select v-model="httpServiceFilter.isHttp" :placeholder="$t('fingerprint.allTypes')" clearable style="width: 150px" @change="loadHttpServiceMappings">
+                    <el-option :label="$t('fingerprint.httpService')" :value="true" />
+                    <el-option :label="$t('fingerprint.nonHttpService')" :value="false" />
                   </el-select>
                 </el-form-item>
-                <el-form-item label="搜索">
-                  <el-input v-model="httpServiceFilter.keyword" placeholder="服务名称" clearable style="width: 180px" @keyup.enter="loadHttpServiceMappings" />
+                <el-form-item :label="$t('fingerprint.search')">
+                  <el-input v-model="httpServiceFilter.keyword" :placeholder="$t('fingerprint.serviceName')" clearable style="width: 180px" @keyup.enter="loadHttpServiceMappings" />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" @click="loadHttpServiceMappings">搜索</el-button>
+                  <el-button type="primary" @click="loadHttpServiceMappings">{{ $t('fingerprint.search') }}</el-button>
                 </el-form-item>
               </el-form>
               <!-- 统计信息 -->
               <div class="stats-bar">
-                <el-tag type="success" size="small">HTTP服务: {{ httpServiceStats.httpCount || 0 }}</el-tag>
-                <el-tag type="info" size="small">非HTTP服务: {{ httpServiceStats.nonHttpCount || 0 }}</el-tag>
-                <el-tag size="small">总计: {{ httpServiceStats.total || 0 }}</el-tag>
+                <el-tag type="success" size="small">{{ $t('fingerprint.httpService') }}: {{ httpServiceStats.httpCount || 0 }}</el-tag>
+                <el-tag type="info" size="small">{{ $t('fingerprint.nonHttpService') }}: {{ httpServiceStats.nonHttpCount || 0 }}</el-tag>
+                <el-tag size="small">{{ $t('fingerprint.total') }}: {{ httpServiceStats.total || 0 }}</el-tag>
               </div>
               <!-- 映射列表 -->
               <el-table :data="httpServiceMappings" stripe v-loading="httpServiceLoading" max-height="500">
-                <el-table-column prop="serviceName" label="服务名称" width="180" />
-                <el-table-column prop="isHttp" label="服务类型" width="120">
+                <el-table-column prop="serviceName" :label="$t('fingerprint.serviceName')" width="180" />
+                <el-table-column prop="isHttp" :label="$t('fingerprint.serviceType')" width="120">
                   <template #default="{ row }">
                     <el-tag :type="row.isHttp ? 'success' : 'info'" size="small">
-                      {{ row.isHttp ? 'HTTP服务' : '非HTTP服务' }}
+                      {{ row.isHttp ? $t('fingerprint.httpService') : $t('fingerprint.nonHttpService') }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="description" label="描述" min-width="200" />
-                <el-table-column prop="enabled" label="状态" width="80">
+                <el-table-column prop="description" :label="$t('fingerprint.description')" min-width="200" />
+                <el-table-column prop="enabled" :label="$t('fingerprint.status')" width="80">
                   <template #default="{ row }">
                     <el-switch v-model="row.enabled" @change="handleToggleHttpServiceEnabled(row)" size="small" />
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120">
+                <el-table-column :label="$t('fingerprint.operation')" width="120">
                   <template #default="{ row }">
-                    <el-button type="primary" link size="small" @click="showHttpServiceMappingForm(row)">编辑</el-button>
-                    <el-button type="danger" link size="small" @click="handleDeleteHttpServiceMapping(row)">删除</el-button>
+                    <el-button type="primary" link size="small" @click="showHttpServiceMappingForm(row)">{{ $t('fingerprint.edit') }}</el-button>
+                    <el-button type="danger" link size="small" @click="handleDeleteHttpServiceMapping(row)">{{ $t('fingerprint.delete') }}</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -397,86 +405,82 @@
           </el-tab-pane>
 
           <!-- Web端口设置 -->
-          <el-tab-pane label="端口映射" name="webPorts">
+          <el-tab-pane :label="$t('fingerprint.portMapping')" name="webPorts">
             <el-card>
               <template #header>
                 <div class="card-header">
-                  <span>端口配置</span>
-                  <el-button type="primary" size="small" @click="handleSaveWebPortsConfig" :loading="webPortsSaving">
-                    <el-icon><Check /></el-icon>保存配置
-                  </el-button>
+                  <span>{{ $t('fingerprint.portConfig') }}</span>
+                  <div class="header-actions">
+                    <el-button size="small" @click="handleExportHttpService">
+                      <el-icon><Download /></el-icon>{{ $t('fingerprint.export') }}
+                    </el-button>
+                    <el-button size="small" @click="showHttpServiceImportDialog">
+                      <el-icon><Upload /></el-icon>{{ $t('fingerprint.import') }}
+                    </el-button>
+                    <el-button type="primary" size="small" @click="handleSaveWebPortsConfig" :loading="webPortsSaving">
+                      <el-icon><Check /></el-icon>{{ $t('fingerprint.saveConfig') }}
+                    </el-button>
+                  </div>
                 </div>
               </template>
               <p class="tip-text">
-                配置 Web 端口和非 Web 端口列表。当端口扫描无法识别服务名称时，会根据端口号判断是否进行指纹扫描。
+                {{ $t('fingerprint.portConfigTip') }}
                 <br/>
-                <span style="color: #e6a23c">注意：每次扫描前会实时从数据库获取最新配置，修改后立即生效。</span>
+                <span class="text-warning">{{ $t('fingerprint.portConfigNote') }}</span>
               </p>
               
               <el-form :model="webPortsConfig" label-width="120px" v-loading="webPortsLoading" class="web-ports-form">
-                <el-divider content-position="left">Web 端口（会进行指纹扫描）</el-divider>
+                <el-divider content-position="left">{{ $t('fingerprint.webPorts') }}</el-divider>
                 
-                <el-form-item label="HTTP端口">
+                <el-form-item :label="$t('fingerprint.httpPorts')">
                   <div class="ports-input-wrapper">
                     <el-input
                       v-model="webPortsConfig.httpPortsText"
                       type="textarea"
                       :rows="4"
-                      placeholder="输入HTTP端口，多个端口用逗号、空格或换行分隔，如: 80, 8080, 8000"
+                      :placeholder="$t('fingerprint.httpPortsPlaceholder')"
                     />
                     <div class="ports-count">
-                      共 {{ parsePortsCount(webPortsConfig.httpPortsText) }} 个端口
+                      {{ $t('fingerprint.totalPorts', { count: parsePortsCount(webPortsConfig.httpPortsText) }) }}
                     </div>
                   </div>
-                  <div class="form-tip">常见HTTP端口：80, 8080, 8000, 8888, 3000, 5000, 9000 等</div>
+                  <div class="form-tip">{{ $t('fingerprint.commonHttpPorts') }}</div>
                 </el-form-item>
                 
-                <el-form-item label="HTTPS端口">
+                <el-form-item :label="$t('fingerprint.httpsPorts')">
                   <div class="ports-input-wrapper">
                     <el-input
                       v-model="webPortsConfig.httpsPortsText"
                       type="textarea"
                       :rows="3"
-                      placeholder="输入HTTPS端口，多个端口用逗号、空格或换行分隔，如: 443, 8443"
+                      :placeholder="$t('fingerprint.httpsPortsPlaceholder')"
                     />
                     <div class="ports-count">
-                      共 {{ parsePortsCount(webPortsConfig.httpsPortsText) }} 个端口
+                      {{ $t('fingerprint.totalPorts', { count: parsePortsCount(webPortsConfig.httpsPortsText) }) }}
                     </div>
                   </div>
-                  <div class="form-tip">常见HTTPS端口：443, 8443, 9443, 4443 等</div>
+                  <div class="form-tip">{{ $t('fingerprint.commonHttpsPorts') }}</div>
                 </el-form-item>
                 
-                <el-divider content-position="left">非 Web 端口（明确排除，不进行指纹扫描）</el-divider>
+                <el-divider content-position="left">{{ $t('fingerprint.nonWebPorts') }}</el-divider>
                 
-                <el-form-item label="非Web端口">
+                <el-form-item :label="$t('fingerprint.nonHttpPorts')">
                   <div class="ports-input-wrapper">
                     <el-input
                       v-model="webPortsConfig.nonHttpPortsText"
                       type="textarea"
                       :rows="5"
-                      placeholder="输入非Web端口，多个端口用逗号、空格或换行分隔，如: 22, 135, 445, 3306"
+                      :placeholder="$t('fingerprint.nonHttpPortsPlaceholder')"
                     />
                     <div class="ports-count">
-                      共 {{ parsePortsCount(webPortsConfig.nonHttpPortsText) }} 个端口
+                      {{ $t('fingerprint.totalPorts', { count: parsePortsCount(webPortsConfig.nonHttpPortsText) }) }}
                     </div>
                   </div>
                   <div class="form-tip">
-                    常见非Web端口：22(SSH), 23(Telnet), 25(SMTP), 110(POP3), 143(IMAP), 135/139/445(Windows), 3306(MySQL), 6379(Redis) 等
+                    {{ $t('fingerprint.commonNonHttpPorts') }}
                   </div>
                 </el-form-item>
-                
-                <el-form-item label="描述">
-                  <el-input v-model="webPortsConfig.description" placeholder="可选描述信息" />
-                </el-form-item>
               </el-form>
-              
-              <el-divider content-position="left">快捷操作</el-divider>
-              <div class="quick-actions">
-                <el-button size="small" @click="resetWebPortsToDefault">恢复默认配置</el-button>
-                <el-button size="small" @click="addCommonHttpPorts">添加常用HTTP端口</el-button>
-                <el-button size="small" @click="addCommonHttpsPorts">添加常用HTTPS端口</el-button>
-                <el-button size="small" @click="addCommonNonHttpPorts">添加常用非Web端口</el-button>
-              </div>
             </el-card>
           </el-tab-pane>
         </el-tabs>
@@ -484,131 +488,123 @@
     </el-tabs>
 
     <!-- 指纹详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" :title="currentFingerprint.name || '指纹详情'" width="900px" top="5vh">
+    <el-dialog v-model="detailDialogVisible" :title="currentFingerprint.name || $t('fingerprint.fingerprintDetail')" width="900px" top="5vh">
       <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
-        <el-descriptions-item label="应用名称">{{ currentFingerprint.name }}</el-descriptions-item>
-        <el-descriptions-item label="分类">{{ currentFingerprint.category }}</el-descriptions-item>
-        <el-descriptions-item label="官网" :span="2">
-          <a v-if="currentFingerprint.website" :href="currentFingerprint.website" target="_blank" style="color: #409eff">{{ currentFingerprint.website }}</a>
+        <el-descriptions-item :label="$t('fingerprint.appName')">{{ currentFingerprint.name }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.category')">{{ currentFingerprint.category }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.website')" :span="2">
+          <a v-if="currentFingerprint.website" :href="currentFingerprint.website" target="_blank" class="link-primary">{{ currentFingerprint.website }}</a>
           <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item label="描述" :span="2">{{ currentFingerprint.description || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="CPE" :span="2" v-if="currentFingerprint.cpe">{{ currentFingerprint.cpe }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.description')" :span="2">{{ currentFingerprint.description || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.cpe')" :span="2" v-if="currentFingerprint.cpe">{{ currentFingerprint.cpe }}</el-descriptions-item>
       </el-descriptions>
       
-      <el-divider content-position="left">匹配规则</el-divider>
+      <el-divider content-position="left">{{ $t('fingerprint.matchRules') }}</el-divider>
       
       <div class="match-logic-tip">
         <el-alert type="info" :closable="false" show-icon>
           <template #title>
-            <span>匹配逻辑：<strong>不同类型</strong>之间为 <el-tag size="small" type="success">AND</el-tag> 关系，<strong>同类型内多个规则</strong>为 <el-tag size="small" type="warning">OR</el-tag> 关系</span>
+            <span>{{ $t('fingerprint.matchLogic') }}：<strong>{{ $t('fingerprint.matchLogicTip') }}</strong></span>
           </template>
           <template #default>
-            <div style="font-size: 12px; color: #909399; margin-top: 5px">
-              例如：同时配置了 Headers 和 HTML 规则时，两者都需要匹配；但 HTML 内有多个正则时，只需匹配其中一个
+            <div class="hint-secondary" style="margin-top: 5px">
+              {{ $t('fingerprint.matchLogicExample') }}
             </div>
           </template>
         </el-alert>
       </div>
       
       <div v-if="!hasAnyRule(currentFingerprint)" class="no-rules">
-        <el-empty description="该指纹没有配置匹配规则" :image-size="60" />
+        <el-empty :description="$t('fingerprint.noRules')" :image-size="60" />
       </div>
       
       <div class="rules-container" v-else>
         <!-- ARL格式规则 -->
         <div class="rule-section" v-if="currentFingerprint.rule">
-          <div class="rule-title"><el-tag size="small" type="warning">自定义规则</el-tag> 简化规则语法</div>
+          <div class="rule-title"><el-tag size="small" type="warning">{{ $t('fingerprint.customRule') }}</el-tag> {{ $t('fingerprint.simplifiedSyntax') }}</div>
           <pre class="rule-content">{{ currentFingerprint.rule }}</pre>
           <div class="rule-help">
-            <p>语法说明：</p>
+            <p>{{ $t('fingerprint.syntaxHelp') }}：</p>
             <ul>
-              <li><code>body="xxx"</code> - 匹配响应体包含xxx</li>
-              <li><code>title="xxx"</code> - 匹配页面标题包含xxx</li>
-              <li><code>header="xxx"</code> - 匹配响应头包含xxx</li>
-              <li><code>server="xxx"</code> - 匹配Server头包含xxx</li>
-              <li><code>&&</code> - AND逻辑，所有条件都需满足</li>
-              <li><code>||</code> - OR逻辑，满足任一条件即可</li>
+              <li><code>body="xxx"</code> - {{ $t('fingerprint.bodyMatch') }}</li>
+              <li><code>title="xxx"</code> - {{ $t('fingerprint.titleMatch') }}</li>
+              <li><code>header="xxx"</code> - {{ $t('fingerprint.headerMatch') }}</li>
+              <li><code>server="xxx"</code> - {{ $t('fingerprint.serverMatch') }}</li>
+              <li><code>&&</code> - {{ $t('fingerprint.andLogic') }}</li>
+              <li><code>||</code> - {{ $t('fingerprint.orLogic') }}</li>
             </ul>
           </div>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.headers && Object.keys(currentFingerprint.headers).length">
-          <div class="rule-title"><el-tag size="small" type="primary">Headers</el-tag> HTTP响应头匹配</div>
+          <div class="rule-title"><el-tag size="small" type="primary">Headers</el-tag> {{ $t('fingerprint.httpHeaderMatch') }}</div>
           <pre class="rule-content">{{ JSON.stringify(currentFingerprint.headers, null, 2) }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.cookies && Object.keys(currentFingerprint.cookies).length">
-          <div class="rule-title"><el-tag size="small" type="primary">Cookies</el-tag> Cookie匹配</div>
+          <div class="rule-title"><el-tag size="small" type="primary">Cookies</el-tag> {{ $t('fingerprint.cookieMatch') }}</div>
           <pre class="rule-content">{{ JSON.stringify(currentFingerprint.cookies, null, 2) }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.html && currentFingerprint.html.length">
-          <div class="rule-title"><el-tag size="small" type="success">HTML</el-tag> HTML内容匹配（正则）</div>
+          <div class="rule-title"><el-tag size="small" type="success">HTML</el-tag> {{ $t('fingerprint.htmlMatch') }}</div>
           <pre class="rule-content">{{ currentFingerprint.html.join('\n') }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.scripts && currentFingerprint.scripts.length">
-          <div class="rule-title"><el-tag size="small" type="warning">Scripts</el-tag> Script标签匹配（正则）</div>
+          <div class="rule-title"><el-tag size="small" type="warning">Scripts</el-tag> {{ $t('fingerprint.scriptMatch') }}</div>
           <pre class="rule-content">{{ currentFingerprint.scripts.join('\n') }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.scriptSrc && currentFingerprint.scriptSrc.length">
-          <div class="rule-title"><el-tag size="small" type="warning">ScriptSrc</el-tag> Script src属性匹配</div>
+          <div class="rule-title"><el-tag size="small" type="warning">ScriptSrc</el-tag> {{ $t('fingerprint.scriptSrcMatch') }}</div>
           <pre class="rule-content">{{ currentFingerprint.scriptSrc.join('\n') }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.js && Object.keys(currentFingerprint.js).length">
-          <div class="rule-title"><el-tag size="small" type="danger">JS</el-tag> JavaScript变量匹配</div>
+          <div class="rule-title"><el-tag size="small" type="danger">JS</el-tag> {{ $t('fingerprint.jsVarMatch') }}</div>
           <pre class="rule-content">{{ JSON.stringify(currentFingerprint.js, null, 2) }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.meta && Object.keys(currentFingerprint.meta).length">
-          <div class="rule-title"><el-tag size="small" type="info">Meta</el-tag> Meta标签匹配</div>
+          <div class="rule-title"><el-tag size="small" type="info">Meta</el-tag> {{ $t('fingerprint.metaMatch') }}</div>
           <pre class="rule-content">{{ JSON.stringify(currentFingerprint.meta, null, 2) }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.css && currentFingerprint.css.length">
-          <div class="rule-title"><el-tag size="small">CSS</el-tag> CSS选择器匹配</div>
+          <div class="rule-title"><el-tag size="small">CSS</el-tag> {{ $t('fingerprint.cssMatch') }}</div>
           <pre class="rule-content">{{ currentFingerprint.css.join('\n') }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.url && currentFingerprint.url.length">
-          <div class="rule-title"><el-tag size="small">URL</el-tag> URL路径匹配</div>
+          <div class="rule-title"><el-tag size="small">URL</el-tag> {{ $t('fingerprint.urlMatch') }}</div>
           <pre class="rule-content">{{ currentFingerprint.url.join('\n') }}</pre>
         </div>
         
         <div class="rule-section" v-if="currentFingerprint.dom">
-          <div class="rule-title"><el-tag size="small" type="danger">DOM</el-tag> DOM选择器匹配</div>
+          <div class="rule-title"><el-tag size="small" type="danger">DOM</el-tag> {{ $t('fingerprint.domMatch') }}</div>
           <pre class="rule-content">{{ formatDom(currentFingerprint.dom) }}</pre>
         </div>
       </div>
       
-      <el-divider content-position="left" v-if="currentFingerprint.implies && currentFingerprint.implies.length">关联信息</el-divider>
-      <div class="rule-section" v-if="currentFingerprint.implies && currentFingerprint.implies.length">
-        <div class="rule-title">隐含技术（识别到此应用时自动关联）</div>
-        <div style="margin-top: 8px">
-          <el-tag v-for="imp in currentFingerprint.implies" :key="imp" size="small" style="margin-right: 5px; margin-bottom: 5px">{{ imp }}</el-tag>
-        </div>
-      </div>
-      
       <template #footer>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
+        <el-button @click="detailDialogVisible = false">{{ $t('common.close') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 自定义指纹编辑对话框 -->
-    <el-dialog v-model="formDialogVisible" :title="fingerprintForm.id ? '编辑指纹' : '新增指纹'" width="800px">
+    <el-dialog v-model="formDialogVisible" :title="fingerprintForm.id ? $t('fingerprint.editFingerprint') : $t('fingerprint.addFingerprintTitle')" width="800px">
       <el-form ref="fingerprintFormRef" :model="fingerprintForm" :rules="fingerprintRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="应用名称" prop="name">
-              <el-input v-model="fingerprintForm.name" placeholder="如: WordPress" />
+            <el-form-item :label="$t('fingerprint.appName')" prop="name">
+              <el-input v-model="fingerprintForm.name" placeholder="WordPress" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="分类" prop="category">
-              <el-select v-model="fingerprintForm.category" placeholder="选择分类" filterable allow-create style="width: 100%">
+            <el-form-item :label="$t('fingerprint.category')" prop="category">
+              <el-select v-model="fingerprintForm.category" :placeholder="$t('common.pleaseSelect')" filterable allow-create style="width: 100%">
                 <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
               </el-select>
             </el-form-item>
@@ -616,7 +612,7 @@
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="指纹类型">
+            <el-form-item :label="$t('fingerprint.fingerprintType')">
               <el-radio-group v-model="fingerprintForm.type">
                 <el-radio value="passive">被动指纹</el-radio>
                 <el-radio value="active">主动指纹</el-radio>
@@ -631,73 +627,73 @@
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="官网">
+            <el-form-item :label="$t('fingerprint.website')">
               <el-input v-model="fingerprintForm.website" placeholder="https://example.com" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="描述">
-          <el-input v-model="fingerprintForm.description" type="textarea" :rows="2" placeholder="指纹描述" />
+        <el-form-item :label="$t('fingerprint.description')">
+          <el-input v-model="fingerprintForm.description" type="textarea" :rows="2" :placeholder="$t('fingerprint.description')" />
         </el-form-item>
         
         <!-- 主动指纹路径配置 -->
-        <el-form-item v-if="fingerprintForm.type === 'active'" label="探测路径" prop="activePaths">
+        <el-form-item v-if="fingerprintForm.type === 'active'" :label="$t('fingerprint.activePaths')" prop="activePaths">
           <el-input
             v-model="fingerprintForm.activePathsText"
             type="textarea"
             :rows="3"
-            placeholder="每行一个路径，如：&#10;/admin/login.php&#10;/wp-admin/&#10;/manager/html"
+            :placeholder="$t('fingerprint.activePathsPlaceholder')"
             style="font-family: 'Consolas', 'Monaco', monospace"
           />
           <div class="form-tip">
-            主动指纹会访问这些路径来识别应用，每行一个路径。路径应以 / 开头。
+            {{ $t('fingerprint.activeTip') }}
           </div>
         </el-form-item>
         
-        <el-divider content-position="left">匹配规则</el-divider>
+        <el-divider content-position="left">{{ $t('fingerprint.matchRules') }}</el-divider>
         
         <!-- ARL简化规则 -->
-        <el-form-item label="自定义规则" prop="rule">
+        <el-form-item :label="$t('fingerprint.customRule')" prop="rule">
           <el-input
             v-model="fingerprintForm.rule"
             type="textarea"
             :rows="4"
-            placeholder='简化规则语法，如: body="xxx" && title="xxx" || header="xxx" || icon_hash="123456"'
+            :placeholder="$t('fingerprint.simplifiedRulePlaceholder')"
             style="font-family: 'Consolas', 'Monaco', monospace"
           />
           <div class="form-tip">
-            <p style="margin: 5px 0 3px 0; font-weight: bold;">支持的匹配类型：</p>
+            <p style="margin: 5px 0 3px 0; font-weight: bold;">{{ $t('fingerprint.syntaxHelp') }}：</p>
             <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-              <li><code>body="关键字"</code> - 匹配响应体内容</li>
-              <li><code>title="关键字"</code> - 匹配页面标题</li>
-              <li><code>header="关键字"</code> - 匹配响应头</li>
-              <li><code>server="关键字"</code> - 匹配Server头</li>
-              <li><code>cookie="关键字"</code> - 匹配Cookie（如 rememberMe 识别Shiro）</li>
-              <li><code>icon_hash="数字"</code> - 匹配favicon的MMH3哈希值</li>
+              <li><code>body="keyword"</code> - {{ $t('fingerprint.bodyMatch') }}</li>
+              <li><code>title="keyword"</code> - {{ $t('fingerprint.titleMatch') }}</li>
+              <li><code>header="keyword"</code> - {{ $t('fingerprint.headerMatch') }}</li>
+              <li><code>server="keyword"</code> - {{ $t('fingerprint.serverMatch') }}</li>
+              <li><code>cookie="keyword"</code> - {{ $t('fingerprint.cookieMatch') }}</li>
+              <li><code>icon_hash="number"</code> - Icon Hash</li>
             </ul>
-            <p style="margin: 8px 0 3px 0; font-weight: bold;">逻辑运算符：</p>
+            <p style="margin: 8px 0 3px 0; font-weight: bold;">{{ $t('fingerprint.matchLogic') }}：</p>
             <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-              <li><code>&&</code> - AND逻辑，所有条件都需满足</li>
-              <li><code>||</code> - OR逻辑，满足任一条件即可</li>
+              <li><code>&&</code> - {{ $t('fingerprint.andLogic') }}</li>
+              <li><code>||</code> - {{ $t('fingerprint.orLogic') }}</li>
             </ul>
           </div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="formDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveFingerprint">保存</el-button>
+        <el-button @click="formDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveFingerprint">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 导入指纹对话框（自定义指纹） -->
-    <el-dialog v-model="importDialogVisible" title="导入自定义指纹" width="700px">
+    <el-dialog v-model="importDialogVisible" :title="$t('fingerprint.importCustomFingerprint')" width="700px">
       <el-alert type="info" :closable="false" style="margin-bottom: 15px">
-        <template #title>支持多种指纹格式，可批量上传多个文件</template>
+        <template #title>{{ $t('fingerprint.supportMultiFormat') }}</template>
         <template #default>
           <div style="font-size: 12px">
-            <p style="margin: 5px 0;"><strong>格式1 - ARL finger.json：</strong><code>{"fingerprint": [{"cms": "xxx", "keyword": ["xxx"], "location": "body"}]}</code></p>
-            <p style="margin: 5px 0;"><strong>格式2 - ARL finger.yml：</strong><code>- name: Weblogic</code> / <code>rule: body="xxx" && title="xxx"</code></p>
-            <p style="margin: 5px 0;"><strong>格式3 - 简化YAML：</strong><code>AppName:</code> + <code>- 'body="xxx" || title="xxx"'</code></p>
+            <p style="margin: 5px 0;"><strong>Format 1 - ARL finger.json：</strong><code>{"fingerprint": [{"cms": "xxx", "keyword": ["xxx"], "location": "body"}]}</code></p>
+            <p style="margin: 5px 0;"><strong>Format 2 - ARL finger.yml：</strong><code>- name: Weblogic</code> / <code>rule: body="xxx" && title="xxx"</code></p>
+            <p style="margin: 5px 0;"><strong>Format 3 - Simplified YAML：</strong><code>AppName:</code> + <code>- 'body="xxx" || title="xxx"'</code></p>
           </div>
         </template>
       </el-alert>
@@ -713,46 +709,46 @@
         :show-file-list="false"
       >
         <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
+        <div class="el-upload__text">{{ $t('fingerprint.uploadHint') }}</div>
         <template #tip>
-          <div class="el-upload__tip">支持 .json / .yml / .yaml 格式文件，可批量选择多个文件</div>
+          <div class="el-upload__tip">{{ $t('fingerprint.uploadTip') }}</div>
         </template>
       </el-upload>
       
       <div v-if="importFiles.length > 0" class="file-preview">
         <div class="preview-header">
-          <span>已选择 {{ importFiles.length }} 个文件</span>
-          <el-button type="danger" link size="small" @click="clearImportFile">清除全部</el-button>
+          <span>{{ $t('fingerprint.selectedFile') }}: {{ importFiles.length }}</span>
+          <el-button type="danger" link size="small" @click="clearImportFile">{{ $t('common.delete') }}</el-button>
         </div>
         <el-table :data="importFiles" max-height="200" size="small">
-          <el-table-column prop="name" label="文件名" show-overflow-tooltip />
-          <el-table-column prop="size" label="大小" width="100">
+          <el-table-column prop="name" :label="$t('common.name')" show-overflow-tooltip />
+          <el-table-column prop="size" label="Size" width="100">
             <template #default="{ row }">{{ formatFileSize(row.size) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="80">
+          <el-table-column :label="$t('fingerprint.operation')" width="80">
             <template #default="{ $index }">
-              <el-button type="danger" link size="small" @click="removeImportFile($index)">移除</el-button>
+              <el-button type="danger" link size="small" @click="removeImportFile($index)">{{ $t('common.delete') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
       </div>
       
       <template #footer>
-        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button @click="importDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleImportFingerprints" :loading="importLoading" :disabled="importFiles.length === 0">
-          导入 ({{ importFiles.length }})
+          {{ $t('fingerprint.import') }} ({{ importFiles.length }})
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 导入内置指纹对话框（Wappalyzer格式） -->
-    <el-dialog v-model="builtinImportDialogVisible" title="导入内置指纹" width="600px">
+    <el-dialog v-model="builtinImportDialogVisible" :title="$t('fingerprint.importBuiltinFingerprint')" width="600px">
       <el-alert type="info" :closable="false" style="margin-bottom: 15px">
-        <template #title>支持 Wappalyzer fingerprints_data.json 格式</template>
+        <template #title>{{ $t('fingerprint.wappalyzerDataFormat') }}</template>
         <template #default>
           <div style="font-size: 12px">
-            从 <a href="https://github.com/projectdiscovery/wappalyzergo/blob/main/fingerprints_data.json" target="_blank" style="color: #409eff">wappalyzergo GitHub</a> 下载最新的 fingerprints_data.json 文件<br/>
-            格式：<code>{"apps": {"应用名": {"cats": [1], "headers": {...}, "html": [...]}}}</code>
+            {{ $t('fingerprint.wappalyzerDataTip') }}<br/>
+            <a href="https://github.com/projectdiscovery/wappalyzergo/blob/main/fingerprints_data.json" target="_blank" class="link-primary">wappalyzergo GitHub</a>
           </div>
         </template>
       </el-alert>
@@ -767,135 +763,132 @@
         :on-exceed="handleExceed"
       >
         <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
+        <div class="el-upload__text">{{ $t('fingerprint.uploadHint') }}</div>
         <template #tip>
-          <div class="el-upload__tip">支持 fingerprints_data.json 格式文件</div>
+          <div class="el-upload__tip">fingerprints_data.json</div>
         </template>
       </el-upload>
       
       <div v-if="builtinImportContent" class="file-preview">
         <div class="preview-header">
-          <span>文件预览 ({{ builtinImportFileName }})</span>
-          <el-button type="danger" link size="small" @click="clearBuiltinImportFile">清除</el-button>
+          <span>{{ $t('fingerprint.selectedFile') }} ({{ builtinImportFileName }})</span>
+          <el-button type="danger" link size="small" @click="clearBuiltinImportFile">{{ $t('fingerprint.clear') }}</el-button>
         </div>
-        <pre class="preview-content">{{ builtinImportContent.substring(0, 500) }}{{ builtinImportContent.length > 500 ? '\n...(已截断)' : '' }}</pre>
+        <pre class="preview-content">{{ builtinImportContent.substring(0, 500) }}{{ builtinImportContent.length > 500 ? '\n...' : '' }}</pre>
       </div>
       
       <template #footer>
-        <el-button @click="builtinImportDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleImportBuiltinFingerprints" :loading="builtinImportLoading" :disabled="!builtinImportContent">导入</el-button>
+        <el-button @click="builtinImportDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleImportBuiltinFingerprints" :loading="builtinImportLoading" :disabled="!builtinImportContent">{{ $t('fingerprint.import') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 指纹验证对话框 -->
-    <el-dialog v-model="validateDialogVisible" title="验证指纹" width="600px">
+    <el-dialog v-model="validateDialogVisible" :title="$t('fingerprint.validateFingerprint')" width="600px">
       <el-form label-width="80px">
-        <el-form-item label="指纹名称">
+        <el-form-item :label="$t('fingerprint.fingerprintName')">
           <el-input :value="validateFingerprint.name" disabled />
         </el-form-item>
-        <el-form-item label="目标URL">
-          <el-input v-model="validateUrl" placeholder="请输入目标URL，如 https://example.com" />
+        <el-form-item :label="$t('fingerprint.targetUrl')">
+          <el-input v-model="validateUrl" :placeholder="$t('fingerprint.targetUrlPlaceholder')" />
         </el-form-item>
       </el-form>
       <div v-if="validateResult" class="validate-result" :class="{ 'matched': validateResult.matched }">
         <div class="result-header">
           <el-tag :type="validateResult.matched ? 'success' : 'info'" size="large">
-            {{ validateResult.matched ? '✓ 匹配成功' : '✗ 未匹配' }}
+            {{ validateResult.matched ? '✓ ' + $t('fingerprint.matched') : '✗ ' + $t('fingerprint.notMatched') }}
           </el-tag>
         </div>
         <pre class="result-details" v-html="formatValidateDetails(validateResult.details)"></pre>
       </div>
       <template #footer>
-        <el-button @click="validateDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleValidateFingerprint" :loading="validateLoading" :disabled="!validateUrl">验证</el-button>
+        <el-button @click="validateDialogVisible = false">{{ $t('common.close') }}</el-button>
+        <el-button type="primary" @click="handleValidateFingerprint" :loading="validateLoading" :disabled="!validateUrl">{{ $t('fingerprint.validate') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 批量验证对话框 -->
-    <el-dialog v-model="batchValidateDialogVisible" title="批量验证指纹" width="800px">
+    <el-dialog v-model="batchValidateDialogVisible" :title="$t('fingerprint.batchValidateFingerprint')" width="800px">
       <el-form label-width="80px">
-        <el-form-item label="目标URL">
-          <el-input v-model="batchValidateUrl" placeholder="请输入目标URL，如 https://example.com" />
+        <el-form-item :label="$t('fingerprint.targetUrl')">
+          <el-input v-model="batchValidateUrl" :placeholder="$t('fingerprint.targetUrlPlaceholder')" />
         </el-form-item>
-        <el-form-item label="指纹范围">
+        <el-form-item :label="$t('fingerprint.selectFingerprints')">
           <el-radio-group v-model="batchValidateScope">
-            <el-radio value="all">全部指纹</el-radio>
-            <el-radio value="builtin">仅内置指纹</el-radio>
-            <el-radio value="custom">仅自定义指纹</el-radio>
+            <el-radio value="all">{{ $t('fingerprint.allFingerprints') }}</el-radio>
+            <el-radio value="builtin">{{ $t('fingerprint.builtinFingerprint') }}</el-radio>
+            <el-radio value="custom">{{ $t('fingerprint.customFingerprint') }}</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <div v-if="batchValidateResult" class="batch-validate-result">
         <div class="result-header">
           <el-tag type="success" size="large">
-            共匹配到 {{ batchValidateResult.matchedCount }} 个指纹
+            {{ $t('fingerprint.matchedAssets', { count: batchValidateResult.matchedCount }) }}
           </el-tag>
-          <span style="margin-left: 10px; color: #909399; font-size: 13px">
-            耗时: {{ batchValidateResult.duration }}
+          <span class="card-header-hint">
+            {{ batchValidateResult.duration }}
           </span>
         </div>
         <div v-if="batchValidateResult.matched && batchValidateResult.matched.length > 0" class="matched-list">
           <el-table :data="batchValidateResult.matched" stripe max-height="400">
-            <el-table-column prop="name" label="指纹名称" width="200" />
-            <el-table-column prop="category" label="分类" width="120" />
-            <el-table-column prop="source" label="来源" width="100">
+            <el-table-column prop="name" :label="$t('fingerprint.fingerprintName')" width="200" />
+            <el-table-column prop="category" :label="$t('fingerprint.category')" width="120" />
+            <el-table-column prop="source" :label="$t('fingerprint.type')" width="100">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.isBuiltin ? 'primary' : 'warning'">
-                  {{ row.isBuiltin ? '内置' : '自定义' }}
+                  {{ row.isBuiltin ? $t('fingerprint.builtinFingerprint') : $t('fingerprint.customFingerprint') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="matchedConditions" label="命中条件" min-width="300">
+            <el-table-column prop="matchedConditions" :label="$t('fingerprint.matchRules')" min-width="300">
               <template #default="{ row }">
-                <span style="color: #f56c6c; font-size: 12px">{{ row.matchedConditions || '-' }}</span>
+                <span class="text-danger hint-secondary">{{ row.matchedConditions || '-' }}</span>
               </template>
             </el-table-column>
           </el-table>
         </div>
         <div v-else class="no-match">
-          <el-empty description="未匹配到任何指纹" :image-size="60" />
+          <el-empty :description="$t('fingerprint.noMatchedAssets')" :image-size="60" />
         </div>
       </div>
       <template #footer>
-        <el-button @click="batchValidateDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleBatchValidate" :loading="batchValidateLoading" :disabled="!batchValidateUrl">开始验证</el-button>
+        <el-button @click="batchValidateDialogVisible = false">{{ $t('common.close') }}</el-button>
+        <el-button type="primary" @click="handleBatchValidate" :loading="batchValidateLoading" :disabled="!batchValidateUrl">{{ $t('fingerprint.startValidate') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- HTTP服务映射编辑对话框 -->
-    <el-dialog v-model="httpServiceMappingDialogVisible" :title="httpServiceMappingForm.id ? '编辑映射' : '新增映射'" width="500px">
+    <el-dialog v-model="httpServiceMappingDialogVisible" :title="httpServiceMappingForm.id ? $t('fingerprint.editMapping') : $t('fingerprint.addMappingTitle')" width="500px">
       <el-form ref="httpServiceMappingFormRef" :model="httpServiceMappingForm" :rules="httpServiceMappingRules" label-width="100px">
-        <el-form-item label="服务名称" prop="serviceName">
-          <el-input v-model="httpServiceMappingForm.serviceName" placeholder="端口扫描识别的服务名称，如: http, ssh, mysql" />
-          <div style="color: #909399; font-size: 12px; margin-top: 4px;">
-            服务名称应与 nmap/masscan 识别的 Service 字段一致（小写）
-          </div>
+        <el-form-item :label="$t('fingerprint.serviceName')" prop="serviceName">
+          <el-input v-model="httpServiceMappingForm.serviceName" :placeholder="$t('fingerprint.serviceNamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="服务类型" prop="isHttp">
+        <el-form-item :label="$t('fingerprint.serviceType')" prop="isHttp">
           <el-radio-group v-model="httpServiceMappingForm.isHttp">
-            <el-radio :value="true">HTTP服务（会进行HTTP指纹识别）</el-radio>
-            <el-radio :value="false">非HTTP服务（跳过HTTP探测）</el-radio>
+            <el-radio :value="true">{{ $t('fingerprint.httpService') }}</el-radio>
+            <el-radio :value="false">{{ $t('fingerprint.nonHttpService') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="httpServiceMappingForm.description" placeholder="可选描述" />
+        <el-form-item :label="$t('fingerprint.description')">
+          <el-input v-model="httpServiceMappingForm.description" :placeholder="$t('fingerprint.descriptionPlaceholder')" />
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('fingerprint.enabled')">
           <el-switch v-model="httpServiceMappingForm.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="httpServiceMappingDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveHttpServiceMapping">保存</el-button>
+        <el-button @click="httpServiceMappingDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveHttpServiceMapping">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 匹配现有资产对话框 -->
-    <el-dialog v-model="matchAssetsDialogVisible" title="匹配现有资产" width="900px">
+    <el-dialog v-model="matchAssetsDialogVisible" :title="$t('fingerprint.matchExistingAssets')" width="900px">
       <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
-        <el-descriptions-item label="指纹名称">{{ matchAssetsFingerprint.name }}</el-descriptions-item>
-        <el-descriptions-item label="匹配规则">
-          <el-tag v-if="matchAssetsFingerprint.rule" size="small" type="warning">自定义规则</el-tag>
+        <el-descriptions-item :label="$t('fingerprint.fingerprintName')">{{ matchAssetsFingerprint.name }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.matchRules')">
+          <el-tag v-if="matchAssetsFingerprint.rule" size="small" type="warning">{{ $t('fingerprint.customRule') }}</el-tag>
           <span v-else>-</span>
         </el-descriptions-item>
       </el-descriptions>
@@ -903,73 +896,67 @@
       <div v-if="!matchAssetsResult" class="match-assets-tip">
         <el-alert type="info" :closable="false" show-icon>
           <template #title>
-            点击"开始匹配"将使用该指纹规则扫描数据库中所有已存储HTTP响应数据的资产
+            {{ $t('fingerprint.matchExistingAssets') }}
           </template>
           <template #default>
-            <div style="font-size: 12px; color: #909399; margin-top: 5px">
+            <div class="hint-secondary" style="margin-top: 5px">
               匹配依据：资产的 Title、Header、Body、IconHash 等字段
             </div>
           </template>
         </el-alert>
         <div style="margin-top: 15px">
           <el-checkbox v-model="matchAssetsUpdateAsset">
-            匹配成功后自动更新资产的指纹信息
+            {{ $t('fingerprint.matchExistingAssets') }}
           </el-checkbox>
-          <div style="font-size: 12px; color: #909399; margin-top: 5px; margin-left: 24px">
-            勾选后，匹配到的资产将自动添加该指纹名称到其应用指纹列表中
-          </div>
         </div>
       </div>
       
       <div v-if="matchAssetsResult" class="match-assets-result">
         <div class="result-header">
           <el-tag type="success" size="large">
-            共匹配到 {{ matchAssetsResult.matchedCount }} 个资产
+            {{ $t('fingerprint.matchedAssets', { count: matchAssetsResult.matchedCount }) }}
           </el-tag>
-          <el-tag v-if="matchAssetsResult.updatedCount > 0" type="warning" size="large" style="margin-left: 10px">
-            已更新 {{ matchAssetsResult.updatedCount }} 个资产
-          </el-tag>
-          <span style="margin-left: 10px; color: #909399; font-size: 13px">
-            扫描 {{ matchAssetsResult.totalScanned }} 个资产，耗时: {{ matchAssetsResult.duration }}
+          <span class="card-header-hint">
+            {{ matchAssetsResult.duration }}
           </span>
         </div>
         <div v-if="matchAssetsResult.matchedList && matchAssetsResult.matchedList.length > 0" class="matched-list">
           <el-table :data="matchAssetsResult.matchedList" stripe max-height="400">
-            <el-table-column prop="authority" label="资产地址" min-width="250" show-overflow-tooltip />
-            <el-table-column prop="host" label="主机" width="150" />
-            <el-table-column prop="port" label="端口" width="80" />
-            <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-            <el-table-column prop="service" label="服务" width="100" />
+            <el-table-column prop="authority" :label="$t('fingerprint.assetAddress')" min-width="250" show-overflow-tooltip />
+            <el-table-column prop="host" label="Host" width="150" />
+            <el-table-column prop="port" label="Port" width="80" />
+            <el-table-column prop="title" label="Title" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="service" label="Service" width="100" />
           </el-table>
         </div>
         <div v-else class="no-match">
-          <el-empty description="未匹配到任何资产" :image-size="60" />
+          <el-empty :description="$t('fingerprint.noMatchedAssets')" :image-size="60" />
         </div>
       </div>
       
       <template #footer>
-        <el-button @click="matchAssetsDialogVisible = false">关闭</el-button>
+        <el-button @click="matchAssetsDialogVisible = false">{{ $t('common.close') }}</el-button>
         <el-button type="primary" @click="handleMatchAssets" :loading="matchAssetsLoading">
-          {{ matchAssetsResult ? '重新匹配' : '开始匹配' }}
+          {{ $t('fingerprint.startValidate') }}
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 主动指纹详情对话框 -->
-    <el-dialog v-model="activeFingerprintDetailDialogVisible" :title="currentActiveFingerprint.name || '主动指纹详情'" width="800px">
+    <el-dialog v-model="activeFingerprintDetailDialogVisible" :title="currentActiveFingerprint.name || $t('fingerprint.activeFingerprintDetail')" width="800px">
       <el-descriptions :column="2" border size="small" style="margin-bottom: 15px">
-        <el-descriptions-item label="应用名称">{{ currentActiveFingerprint.name }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
+        <el-descriptions-item :label="$t('fingerprint.appName')">{{ currentActiveFingerprint.name }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.status')">
           <el-tag :type="currentActiveFingerprint.enabled ? 'success' : 'info'" size="small">
-            {{ currentActiveFingerprint.enabled ? '启用' : '禁用' }}
+            {{ currentActiveFingerprint.enabled ? $t('fingerprint.enabled') : $t('common.disabled') }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="描述" :span="2">{{ currentActiveFingerprint.description || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ currentActiveFingerprint.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="更新时间">{{ currentActiveFingerprint.updateTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('fingerprint.description')" :span="2">{{ currentActiveFingerprint.description || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('common.createTime')">{{ currentActiveFingerprint.createTime }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('common.updateTime')">{{ currentActiveFingerprint.updateTime }}</el-descriptions-item>
       </el-descriptions>
       
-      <el-divider content-position="left">探测路径 ({{ (currentActiveFingerprint.paths || []).length }})</el-divider>
+      <el-divider content-position="left">{{ $t('fingerprint.probePaths') }} ({{ (currentActiveFingerprint.paths || []).length }})</el-divider>
       <div class="paths-list">
         <el-tag v-for="(path, idx) in (currentActiveFingerprint.paths || [])" :key="idx" size="small" style="margin-right: 8px; margin-bottom: 8px">
           {{ path }}
@@ -977,87 +964,84 @@
       </div>
       
       <el-divider content-position="left" v-if="currentActiveFingerprint.relatedFingerprints && currentActiveFingerprint.relatedFingerprints.length">
-        关联被动指纹 ({{ currentActiveFingerprint.relatedCount }})
+        {{ $t('fingerprint.relatedPassiveFingerprints') }} ({{ currentActiveFingerprint.relatedCount }})
       </el-divider>
       <el-table v-if="currentActiveFingerprint.relatedFingerprints && currentActiveFingerprint.relatedFingerprints.length" 
                 :data="currentActiveFingerprint.relatedFingerprints" stripe max-height="300" size="small">
-        <el-table-column prop="name" label="名称" width="150" />
-        <el-table-column prop="rule" label="匹配规则" min-width="300" show-overflow-tooltip />
-        <el-table-column prop="source" label="来源" width="100">
+        <el-table-column prop="name" :label="$t('common.name')" width="150" />
+        <el-table-column prop="rule" :label="$t('fingerprint.matchRules')" min-width="300" show-overflow-tooltip />
+        <el-table-column prop="source" :label="$t('fingerprint.type')" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="row.isBuiltin ? 'primary' : 'warning'">
-              {{ row.isBuiltin ? '内置' : '自定义' }}
+              {{ row.isBuiltin ? $t('fingerprint.builtinFingerprint') : $t('fingerprint.customFingerprint') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="enabled" label="状态" width="80">
+        <el-table-column prop="enabled" :label="$t('fingerprint.status')" width="80">
           <template #default="{ row }">
             <el-tag size="small" :type="row.enabled ? 'success' : 'info'">
-              {{ row.enabled ? '启用' : '禁用' }}
+              {{ row.enabled ? $t('fingerprint.enabled') : $t('common.disabled') }}
             </el-tag>
           </template>
         </el-table-column>
       </el-table>
       <div v-else-if="!currentActiveFingerprint.relatedFingerprints || currentActiveFingerprint.relatedFingerprints.length === 0" class="no-related">
-        <el-empty description="暂无关联的被动指纹" :image-size="60">
-          <template #description>
-            <span style="color: #909399">创建同名的被动指纹后将自动关联</span>
-          </template>
+        <el-empty :description="$t('fingerprint.noRelatedPassive')" :image-size="60">
         </el-empty>
       </div>
       
       <template #footer>
-        <el-button @click="activeFingerprintDetailDialogVisible = false">关闭</el-button>
+        <el-button @click="activeFingerprintDetailDialogVisible = false">{{ $t('common.close') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 主动指纹编辑对话框 -->
-    <el-dialog v-model="activeFingerprintFormDialogVisible" :title="activeFingerprintForm.id ? '编辑主动指纹' : '新增主动指纹'" width="800px">
+    <el-dialog v-model="activeFingerprintFormDialogVisible" :title="activeFingerprintForm.id ? $t('fingerprint.editActiveFingerprint') : $t('fingerprint.addActiveFingerprint')" width="800px">
       <el-form ref="activeFingerprintFormRef" :model="activeFingerprintForm" :rules="activeFingerprintRules" label-width="100px">
-        <el-form-item label="应用名称" prop="name">
+        <el-form-item :label="$t('fingerprint.appName')" prop="name">
           <div style="display: flex; gap: 10px; width: 100%;">
-            <el-input v-model="activeFingerprintForm.name" placeholder="如: WordPress、Nacos（与被动指纹同名可自动关联）" style="flex: 1;" />
+            <el-input v-model="activeFingerprintForm.name" placeholder="WordPress, Nacos" style="flex: 1;" />
             <el-button type="primary" @click="handleSearchRelatedPassiveFingerprint" :loading="searchPassiveLoading">
-              确认
+              {{ $t('common.confirm') }}
             </el-button>
           </div>
         </el-form-item>
-        <el-form-item label="探测路径" prop="pathsText">
+        <el-form-item :label="$t('fingerprint.probePaths')" prop="pathsText">
           <el-input
             v-model="activeFingerprintForm.pathsText"
             type="textarea"
             :rows="6"
-            placeholder="每行一个路径，如：&#10;/admin/login.php&#10;/wp-admin/&#10;/manager/html"
+            :placeholder="$t('fingerprint.pathsPlaceholder')"
             style="font-family: 'Consolas', 'Monaco', monospace"
           />
           <div class="form-tip">
-            主动扫描时会访问这些路径来识别应用，每行一个路径。路径应以 / 开头。
+            {{ $t('fingerprint.activeTip') }}
           </div>
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="activeFingerprintForm.description" type="textarea" :rows="2" placeholder="可选描述" />
+        <el-form-item :label="$t('fingerprint.description')">
+          <el-input v-model="activeFingerprintForm.description" type="textarea" :rows="2" :placeholder="$t('fingerprint.descriptionPlaceholder')" />
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('fingerprint.enabled')">
           <el-switch v-model="activeFingerprintForm.enabled" />
         </el-form-item>
         
         <!-- 关联被动指纹区域 -->
-        <el-divider content-position="left">关联被动指纹</el-divider>
+        <el-divider content-position="left">{{ $t('fingerprint.relatedPassiveFingerprints') }}</el-divider>
         <div v-if="!activeFingerprintForm.name" class="passive-tip">
           <el-alert type="info" :closable="false" show-icon>
-            请先输入应用名称并点击"确认"按钮搜索关联的被动指纹
+            {{ $t('fingerprint.appName') }}
           </el-alert>
         </div>
         <div v-else-if="searchPassiveLoading" style="text-align: center; padding: 20px;">
           <el-icon class="is-loading"><Loading /></el-icon>
-          <span style="margin-left: 8px;">搜索中...</span>
+          <span style="margin-left: 8px;">{{ $t('common.loading') }}</span>
         </div>
         <div v-else>
           <div v-if="relatedPassiveFingerprints.length > 0" class="related-passive-list">
             <el-table :data="relatedPassiveFingerprints" stripe max-height="200" size="small">
-              <el-table-column prop="name" label="名称" width="150" />
-              <el-table-column prop="rule" label="匹配规则" min-width="250" show-overflow-tooltip />
-              <el-table-column prop="source" label="来源" width="80">
+              <el-table-column prop="name" :label="$t('common.name')" width="150" />
+              <el-table-column prop="rule" :label="$t('fingerprint.matchRules')" min-width="250" show-overflow-tooltip />
+              <el-table-column prop="source" :label="$t('fingerprint.type')" width="80">
                 <template #default="{ row }">
                   <el-tag size="small" :type="row.isBuiltin ? 'primary' : 'warning'">
                     {{ row.isBuiltin ? '内置' : '自定义' }}
@@ -1072,56 +1056,55 @@
             </el-table>
           </div>
           <div v-else-if="passiveSearched" class="no-passive">
-            <el-empty description="未找到同名被动指纹" :image-size="40" />
+            <el-empty :description="$t('fingerprint.noRelatedPassive')" :image-size="40" />
           </div>
           <div style="margin-top: 10px;">
             <el-button type="success" size="small" @click="handleAddRelatedPassive">
-              <el-icon><Plus /></el-icon>新增被动指纹
+              <el-icon><Plus /></el-icon>{{ $t('fingerprint.addPassiveFingerprint') }}
             </el-button>
           </div>
         </div>
       </el-form>
       <template #footer>
-        <el-button @click="activeFingerprintFormDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveActiveFingerprint">保存</el-button>
+        <el-button @click="activeFingerprintFormDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveActiveFingerprint">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 关联被动指纹编辑对话框 -->
-    <el-dialog v-model="relatedPassiveDialogVisible" :title="relatedPassiveForm.id ? '编辑被动指纹' : '新增被动指纹'" width="600px" append-to-body>
+    <el-dialog v-model="relatedPassiveDialogVisible" :title="relatedPassiveForm.id ? $t('fingerprint.editPassiveFingerprint') : $t('fingerprint.addPassiveFingerprintTitle')" width="600px" append-to-body>
       <el-form ref="relatedPassiveFormRef" :model="relatedPassiveForm" :rules="relatedPassiveRules" label-width="100px">
-        <el-form-item label="应用名称">
+        <el-form-item :label="$t('fingerprint.appName')">
           <el-input :value="relatedPassiveForm.name" disabled />
-          <div class="form-tip">应用名称与主动指纹保持一致</div>
         </el-form-item>
-        <el-form-item label="匹配规则" prop="rule">
+        <el-form-item :label="$t('fingerprint.matchRules')" prop="rule">
           <el-input
             v-model="relatedPassiveForm.rule"
             type="textarea"
             :rows="4"
-            placeholder="如: body=&quot;Nacos&quot; || title=&quot;Nacos&quot;"
+            :placeholder="$t('fingerprint.simplifiedRulePlaceholder')"
             style="font-family: 'Consolas', 'Monaco', monospace"
           />
           <div class="form-tip">
-            语法：body="xxx" 匹配响应体，title="xxx" 匹配标题，header="xxx" 匹配响应头，&& 表示AND，|| 表示OR
+            {{ $t('fingerprint.syntaxHelp') }}
           </div>
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('fingerprint.enabled')">
           <el-switch v-model="relatedPassiveForm.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="relatedPassiveDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveRelatedPassive">保存</el-button>
+        <el-button @click="relatedPassiveDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSaveRelatedPassive">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 主动指纹导入对话框 -->
-    <el-dialog v-model="activeImportDialogVisible" title="导入主动扫描指纹" width="700px">
+    <el-dialog v-model="activeImportDialogVisible" :title="$t('fingerprint.importActiveFingerprint')" width="700px">
       <el-alert type="info" :closable="false" style="margin-bottom: 15px">
         <template #default>
           <div style="font-size: 12px">
-            <p style="margin: 5px 0;"><strong>格式示例：</strong></p>
+            <p style="margin: 5px 0;"><strong>{{ $t('fingerprint.activeYamlExample') }}：</strong></p>
             <pre style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin: 5px 0;">Alibaba-Nacos:
   - "/nacos/"
 SpringBoot-Actuator:
@@ -1141,33 +1124,68 @@ SpringBoot-Actuator:
         :show-file-list="false"
       >
         <el-icon class="el-icon--upload"><Upload /></el-icon>
-        <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
+        <div class="el-upload__text">{{ $t('fingerprint.uploadHint') }}</div>
         <template #tip>
-          <div class="el-upload__tip">支持 .yaml / .yml 格式文件</div>
+          <div class="el-upload__tip">.yaml / .yml</div>
         </template>
       </el-upload>
       
       <div v-if="activeImportContent" class="file-preview">
         <div class="preview-header">
-          <span>文件预览 ({{ activeImportFileName }})</span>
-          <el-button type="danger" link size="small" @click="clearActiveImportFile">清除</el-button>
+          <span>{{ $t('fingerprint.selectedFile') }} ({{ activeImportFileName }})</span>
+          <el-button type="danger" link size="small" @click="clearActiveImportFile">{{ $t('fingerprint.clear') }}</el-button>
         </div>
-        <pre class="preview-content">{{ activeImportContent.substring(0, 800) }}{{ activeImportContent.length > 800 ? '\n...(已截断)' : '' }}</pre>
+        <pre class="preview-content">{{ activeImportContent.substring(0, 800) }}{{ activeImportContent.length > 800 ? '\n...' : '' }}</pre>
       </div>
       
       <template #footer>
-        <el-button @click="activeImportDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleImportActiveFingerprints" :loading="activeImportLoading" :disabled="!activeImportContent">导入</el-button>
+        <el-button @click="activeImportDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleImportActiveFingerprints" :loading="activeImportLoading" :disabled="!activeImportContent">{{ $t('fingerprint.import') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- HTTP服务映射导入对话框 -->
+    <el-dialog v-model="httpServiceImportDialogVisible" :title="$t('fingerprint.importHttpServiceConfig')" width="700px">
+      <el-alert type="info" :closable="false" style="margin-bottom: 15px">
+        <template #default>
+          <div>{{ $t('fingerprint.httpServiceImportTip') }}</div>
+        </template>
+      </el-alert>
+      
+      <el-upload
+        ref="httpServiceUploadRef"
+        :auto-upload="false"
+        :show-file-list="false"
+        accept=".txt"
+        :on-change="handleHttpServiceFileChange"
+      >
+        <template #trigger>
+          <el-button type="primary">{{ $t('fingerprint.selectFile') }}</el-button>
+        </template>
+        <span style="margin-left: 10px; color: #909399">{{ httpServiceImportFileName || $t('fingerprint.noFileSelected') }}</span>
+      </el-upload>
+      
+      <el-input
+        v-model="httpServiceImportContent"
+        type="textarea"
+        :rows="15"
+        :placeholder="$t('fingerprint.httpServiceImportPlaceholder')"
+        style="margin-top: 15px"
+      />
+      
+      <template #footer>
+        <el-button @click="httpServiceImportDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleImportHttpService" :loading="httpServiceImportLoading" :disabled="!httpServiceImportContent">{{ $t('fingerprint.import') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 主动指纹验证对话框 -->
-    <el-dialog v-model="activeValidateDialogVisible" title="验证主动指纹" width="800px">
+    <el-dialog v-model="activeValidateDialogVisible" :title="$t('fingerprint.validateActiveFingerprint')" width="800px">
       <el-form label-width="100px">
-        <el-form-item label="指纹名称">
+        <el-form-item :label="$t('fingerprint.fingerprintName')">
           <el-input :value="activeValidateFingerprint.name" disabled />
         </el-form-item>
-        <el-form-item label="探测路径">
+        <el-form-item :label="$t('fingerprint.probePaths')">
           <div class="paths-preview">
             <el-tag v-for="(path, idx) in (activeValidateFingerprint.paths || []).slice(0, 5)" :key="idx" size="small" style="margin-right: 5px; margin-bottom: 3px">
               {{ path }}
@@ -1177,47 +1195,44 @@ SpringBoot-Actuator:
             </el-tag>
           </div>
         </el-form-item>
-        <el-form-item label="目标URL">
-          <el-input v-model="activeValidateUrl" placeholder="请输入目标基础URL，如 https://example.com（不含路径）" />
-          <div style="color: #909399; font-size: 12px; margin-top: 4px;">
-            验证时会自动拼接探测路径进行访问，并使用关联的被动指纹规则进行匹配
-          </div>
+        <el-form-item :label="$t('fingerprint.targetUrl')">
+          <el-input v-model="activeValidateUrl" :placeholder="$t('fingerprint.targetUrlPlaceholder')" />
         </el-form-item>
       </el-form>
       <div v-if="activeValidateResult" class="validate-result" :class="{ 'matched': activeValidateResult.matched }">
         <div class="result-header">
           <el-tag :type="activeValidateResult.matched ? 'success' : 'info'" size="large">
-            {{ activeValidateResult.matched ? '✓ 匹配成功' : '✗ 未匹配' }}
+            {{ activeValidateResult.matched ? '✓ ' + $t('fingerprint.matched') : '✗ ' + $t('fingerprint.notMatched') }}
           </el-tag>
         </div>
         <el-table :data="activeValidateResult.results" stripe max-height="350" size="small" style="margin-top: 15px">
-          <el-table-column prop="path" label="探测路径" width="200" />
-          <el-table-column prop="statusCode" label="状态码" width="80">
+          <el-table-column prop="path" :label="$t('fingerprint.probePaths')" width="200" />
+          <el-table-column prop="statusCode" label="Status" width="80">
             <template #default="{ row }">
               <el-tag v-if="row.statusCode" :type="row.statusCode >= 200 && row.statusCode < 400 ? 'success' : 'warning'" size="small">
                 {{ row.statusCode }}
               </el-tag>
-              <span v-else style="color: #909399">-</span>
+              <span v-else class="text-secondary">-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="matched" label="匹配" width="80">
+          <el-table-column prop="matched" :label="$t('fingerprint.matched')" width="80">
             <template #default="{ row }">
               <el-tag :type="row.matched ? 'success' : 'info'" size="small">
-                {{ row.matched ? '是' : '否' }}
+                {{ row.matched ? $t('common.yes') : $t('common.no') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="matchedDetails" label="匹配详情" min-width="300">
+          <el-table-column prop="matchedDetails" :label="$t('fingerprint.detail')" min-width="300">
             <template #default="{ row }">
-              <span v-if="row.matched" style="color: #67c23a; font-size: 12px">{{ row.matchedDetails }}</span>
-              <span v-else style="color: #909399; font-size: 12px">{{ row.matchedDetails }}</span>
+              <span v-if="row.matched" class="text-success hint-secondary">{{ row.matchedDetails }}</span>
+              <span v-else class="hint-secondary">{{ row.matchedDetails }}</span>
             </template>
           </el-table-column>
         </el-table>
       </div>
       <template #footer>
-        <el-button @click="activeValidateDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleActiveValidateFingerprint" :loading="activeValidateLoading" :disabled="!activeValidateUrl">验证</el-button>
+        <el-button @click="activeValidateDialogVisible = false">{{ $t('common.close') }}</el-button>
+        <el-button type="primary" @click="handleActiveValidateFingerprint" :loading="activeValidateLoading" :disabled="!activeValidateUrl">{{ $t('fingerprint.validate') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -1228,9 +1243,11 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, ArrowDown, Delete, Upload, Search, Download, Operation, Loading, Check } from '@element-plus/icons-vue'
-import { getFingerprintList, saveFingerprint, deleteFingerprint, getFingerprintCategories, syncFingerprints, updateFingerprintEnabled, batchUpdateFingerprintEnabled, importFingerprints, clearCustomFingerprints, validateFingerprint as validateFingerprintApi, batchValidateFingerprints, matchFingerprintAssets, getHttpServiceMappingList, saveHttpServiceMapping, deleteHttpServiceMapping, getHttpServiceConfig, saveHttpServiceConfig, getActiveFingerprintList, saveActiveFingerprint, deleteActiveFingerprint, importActiveFingerprints, exportActiveFingerprints, clearActiveFingerprints, validateActiveFingerprint } from '@/api/fingerprint'
+import { useI18n } from 'vue-i18n'
+import { getFingerprintList, saveFingerprint, deleteFingerprint, getFingerprintCategories, syncFingerprints, updateFingerprintEnabled, batchUpdateFingerprintEnabled, importFingerprints, clearCustomFingerprints, validateFingerprint as validateFingerprintApi, batchValidateFingerprints, matchFingerprintAssets, getHttpServiceMappingList, saveHttpServiceMapping, deleteHttpServiceMapping, getHttpServiceConfig, saveHttpServiceConfig, exportHttpServiceConfig, importHttpServiceConfig, getActiveFingerprintList, saveActiveFingerprint, deleteActiveFingerprint, importActiveFingerprints, exportActiveFingerprints, clearActiveFingerprints, validateActiveFingerprint } from '@/api/fingerprint'
 import { saveAs } from 'file-saver'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -1391,6 +1408,13 @@ const webPortsConfig = reactive({
   nonHttpPortsText: '',
   description: ''
 })
+
+// HTTP服务映射导入导出
+const httpServiceImportDialogVisible = ref(false)
+const httpServiceImportContent = ref('')
+const httpServiceImportFileName = ref('')
+const httpServiceImportLoading = ref(false)
+const httpServiceUploadRef = ref()
 
 // 默认端口配置
 const defaultHttpPorts = [80, 8080, 8000, 8888, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8090, 9000, 9001, 9080, 3000, 3001, 5000, 5001, 8008, 8009, 8181, 8200, 8300, 8400, 8500, 8600, 8800, 8880, 8983, 9090, 9091, 9200, 9300, 10000]
@@ -1603,7 +1627,7 @@ async function handleBatchEnabledCommand(command) {
       ElMessage.error(res.msg)
     }
   } catch (err) {
-    ElMessage.error('操作失败: ' + (err.message || '未知错误'))
+    ElMessage.error(t('common.operationFailed') + ': ' + (err.message || t('common.error')))
   } finally {
     batchEnabledLoading.value = false
   }
@@ -1677,7 +1701,7 @@ function formatFileSize(bytes) {
 // 导入指纹（批量）
 async function handleImportFingerprints() {
   if (importFiles.value.length === 0) {
-    ElMessage.warning('请先选择文件')
+    ElMessage.warning(t('fingerprint.selectFile'))
     return
   }
   
@@ -1732,7 +1756,7 @@ async function handleImportFingerprints() {
     loadCategories()
   } catch (err) {
     console.error('Import error:', err)
-    ElMessage.error('导入请求失败: ' + (err.message || '未知错误'))
+    ElMessage.error(t('fingerprint.importFailed') + ': ' + (err.message || t('common.error')))
   } finally {
     importLoading.value = false
   }
@@ -1763,7 +1787,7 @@ function handleBuiltinFileChange(file) {
     builtinImportFileName.value = file.name
   }
   reader.onerror = () => {
-    ElMessage.error('文件读取失败')
+    ElMessage.error(t('common.operationFailed'))
   }
   reader.readAsText(file.raw, 'UTF-8')
 }
@@ -1780,7 +1804,7 @@ function clearBuiltinImportFile() {
 // 导入内置指纹（Wappalyzer格式）
 async function handleImportBuiltinFingerprints() {
   if (!builtinImportContent.value.trim()) {
-    ElMessage.warning('请先选择文件')
+    ElMessage.warning(t('fingerprint.selectFile'))
     return
   }
   
@@ -1816,7 +1840,7 @@ async function handleImportBuiltinFingerprints() {
       })
     }
   } catch (err) {
-    ElMessage.error('导入请求失败: ' + (err.message || '未知错误'))
+    ElMessage.error(t('fingerprint.importFailed') + ': ' + (err.message || t('common.error')))
   } finally {
     builtinImportLoading.value = false
   }
@@ -1917,7 +1941,7 @@ async function handleSaveFingerprint() {
   }
   const res = await saveFingerprint(fingerprintForm)
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('fingerprint.saveSuccess'))
     formDialogVisible.value = false
     loadCustomFingerprints()
   } else {
@@ -1929,7 +1953,7 @@ async function handleDeleteFingerprint(row) {
   await ElMessageBox.confirm('确定删除该指纹吗？', '提示', { type: 'warning' })
   const res = await deleteFingerprint({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('fingerprint.deleteSuccess'))
     loadCustomFingerprints()
   }
 }
@@ -1964,7 +1988,7 @@ async function handleClearCustomFingerprints() {
 // 导出自定义指纹（导出为单个yml文件）
 async function handleExportFingerprints() {
   if (customFingerprints.value.length === 0 && customPagination.total === 0) {
-    ElMessage.warning('没有可导出的指纹')
+    ElMessage.warning(t('fingerprint.noDataToExport'))
     return
   }
 
@@ -1991,7 +2015,7 @@ async function handleExportFingerprints() {
     }
 
     if (allFingerprints.length === 0) {
-      ElMessage.warning('没有可导出的指纹')
+      ElMessage.warning(t('fingerprint.noDataToExport'))
       return
     }
 
@@ -2010,7 +2034,7 @@ async function handleExportFingerprints() {
     ElMessage.success(`成功导出 ${allFingerprints.length} 个指纹`)
   } catch (e) {
     console.error('Export error:', e)
-    ElMessage.error('导出失败')
+    ElMessage.error(t('fingerprint.exportFailed'))
   } finally {
     exportLoading.value = false
   }
@@ -2271,7 +2295,7 @@ async function handleSaveHttpServiceMapping() {
   await httpServiceMappingFormRef.value.validate()
   const res = await saveHttpServiceMapping(httpServiceMappingForm)
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('fingerprint.saveSuccess'))
     httpServiceMappingDialogVisible.value = false
     loadHttpServiceMappings()
   } else {
@@ -2303,7 +2327,7 @@ async function handleDeleteHttpServiceMapping(row) {
   await ElMessageBox.confirm('确定删除该映射吗？', '提示', { type: 'warning' })
   const res = await deleteHttpServiceMapping({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('fingerprint.deleteSuccess'))
     loadHttpServiceMappings()
   } else {
     ElMessage.error(res.msg || '删除失败')
@@ -2376,7 +2400,7 @@ async function handleSaveWebPortsConfig() {
       description: webPortsConfig.description
     })
     if (res.code === 0) {
-      ElMessage.success('保存成功')
+      ElMessage.success(t('fingerprint.saveSuccess'))
       // 更新显示的文本（格式化后的）
       webPortsConfig.httpPortsText = httpPorts.join(', ')
       webPortsConfig.httpsPortsText = httpsPorts.join(', ')
@@ -2423,6 +2447,75 @@ function addCommonNonHttpPorts() {
   const newPorts = [...new Set([...currentPorts, ...commonPorts])].sort((a, b) => a - b)
   webPortsConfig.nonHttpPortsText = newPorts.join(', ')
   ElMessage.info('已添加常用非Web端口，请点击保存生效')
+}
+
+// ==================== HTTP服务映射导入导出 ====================
+
+// 显示HTTP服务映射导入对话框
+function showHttpServiceImportDialog() {
+  httpServiceImportContent.value = ''
+  httpServiceImportFileName.value = ''
+  if (httpServiceUploadRef.value) {
+    httpServiceUploadRef.value.clearFiles()
+  }
+  httpServiceImportDialogVisible.value = true
+}
+
+// 处理HTTP服务映射文件选择
+function handleHttpServiceFileChange(file) {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    httpServiceImportContent.value = e.target.result
+    httpServiceImportFileName.value = file.name
+  }
+  reader.readAsText(file.raw)
+}
+
+// 导出HTTP服务映射配置
+async function handleExportHttpService() {
+  try {
+    const res = await exportHttpServiceConfig()
+    if (res.code === 0) {
+      const blob = new Blob([res.content], { type: 'text/plain;charset=utf-8' })
+      saveAs(blob, 'http-service-mapping.txt')
+      ElMessage.success(t('fingerprint.exportSuccess'))
+    } else {
+      ElMessage.error(res.msg || t('fingerprint.exportFailed'))
+    }
+  } catch (e) {
+    console.error('Export HTTP service config error:', e)
+    ElMessage.error(t('fingerprint.exportFailed'))
+  }
+}
+
+// 导入HTTP服务映射配置
+async function handleImportHttpService() {
+  if (!httpServiceImportContent.value) {
+    ElMessage.warning(t('fingerprint.pleaseInputContent'))
+    return
+  }
+  
+  httpServiceImportLoading.value = true
+  try {
+    const res = await importHttpServiceConfig({
+      content: httpServiceImportContent.value
+    })
+    
+    if (res.code === 0) {
+      httpServiceImportDialogVisible.value = false
+      ElMessage.success(res.msg || t('fingerprint.importSuccess'))
+      // 刷新数据
+      loadHttpServiceMappings()
+      loadWebPortsConfig()
+    } else {
+      ElMessage.error(res.msg || t('fingerprint.importFailed'))
+    }
+  } catch (e) {
+    console.error('Import HTTP service config error:', e)
+    ElMessage.error(t('fingerprint.importFailed'))
+  } finally {
+    httpServiceImportLoading.value = false
+  }
 }
 
 // ==================== 主动扫描指纹相关方法 ====================
@@ -2566,7 +2659,7 @@ async function handleSaveRelatedPassive() {
   })
   
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('fingerprint.saveSuccess'))
     relatedPassiveDialogVisible.value = false
     // 刷新关联被动指纹列表
     handleSearchRelatedPassiveFingerprint()
@@ -2599,7 +2692,7 @@ async function handleSaveActiveFingerprint() {
   })
   
   if (res.code === 0) {
-    ElMessage.success('保存成功')
+    ElMessage.success(t('fingerprint.saveSuccess'))
     activeFingerprintFormDialogVisible.value = false
     loadActiveFingerprints()
   } else {
@@ -2631,7 +2724,7 @@ async function handleDeleteActiveFingerprint(row) {
   await ElMessageBox.confirm('确定删除该主动指纹吗？', '提示', { type: 'warning' })
   const res = await deleteActiveFingerprint({ id: row.id })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('fingerprint.deleteSuccess'))
     loadActiveFingerprints()
   } else {
     ElMessage.error(res.msg || '删除失败')
@@ -2689,7 +2782,7 @@ function handleActiveFileChange(file) {
     activeImportFileName.value = file.name
   }
   reader.onerror = () => {
-    ElMessage.error('文件读取失败')
+    ElMessage.error(t('common.operationFailed'))
   }
   reader.readAsText(file.raw, 'UTF-8')
 }
@@ -2706,7 +2799,7 @@ function clearActiveImportFile() {
 // 导入主动指纹
 async function handleImportActiveFingerprints() {
   if (!activeImportContent.value.trim()) {
-    ElMessage.warning('请先选择文件')
+    ElMessage.warning(t('fingerprint.selectFile'))
     return
   }
   
@@ -2736,7 +2829,7 @@ async function handleImportActiveFingerprints() {
       ElMessage.error(res.msg || '导入失败')
     }
   } catch (err) {
-    ElMessage.error('导入请求失败: ' + (err.message || '未知错误'))
+    ElMessage.error(t('fingerprint.importFailed') + ': ' + (err.message || t('common.error')))
   } finally {
     activeImportLoading.value = false
   }
@@ -2745,7 +2838,7 @@ async function handleImportActiveFingerprints() {
 // 导出主动指纹
 async function handleExportActiveFingerprints() {
   if (activeFingerprintStats.value.total === 0) {
-    ElMessage.warning('没有可导出的指纹')
+    ElMessage.warning(t('fingerprint.noDataToExport'))
     return
   }
   
@@ -2756,7 +2849,7 @@ async function handleExportActiveFingerprints() {
       const blob = new Blob([res.content], { type: 'text/yaml;charset=utf-8' })
       const dateStr = new Date().toISOString().slice(0, 10)
       saveAs(blob, `active-fingerprints-${dateStr}.yaml`)
-      ElMessage.success('导出成功')
+      ElMessage.success(t('fingerprint.exportSuccess'))
     } else {
       ElMessage.error(res.msg || '导出失败')
     }
@@ -2847,15 +2940,15 @@ async function handleActiveValidateFingerprint() {
     .rule-title {
       font-weight: bold;
       margin-bottom: 8px;
-      color: #606266;
+      color: var(--el-text-color-regular);
       display: flex;
       align-items: center;
       gap: 8px;
     }
     
     .rule-content {
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--el-fill-color-darker, #1e1e1e);
+      color: var(--el-text-color-primary);
       padding: 12px;
       border-radius: 4px;
       font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -2865,7 +2958,7 @@ async function handleActiveValidateFingerprint() {
       max-height: 200px;
       overflow-y: auto;
       margin: 0;
-      border: 1px solid #3c3c3c;
+      border: 1px solid var(--el-border-color);
     }
   }
 
@@ -2954,7 +3047,7 @@ async function handleActiveValidateFingerprint() {
   .fingerprint-id {
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 12px;
-    color: #409eff;
+    color: var(--el-color-primary);
     cursor: pointer;
     
     &:hover {
@@ -2969,7 +3062,7 @@ async function handleActiveValidateFingerprint() {
     overflow: hidden;
 
     &.matched {
-      border-color: #67c23a;
+      border-color: var(--el-color-success);
     }
 
     .result-header {
@@ -2983,15 +3076,15 @@ async function handleActiveValidateFingerprint() {
       padding: 12px 15px;
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 13px;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--el-fill-color-darker, #1e1e1e);
+      color: var(--el-text-color-primary);
       white-space: pre-wrap;
       word-break: break-all;
       max-height: 300px;
       overflow-y: auto;
 
       :deep(.matched-condition) {
-        color: #f56c6c;
+        color: var(--el-color-danger);
         font-weight: bold;
       }
     }

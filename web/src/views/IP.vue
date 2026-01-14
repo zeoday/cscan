@@ -1,29 +1,29 @@
-<template>
+﻿<template>
   <div class="ip-page">
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :inline="true" class="search-form">
         <el-form-item label="IP">
-          <el-input v-model="searchForm.ip" placeholder="IP地址" clearable @keyup.enter="handleSearch" />
+          <el-input v-model="searchForm.ip" :placeholder="$t('ip.ipAddress')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="端口">
-          <el-input v-model="searchForm.port" placeholder="端口号" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('ip.port')">
+          <el-input v-model="searchForm.port" :placeholder="$t('ip.port')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="服务">
-          <el-input v-model="searchForm.service" placeholder="服务类型" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('ip.service')">
+          <el-input v-model="searchForm.service" :placeholder="$t('ip.serviceType')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="地区">
-          <el-input v-model="searchForm.location" placeholder="地理位置" clearable @keyup.enter="handleSearch" />
+        <el-form-item :label="$t('ip.location')">
+          <el-input v-model="searchForm.location" :placeholder="$t('ip.location')" clearable @keyup.enter="handleSearch" />
         </el-form-item>
-        <el-form-item label="组织">
-          <el-select v-model="searchForm.orgId" placeholder="全部组织" clearable style="width: 140px">
-            <el-option label="全部组织" value="" />
+        <el-form-item :label="$t('ip.organization')">
+          <el-select v-model="searchForm.orgId" :placeholder="$t('common.allOrganizations')" clearable style="width: 140px">
+            <el-option :label="$t('common.allOrganizations')" value="" />
             <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('common.search') }}</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -33,25 +33,25 @@
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.total }}</div>
-          <div class="stat-label">IP总数</div>
+          <div class="stat-label">{{ $t('ip.totalIPs') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.portCount }}</div>
-          <div class="stat-label">开放端口</div>
+          <div class="stat-label">{{ $t('ip.openPorts') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.serviceCount }}</div>
-          <div class="stat-label">服务类型</div>
+          <div class="stat-label">{{ $t('ip.serviceTypes') }}</div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-value">{{ stat.newCount }}</div>
-          <div class="stat-label">新增IP</div>
+          <div class="stat-label">{{ $t('ip.newIPs') }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -59,33 +59,33 @@
     <!-- 数据表格 -->
     <el-card class="table-card">
       <div class="table-header">
-        <span class="total-info">共 {{ pagination.total }} 个IP</span>
+        <span class="total-info">{{ $t('common.total') }} {{ pagination.total }} IP</span>
         <div class="table-actions">
           <el-button type="primary" size="small" :disabled="selectedRows.length === 0" @click="handleScan">
-            扫描选中 ({{ selectedRows.length }})
+            {{ $t('common.scanSelected') }} ({{ selectedRows.length }})
           </el-button>
           <el-button type="danger" size="small" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-            批量删除 ({{ selectedRows.length }})
+            {{ $t('common.batchDelete') }} ({{ selectedRows.length }})
           </el-button>
         </div>
       </div>
       
       <el-table :data="tableData" v-loading="loading" stripe @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
-        <el-table-column label="IP地址" width="180">
+        <el-table-column :label="$t('ip.ipAddress')" width="180">
           <template #default="{ row }">
             <div class="ip-cell">
               <span class="ip-text">{{ row.ip }}</span>
-              <el-tag v-if="row.isNew" type="success" size="small" effect="dark" class="new-tag">新</el-tag>
+              <el-tag v-if="row.isNew" type="success" size="small" effect="dark" class="new-tag">{{ $t('common.new') }}</el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="地理位置" width="200">
+        <el-table-column :label="$t('ip.location')" width="200">
           <template #default="{ row }">
             {{ row.location || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="开放端口" min-width="300">
+        <el-table-column :label="$t('ip.openPorts')" min-width="300">
           <template #default="{ row }">
             <div class="port-list">
               <el-tag 
@@ -103,33 +103,33 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="关联域名" min-width="200">
+        <el-table-column :label="$t('ip.relatedDomains')" min-width="200">
           <template #default="{ row }">
             <div v-if="row.domains && row.domains.length > 0" class="domain-list">
               <div v-for="domain in row.domains.slice(0, 5)" :key="domain" class="domain-item">
                 {{ domain }}
               </div>
               <div v-if="row.domains.length > 5" class="more-domains">
-                +{{ row.domains.length - 5 }} 更多...
+                +{{ row.domains.length - 5 }} {{ $t('common.more') }}...
               </div>
             </div>
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="组织" width="120">
+        <el-table-column :label="$t('ip.organization')" width="120">
           <template #default="{ row }">
-            {{ row.orgName || '默认组织' }}
+            {{ row.orgName || $t('common.defaultOrganization') }}
           </template>
         </el-table-column>
-        <el-table-column label="更新时间" width="160">
+        <el-table-column :label="$t('common.updateTime')" width="160">
           <template #default="{ row }">
             {{ row.updateTime }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column :label="$t('common.operation')" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
-            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link size="small" @click="showDetail(row)">{{ $t('common.detail') }}</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -147,13 +147,13 @@
     </el-card>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="IP详情" width="700px">
+    <el-dialog v-model="detailVisible" :title="$t('ip.ipDetail')" width="700px">
       <el-descriptions v-if="currentIP" :column="2" border>
-        <el-descriptions-item label="IP地址">{{ currentIP.ip }}</el-descriptions-item>
-        <el-descriptions-item label="地理位置">{{ currentIP.location || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="ASN">{{ currentIP.asn || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="运营商">{{ currentIP.isp || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="开放端口" :span="2">
+        <el-descriptions-item :label="$t('ip.ipAddress')">{{ currentIP.ip }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('ip.location')">{{ currentIP.location || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('ip.asn')">{{ currentIP.asn || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('ip.isp')">{{ currentIP.isp || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('ip.openPorts')" :span="2">
           <div class="detail-ports">
             <el-tag 
               v-for="port in (currentIP.ports || [])" 
@@ -165,7 +165,7 @@
             </el-tag>
           </div>
         </el-descriptions-item>
-        <el-descriptions-item label="关联域名" :span="2">
+        <el-descriptions-item :label="$t('ip.relatedDomains')" :span="2">
           <div v-if="currentIP.domains && currentIP.domains.length > 0">
             <el-tag v-for="domain in currentIP.domains" :key="domain" type="info" size="small" style="margin: 2px">
               {{ domain }}
@@ -180,10 +180,12 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/request'
 import { useWorkspaceStore } from '@/stores/workspace'
 
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const tableData = ref([])
@@ -291,10 +293,10 @@ function handleSelectionChange(rows) {
 }
 
 async function handleDelete(row) {
-  await ElMessageBox.confirm('确定删除该IP及其所有资产吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('ip.confirmDeleteIP'), t('common.tip'), { type: 'warning' })
   const res = await request.post('/asset/ip/delete', { ip: row.ip })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     loadData()
     loadStat()
   }
@@ -302,11 +304,11 @@ async function handleDelete(row) {
 
 async function handleBatchDelete() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 个IP及其所有资产吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('ip.confirmBatchDeleteIP', { count: selectedRows.value.length }), t('common.tip'), { type: 'warning' })
   const ips = selectedRows.value.map(row => row.ip)
   const res = await request.post('/asset/ip/batchDelete', { ips })
   if (res.code === 0) {
-    ElMessage.success('删除成功')
+    ElMessage.success(t('common.deleteSuccess'))
     selectedRows.value = []
     loadData()
     loadStat()
@@ -319,7 +321,7 @@ function showDetail(row) {
 }
 
 function handleScan() {
-  ElMessage.info('功能开发中')
+  ElMessage.info(t('common.featureInDevelopment'))
 }
 
 function getPortType(service) {
@@ -331,7 +333,7 @@ function getPortType(service) {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .ip-page {
   .search-card {
     margin-bottom: 16px;
@@ -441,3 +443,4 @@ function getPortType(service) {
   }
 }
 </style>
+

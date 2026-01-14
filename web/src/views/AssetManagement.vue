@@ -1,36 +1,37 @@
-<template>
+﻿<template>
   <div class="asset-management-page">
     <!-- Tab页切换 -->
     <el-tabs v-model="activeTab" type="border-card" class="asset-tabs" @tab-change="handleTabChange">
       <!-- 全局查看 Tab -->
-      <el-tab-pane label="全局查看" name="all">
+      <el-tab-pane :label="$t('asset.globalView')" name="all">
         <AssetAllView ref="allViewRef" @data-changed="handleDataChanged" />
       </el-tab-pane>
 
       <!-- 站点管理 Tab -->
-      <el-tab-pane label="站点管理" name="site">
+      <el-tab-pane :label="$t('asset.siteManagement')" name="site">
         <SiteView ref="siteViewRef" @data-changed="handleDataChanged" />
       </el-tab-pane>
 
       <!-- 域名管理 Tab -->
-      <el-tab-pane label="域名管理" name="domain">
+      <el-tab-pane :label="$t('asset.domainManagement')" name="domain">
         <DomainView ref="domainViewRef" @data-changed="handleDataChanged" />
       </el-tab-pane>
 
       <!-- IP管理 Tab -->
-      <el-tab-pane label="IP管理" name="ip">
+      <el-tab-pane :label="$t('asset.ipManagement')" name="ip">
         <IPView ref="ipViewRef" @data-changed="handleDataChanged" />
       </el-tab-pane>
 
+      <!-- 目录管理 Tab -->
+      <el-tab-pane :label="$t('asset.dirManagement')" name="dirscan">
+        <DirScanView ref="dirscanViewRef" @data-changed="handleDataChanged" />
+      </el-tab-pane>
+
       <!-- 漏洞管理 Tab -->
-      <el-tab-pane label="漏洞管理" name="vul">
+      <el-tab-pane :label="$t('asset.vulManagement')" name="vul">
         <VulView ref="vulViewRef" @data-changed="handleDataChanged" />
       </el-tab-pane>
 
-      <!-- 目录管理 Tab -->
-      <el-tab-pane label="目录管理" name="dirscan">
-        <DirScanView ref="dirscanViewRef" @data-changed="handleDataChanged" />
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -131,19 +132,19 @@ onUnmounted(() => {
 })
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .asset-management-page {
   height: 100%;
-  
+
   .asset-tabs {
     height: 100%;
-    
+
     :deep(.el-tabs__content) {
       padding: 16px;
       height: calc(100% - 50px);
       overflow-y: auto;
     }
-    
+
     :deep(.el-tab-pane) {
       height: 100%;
     }
