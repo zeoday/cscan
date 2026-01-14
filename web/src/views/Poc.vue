@@ -574,9 +574,9 @@
           <el-form label-width="100px" size="small">
             <el-form-item :label="$t('poc.protocolType')">
               <el-radio-group v-model="aiConfig.protocol">
-                <el-radio-button value="openai">OpenAI</el-radio-button>
-                <el-radio-button value="anthropic">Anthropic</el-radio-button>
-                <el-radio-button value="gemini">Gemini</el-radio-button>
+                <el-radio-button label="openai">OpenAI</el-radio-button>
+                <el-radio-button label="anthropic">Anthropic</el-radio-button>
+                <el-radio-button label="gemini">Gemini</el-radio-button>
               </el-radio-group>
             </el-form-item>
             <el-form-item :label="$t('poc.serverAddress')">

@@ -1,7 +1,7 @@
 # CSCAN Web 前端 Dockerfile
 # 支持多架构: linux/amd64, linux/arm64
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 

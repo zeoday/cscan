@@ -88,12 +88,26 @@ install_docker_compose() {
     info "Docker Compose 安装成功"
 }
 
-# 获取本地版本（从容器标签读取）
+# 获取本地版本
 get_local_version() {
-    # 尝试从cscan_api容器的镜像标签获取版本
+    # 检查容器是否存在
+    if ! docker inspect "cscan_api" >/dev/null 2>&1; then
+        echo "未安装"
+        return
+    fi
+    
+    # 优先从本地 VERSION 文件读取
+    if [ -f "VERSION" ]; then
+        local ver=$(cat VERSION | tr -d '\r\n ')
+        if [ -n "$ver" ]; then
+            echo "$ver"
+            return
+        fi
+    fi
+    
+    # 尝试从容器镜像标签获取版本
     local image=$(docker inspect --format='{{.Config.Image}}' "cscan_api" 2>/dev/null)
     if [ -n "$image" ]; then
-        # 提取标签，如 registry.cn-hangzhou.aliyuncs.com/txf7/cscan-api:V1.0 -> V1.0
         local tag=$(echo "$image" | sed 's/.*://')
         if [ "$tag" != "latest" ] && [ -n "$tag" ]; then
             echo "$tag"
@@ -101,12 +115,12 @@ get_local_version() {
         fi
     fi
     
-    # 如果是latest标签，尝试从镜像创建时间判断
+    # 如果都获取不到，显示镜像创建日期
     local created=$(docker inspect --format='{{.Created}}' "cscan_api" 2>/dev/null | cut -d'T' -f1)
     if [ -n "$created" ]; then
         echo "latest ($created)"
     else
-        echo "未安装"
+        echo "unknown"
     fi
 }
 
@@ -464,11 +478,11 @@ main_menu() {
     echo "  ╚═════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝"
     echo ""
     echo -e "\033[33m===================================================="
-    echo " CSCAN 管理工具 v${SCRIPT_VERSION}"
-    echo " 企业级分布式网络资产扫描平台"
+    echo -e " CSCAN 管理工具 v${SCRIPT_VERSION}"
+    echo -e " 企业级分布式网络资产扫描平台"
     echo -e " 当前版本: ${local_ver}${update_hint}"
-    echo " 当前时间: $(date +"%Y-%m-%d %H:%M:%S")"
-    echo "====================================================\033[0m"
+    echo -e " 当前时间: $(date +"%Y-%m-%d %H:%M:%S")"
+    echo -e "====================================================\033[0m"
     echo ""
     echo " 1. 一键安装"
     echo " 2. 一键升级"

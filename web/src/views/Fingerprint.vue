@@ -614,8 +614,8 @@
           <el-col :span="12">
             <el-form-item :label="$t('fingerprint.fingerprintType')">
               <el-radio-group v-model="fingerprintForm.type">
-                <el-radio value="passive">被动指纹</el-radio>
-                <el-radio value="active">主动指纹</el-radio>
+                <el-radio label="passive">被动指纹</el-radio>
+                <el-radio label="active">主动指纹</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
@@ -815,9 +815,9 @@
         </el-form-item>
         <el-form-item :label="$t('fingerprint.selectFingerprints')">
           <el-radio-group v-model="batchValidateScope">
-            <el-radio value="all">{{ $t('fingerprint.allFingerprints') }}</el-radio>
-            <el-radio value="builtin">{{ $t('fingerprint.builtinFingerprint') }}</el-radio>
-            <el-radio value="custom">{{ $t('fingerprint.customFingerprint') }}</el-radio>
+            <el-radio label="all">{{ $t('fingerprint.allFingerprints') }}</el-radio>
+            <el-radio label="builtin">{{ $t('fingerprint.builtinFingerprint') }}</el-radio>
+            <el-radio label="custom">{{ $t('fingerprint.customFingerprint') }}</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -866,8 +866,8 @@
         </el-form-item>
         <el-form-item :label="$t('fingerprint.serviceType')" prop="isHttp">
           <el-radio-group v-model="httpServiceMappingForm.isHttp">
-            <el-radio :value="true">{{ $t('fingerprint.httpService') }}</el-radio>
-            <el-radio :value="false">{{ $t('fingerprint.nonHttpService') }}</el-radio>
+            <el-radio :label="true">{{ $t('fingerprint.httpService') }}</el-radio>
+            <el-radio :label="false">{{ $t('fingerprint.nonHttpService') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item :label="$t('fingerprint.description')">

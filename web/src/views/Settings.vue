@@ -16,8 +16,8 @@
           <el-form label-width="100px" style="max-width: 500px; margin-top: 20px">
             <el-form-item :label="$t('settings.apiVersion')">
               <el-radio-group v-model="apiConfigs.fofa.version">
-                <el-radio value="v1">v1 (fofa.info)</el-radio>
-                <el-radio value="v5">v5 (v5.fofa.info)</el-radio>
+                <el-radio label="v1">v1 (fofa.info)</el-radio>
+                <el-radio label="v5">v5 (v5.fofa.info)</el-radio>
               </el-radio-group>
             </el-form-item>
             <el-form-item :label="$t('settings.apiKey')">

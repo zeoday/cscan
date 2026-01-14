@@ -333,8 +333,8 @@
             <template v-if="form.pocscanEnable">
               <el-form-item :label="$t('task.pocSource')">
                 <el-radio-group v-model="form.pocscanMode" @change="handlePocModeChange">
-                  <el-radio value="auto">{{ $t('task.autoMatch') }}</el-radio>
-                  <el-radio value="manual">{{ $t('task.manualSelect') }}</el-radio>
+                  <el-radio label="auto">{{ $t('task.autoMatch') }}</el-radio>
+                  <el-radio label="manual">{{ $t('task.manualSelect') }}</el-radio>
                 </el-radio-group>
               </el-form-item>
               
