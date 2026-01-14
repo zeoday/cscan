@@ -16,7 +16,7 @@
 | 子域名枚举 | 被动枚举 + 字典爆破 | Subfinder + Dnsx |
 | 指纹识别 | Web 指纹、3W+ 规则 | Httpx + Wappalyzer + 自定义引擎 |
 | URL 发现 | 路径爬取 | Urlfinder |
-| 漏洞检测 | POC 扫描、800+ 自定义 POC | Nuclei SDK |
+| 漏洞检测 | POC 扫描 | 自定义 POC | Nuclei SDK |
 | Web 截图 | 页面快照 | Chromedp / HTTPX |
 | 在线数据源 | API 聚合搜索 | FOFA / Hunter / Quake |
 
