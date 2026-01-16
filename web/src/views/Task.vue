@@ -1120,17 +1120,21 @@ function getStatusType(status, row) {
 
 // 获取进度环颜色
 function getProgressColor(status) {
+  // 使用 CSS 变量，通过 getComputedStyle 获取
+  const root = document.documentElement
+  const getVar = (name) => getComputedStyle(root).getPropertyValue(name).trim()
+  
   const colorMap = {
-    CREATED: '#909399',
-    PENDING: '#E6A23C',
-    STARTED: '#409EFF',
-    PAUSED: '#E6A23C',
-    SUCCESS: '#67C23A',
-    FAILURE: '#F56C6C',
-    STOPPED: '#909399',
-    REVOKED: '#909399'
+    CREATED: getVar('--status-info') || '#909399',
+    PENDING: getVar('--status-warning') || '#E6A23C',
+    STARTED: getVar('--status-primary') || '#409EFF',
+    PAUSED: getVar('--status-warning') || '#E6A23C',
+    SUCCESS: getVar('--status-success') || '#67C23A',
+    FAILURE: getVar('--status-danger') || '#F56C6C',
+    STOPPED: getVar('--status-info') || '#909399',
+    REVOKED: getVar('--status-info') || '#909399'
   }
-  return colorMap[status] || '#409EFF'
+  return colorMap[status] || getVar('--status-primary') || '#409EFF'
 }
 
 // 获取状态显示文本（简化状态显示，不按扫描模块显示）
@@ -1564,7 +1568,7 @@ function closeLogDialog() {
 .log-container {
   max-height: 450px;
   overflow-y: auto;
-  background-color: var(--el-fill-color-darker, #1e1e1e);
+  background-color: var(--code-bg);
   border-radius: 4px;
   padding: 10px;
   font-family: 'Consolas', 'Monaco', monospace;

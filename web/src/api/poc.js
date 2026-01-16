@@ -56,6 +56,11 @@ export function downloadNucleiTemplates(data = {}) {
   return request.post('/poc/nuclei/download', data)
 }
 
+// 查询下载状态
+export function getDownloadStatus(taskId) {
+  return request.get('/poc/nuclei/download/status', { params: { taskId } })
+}
+
 // 清空Nuclei模板
 export function clearNucleiTemplates() {
   return request.post('/poc/nuclei/clear')

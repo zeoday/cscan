@@ -30,6 +30,21 @@
   --el-color-primary-light-9: #f0f7fe;
   --el-color-primary-dark-2: #2563eb;
   
+  /* 状态颜色变量 */
+  --status-success: #67c23a;
+  --status-warning: #e6a23c;
+  --status-danger: #f56c6c;
+  --status-info: #909399;
+  --status-primary: #409eff;
+  
+  /* 代码编辑器/终端背景 */
+  --code-bg: #f5f5f5;
+  --code-text: #333333;
+  --code-border: #e0e0e0;
+  
+  /* 辅助文本颜色 */
+  --text-muted: #909399;
+  
   /* 侧边栏 */
   --sidebar: 0 0% 98%;
   --sidebar-foreground: 240 5.3% 26.1%;
@@ -48,36 +63,36 @@
   --chart-5: 27 87% 67%;
 }
 
-/* 暗色主题 */
+/* 暗色主题 - 纯黑色 */
 html.dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+  --background: 0 0% 0%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 0%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 0%;
+  --popover-foreground: 0 0% 98%;
   --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 84% 4.9%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 0 0% 10%;
+  --accent-foreground: 0 0% 98%;
   --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 15%;
+  --input: 0 0% 10%;
   --ring: 224.3 76.3% 94.1%;
   
   /* 侧边栏 */
-  --sidebar: 240 5.9% 10%;
-  --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar: 0 0% 0%;
+  --sidebar-foreground: 0 0% 95%;
   --sidebar-primary: 224.3 76.3% 94.1%;
-  --sidebar-primary-foreground: 240 5.9% 10%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 240 4.8% 95.9%;
-  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar-border: 0 0% 15%;
   --sidebar-ring: 217.2 91.2% 59.8%;
   
   /* 图表颜色 */
@@ -86,6 +101,89 @@ html.dark {
   --chart-3: 30 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
+  
+  /* 状态颜色变量 - 暗色模式 */
+  --status-success: #67c23a;
+  --status-warning: #e6a23c;
+  --status-danger: #f56c6c;
+  --status-info: #909399;
+  --status-primary: #409eff;
+  
+  /* 代码编辑器/终端背景 - 暗色模式 */
+  --code-bg: #1e1e1e;
+  --code-text: #d4d4d4;
+  --code-border: #3c3c3c;
+  
+  /* 辅助文本颜色 - 暗色模式 */
+  --text-muted: #a3a6ad;
+}
+
+/* ============================================ */
+/* Pure White 主题 - 纯白色 */
+/* ============================================ */
+html.light.theme-pure-white,
+html.theme-pure-white:not(.dark) {
+  --background: 0 0% 100%;
+  --foreground: 240 10% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 10%;
+  --primary: 240 6% 10%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 6% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 90%;
+  --input: 240 6% 90%;
+  --ring: 240 6% 10%;
+  
+  /* 侧边栏 */
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 240 6% 20%;
+  --sidebar-primary: 240 6% 10%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 5% 96%;
+  --sidebar-accent-foreground: 240 6% 15%;
+  --sidebar-border: 240 6% 90%;
+  --sidebar-ring: 240 6% 10%;
+}
+
+html.dark.theme-pure-white {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 0%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 0%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 0 0% 12%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 15%;
+  --input: 0 0% 10%;
+  --ring: 0 0% 98%;
+  
+  /* 侧边栏 */
+  --sidebar: 0 0% 0%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-primary: 0 0% 98%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar-border: 0 0% 15%;
+  --sidebar-ring: 0 0% 98%;
 }
 
 /* Vercel 主题 - 亮色模式 */
@@ -664,41 +762,42 @@ html.dark.theme-midnight-teal {
 /* Element Plus 官方暗黑模式补充样式 */
 /* ============================================ */
 
-/* 暗黑模式下 Element Plus 组件变量覆盖 */
+/* 暗黑模式下 Element Plus 组件变量覆盖 - 纯黑色 */
 html.dark {
-  /* 使用具体的颜色值而不是 CSS 变量引用 */
-  --el-bg-color: #020817;
-  --el-bg-color-page: #020817;
-  --el-bg-color-overlay: #020817;
-  --el-text-color-primary: #f8fafc;
-  --el-text-color-regular: #94a3b8;
-  --el-text-color-secondary: rgba(148, 163, 184, 0.8);
-  --el-text-color-placeholder: rgba(148, 163, 184, 0.6);
-  --el-border-color: #1e293b;
-  --el-border-color-light: rgba(30, 41, 59, 0.8);
-  --el-border-color-lighter: rgba(30, 41, 59, 0.6);
-  --el-border-color-extra-light: rgba(30, 41, 59, 0.4);
-  --el-fill-color: #1e293b;
-  --el-fill-color-light: rgba(30, 41, 59, 0.8);
-  --el-fill-color-lighter: rgba(30, 41, 59, 0.6);
-  --el-fill-color-extra-light: rgba(30, 41, 59, 0.4);
-  --el-fill-color-blank: #020817;
-  --el-mask-color: rgba(0, 0, 0, 0.8);
-  --el-mask-color-extra-light: rgba(0, 0, 0, 0.3);
+  /* 使用纯黑色 */
+  --el-bg-color: #000000;
+  --el-bg-color-page: #000000;
+  --el-bg-color-overlay: #000000;
+  --el-text-color-primary: #fafafa;
+  --el-text-color-regular: #a1a1a1;
+  --el-text-color-secondary: rgba(161, 161, 161, 0.8);
+  --el-text-color-placeholder: rgba(161, 161, 161, 0.6);
+  --el-border-color: #262626;
+  --el-border-color-light: rgba(38, 38, 38, 0.8);
+  --el-border-color-lighter: rgba(38, 38, 38, 0.6);
+  --el-border-color-extra-light: rgba(38, 38, 38, 0.4);
+  --el-fill-color: #1a1a1a;
+  --el-fill-color-light: rgba(26, 26, 26, 0.8);
+  --el-fill-color-lighter: rgba(26, 26, 26, 0.6);
+  --el-fill-color-extra-light: rgba(26, 26, 26, 0.4);
+  --el-fill-color-blank: #000000;
+  --el-fill-color-darker: #0a0a0a;
+  --el-mask-color: rgba(0, 0, 0, 0.9);
+  --el-mask-color-extra-light: rgba(0, 0, 0, 0.5);
 }
 
-/* 暗黑模式下的卡片样式 */
+/* 暗黑模式下的卡片样式 - 纯黑色 */
 html.dark .el-card {
-  --el-card-bg-color: #020817;
-  background-color: #020817;
-  border-color: #1e293b;
+  --el-card-bg-color: #000000;
+  background-color: #000000;
+  border-color: #262626;
 }
 
-/* 暗黑模式下的输入框样式 */
+/* 暗黑模式下的输入框样式 - 纯黑色 */
 html.dark .el-input__wrapper,
 html.dark .el-textarea__inner {
-  background-color: #1e293b;
-  box-shadow: 0 0 0 1px #1e293b inset;
+  background-color: #1a1a1a;
+  box-shadow: 0 0 0 1px #262626 inset;
 }
 
 html.dark .el-input__wrapper:hover,
@@ -706,37 +805,37 @@ html.dark .el-textarea__inner:hover {
   box-shadow: 0 0 0 1px #3b82f6 inset;
 }
 
-/* 暗黑模式下的选择器样式 */
+/* 暗黑模式下的选择器样式 - 纯黑色 */
 html.dark .el-select__wrapper {
-  background-color: #1e293b;
-  box-shadow: 0 0 0 1px #1e293b inset;
+  background-color: #1a1a1a;
+  box-shadow: 0 0 0 1px #262626 inset;
 }
 
-/* 暗黑模式下的下拉菜单样式 */
+/* 暗黑模式下的下拉菜单样式 - 纯黑色 */
 html.dark .el-select-dropdown,
 html.dark .el-dropdown-menu {
-  background-color: #020817;
-  border-color: #1e293b;
+  background-color: #000000;
+  border-color: #262626;
 }
 
 html.dark .el-select-dropdown__item.hover,
 html.dark .el-select-dropdown__item:hover,
 html.dark .el-dropdown-menu__item:hover {
-  background-color: #1e293b;
+  background-color: #1a1a1a;
 }
 
-/* 暗黑模式下的对话框样式 */
+/* 暗黑模式下的对话框样式 - 纯黑色 */
 html.dark .el-dialog {
-  --el-dialog-bg-color: #020817;
-  background-color: #020817;
+  --el-dialog-bg-color: #000000;
+  background-color: #000000;
 }
 
 html.dark .el-dialog__header {
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid #262626;
 }
 
 html.dark .el-dialog__footer {
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid #262626;
 }
 
 /* 暗黑模式下的标签页样式 */
@@ -1068,27 +1167,27 @@ html, body {
   transition: background 0.3s, color 0.3s;
 }
 
-/* 暗黑模式下强制设置背景色 */
+/* 暗黑模式下强制设置背景色 - 纯黑色 */
 html.dark, html.dark body {
-  background: #020817 !important;
-  color: #f8fafc !important;
+  background: #000000 !important;
+  color: #fafafa !important;
 }
 
-/* 暗黑模式下主内容区域背景 - 使用具体颜色值 */
+/* 暗黑模式下主内容区域背景 - 纯黑色 */
 html.dark .main,
 html.dark .el-main {
-  background: #020817 !important;
-  background-color: #020817 !important;
+  background: #000000 !important;
+  background-color: #000000 !important;
 }
 
-/* 暗黑模式下整体布局背景 */
+/* 暗黑模式下整体布局背景 - 纯黑色 */
 html.dark .layout-container {
-  background: #020817 !important;
+  background: #000000 !important;
 }
 
-/* 暗黑模式下工作台页面背景 */
+/* 暗黑模式下工作台页面背景 - 纯黑色 */
 html.dark .workspace {
-  background: #020817 !important;
+  background: #000000 !important;
 }
 
 #app {
@@ -1120,14 +1219,14 @@ html.dark .workspace {
 }
 
 /* ============================================ */
-/* 暗黑模式下的表格优化（解决滚动区域背景问题） */
+/* 暗黑模式下的表格优化（解决滚动区域背景问题）- 纯黑色 */
 /* ============================================ */
 html.dark .el-table {
-  --el-table-bg-color: #020817;
-  --el-table-tr-bg-color: #020817;
-  --el-table-row-hover-bg-color: #1e293b;
-  --el-table-header-bg-color: #1e293b;
-  background-color: #020817 !important;
+  --el-table-bg-color: #000000;
+  --el-table-tr-bg-color: #000000;
+  --el-table-row-hover-bg-color: #1a1a1a;
+  --el-table-header-bg-color: #0a0a0a;
+  background-color: #000000 !important;
 }
 
 html.dark .el-table .el-table__inner-wrapper,
@@ -1135,21 +1234,21 @@ html.dark .el-table .el-table__body-wrapper,
 html.dark .el-table .el-scrollbar,
 html.dark .el-table .el-scrollbar__wrap,
 html.dark .el-table .el-scrollbar__view {
-  background-color: #020817 !important;
+  background-color: #000000 !important;
 }
 
 html.dark .el-table .el-table__empty-block {
-  background-color: #020817 !important;
+  background-color: #000000 !important;
 }
 
 html.dark .el-table th.el-table__cell {
-  background-color: #1e293b !important;
-  color: #94a3b8 !important;
+  background-color: #0a0a0a !important;
+  color: #a1a1a1 !important;
 }
 
 /* 斑马纹 */
 html.dark .el-table .el-table__row--striped td.el-table__cell {
-  background-color: #1e293b !important;
+  background-color: #0a0a0a !important;
 }
 
 /* ============================================ */
@@ -1164,11 +1263,11 @@ html.dark .el-table .el-table__row--striped td.el-table__cell {
   color: #1f2937;
 }
 
-/* 暗黑模式下强制卡片背景色 - 使用具体颜色值 */
+/* 暗黑模式下强制卡片背景色 - 纯黑色 */
 html.dark .dark-card {
-  background: #020817 !important;
-  border-color: #1e293b !important;
-  color: #f8fafc !important;
+  background: #000000 !important;
+  border-color: #262626 !important;
+  color: #fafafa !important;
 }
 
 .dark-card .card-header {
@@ -1427,9 +1526,9 @@ html.dark .el-card:hover {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
-/* 暗黑模式下的填充色变量 */
+/* 暗黑模式下的填充色变量 - 纯黑色 */
 html.dark {
-  --el-fill-color-darker: #1e1e1e;
+  --el-fill-color-darker: #0a0a0a;
 }
 
 /* 暗黑模式下的树形控件样式 */
@@ -1534,4 +1633,77 @@ html.dark .el-footer {
 
 .link-primary:hover {
   text-decoration: underline;
+}
+
+/* ============================================ */
+/* 代码编辑器/终端样式（深色背景区域） */
+/* ============================================ */
+.code-editor-bg,
+.terminal-bg,
+.logs-bg {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid #3c3c3c;
+}
+
+/* 暗黑模式下代码编辑器样式保持不变（已经是深色） */
+html.dark .code-editor-bg,
+html.dark .terminal-bg,
+html.dark .logs-bg {
+  background-color: #0a0a0a;
+  border-color: #262626;
+}
+
+/* 日志颜色 */
+.log-time-color {
+  color: #6a9955;
+}
+
+.log-info-color {
+  color: #4fc3f7;
+}
+
+.log-error-color {
+  color: #f44336;
+}
+
+.log-warn-color {
+  color: #ff9800;
+}
+
+.log-text-color {
+  color: #d4d4d4;
+}
+
+/* ============================================ */
+/* 更多数量提示（如 +4 更多） */
+/* ============================================ */
+.more-count {
+  color: var(--el-text-color-secondary);
+}
+
+
+/* 辅助类 - 状态颜色 */
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-success {
+  color: var(--status-success);
+}
+
+.text-warning {
+  color: var(--status-warning);
+}
+
+.text-danger {
+  color: var(--status-danger);
+}
+
+.text-info {
+  color: var(--status-info);
+}
+
+.hint-text {
+  font-size: 12px;
 }

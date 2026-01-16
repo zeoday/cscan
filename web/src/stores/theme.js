@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import request from '@/api/request'
 
 // 可用的颜色主题列表（支持明暗两种模式）
 export const COLOR_THEMES = [
   { value: 'default', label: 'theme.default', color: '#3b82f6', darkColor: '#60a5fa', contrastColor: '#ffffff' },
+  { value: 'pure-white', label: 'theme.pureWhite', color: '#ffffff', darkColor: '#fafafa', contrastColor: '#18181b', darkContrastColor: '#18181b' },
   { value: 'forest-green', label: 'theme.forestGreen', color: '#009100', darkColor: '#22c55e', contrastColor: '#ffffff' },
   { value: 'ocean-blue', label: 'theme.oceanBlue', color: '#0ea5e9', darkColor: '#38bdf8', contrastColor: '#ffffff' },
   { value: 'sunset-orange', label: 'theme.sunsetOrange', color: '#f97316', darkColor: '#fb923c', contrastColor: '#ffffff' },
@@ -68,14 +70,48 @@ function setElementPlusPrimaryColor(color, contrastColor = '#ffffff') {
 
 export const useThemeStore = defineStore('theme', () => {
   // 主题模式（亮色/暗色/跟随系统）
-  const theme = ref(localStorage.getItem('theme') || 'system')
+  const theme = ref('system')
   // 颜色主题
-  const colorTheme = ref(localStorage.getItem('colorTheme') || 'default')
+  const colorTheme = ref('default')
   // 是否为暗色模式
   const isDark = ref(false)
+  // 是否已从服务端加载
+  const loaded = ref(false)
+
+  // 从服务端加载主题配置
+  async function loadFromServer() {
+    try {
+      const res = await request.post('/theme/config/get')
+      if (res.code === 0 && res.config) {
+        theme.value = res.config.theme || 'system'
+        colorTheme.value = res.config.colorTheme || 'default'
+        loaded.value = true
+        updateTheme()
+      }
+    } catch (e) {
+      console.error('Failed to load theme config:', e)
+      // 加载失败时使用本地存储的配置
+      theme.value = localStorage.getItem('theme') || 'system'
+      colorTheme.value = localStorage.getItem('colorTheme') || 'default'
+    }
+  }
+
+  // 保存到服务端
+  async function saveToServer() {
+    try {
+      await request.post('/theme/config/save', {
+        theme: theme.value,
+        colorTheme: colorTheme.value
+      })
+    } catch (e) {
+      console.error('Failed to save theme config:', e)
+    }
+  }
 
   // 初始化主题
-  function initTheme() {
+  async function initTheme() {
+    // 先从服务端加载
+    await loadFromServer()
     updateTheme()
   }
 
@@ -126,20 +162,24 @@ export const useThemeStore = defineStore('theme', () => {
         : currentColorTheme.contrastColor || '#ffffff'
       setElementPlusPrimaryColor(primaryColor, contrastColor)
     }
+    
+    // 同时保存到本地存储（作为备份）
+    localStorage.setItem('theme', theme.value)
+    localStorage.setItem('colorTheme', colorTheme.value)
   }
 
   // 切换主题模式
   function setTheme(newTheme) {
     theme.value = newTheme
-    localStorage.setItem('theme', newTheme)
     updateTheme()
+    saveToServer()
   }
 
   // 切换颜色主题
   function setColorTheme(newColorTheme) {
     colorTheme.value = newColorTheme
-    localStorage.setItem('colorTheme', newColorTheme)
     updateTheme()
+    saveToServer()
   }
 
   // 切换暗色模式
@@ -181,7 +221,9 @@ export const useThemeStore = defineStore('theme', () => {
     theme,
     colorTheme,
     isDark,
+    loaded,
     initTheme,
+    loadFromServer,
     setTheme,
     setColorTheme,
     toggleTheme,

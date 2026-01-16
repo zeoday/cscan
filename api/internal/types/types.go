@@ -1062,15 +1062,29 @@ type NucleiTemplateSyncResp struct {
 
 // NucleiTemplateDownloadReq 下载Nuclei模板库请求
 type NucleiTemplateDownloadReq struct {
-	Region string `json:"region,optional"` // 下载源：auto/github/gitee
-	Force  bool   `json:"force,optional"`  // 是否强制重新下载
+	Force bool `json:"force,optional"` // 是否强制重新下载
 }
 
 // NucleiTemplateDownloadResp 下载Nuclei模板库响应
 type NucleiTemplateDownloadResp struct {
 	Code   int    `json:"code"`
 	Msg    string `json:"msg"`
-	TaskId string `json:"taskId,omitempty"` // 异步任务ID（如果是异步执行）
+	TaskId string `json:"taskId,omitempty"` // 下载任务ID
+}
+
+// NucleiTemplateDownloadStatusReq 查询下载状态请求
+type NucleiTemplateDownloadStatusReq struct {
+	TaskId string `form:"taskId"` // 下载任务ID
+}
+
+// NucleiTemplateDownloadStatusResp 查询下载状态响应
+type NucleiTemplateDownloadStatusResp struct {
+	Code          int    `json:"code"`
+	Msg           string `json:"msg"`
+	Status        string `json:"status"`        // pending/downloading/completed/failed
+	Progress      int    `json:"progress"`      // 进度百分比 0-100
+	TemplateCount int    `json:"templateCount"` // 已下载模板数量
+	Error         string `json:"error"`         // 错误信息
 }
 
 type NucleiTemplateWithContent struct {
@@ -2164,4 +2178,26 @@ type ScanTemplateImportResp struct {
 // ScanTemplateUseReq 使用模板请求
 type ScanTemplateUseReq struct {
 	Id string `json:"id"`
+}
+
+// ==================== 全局主题配置 ====================
+
+// ThemeConfig 全局主题配置
+type ThemeConfig struct {
+	Theme      string `json:"theme"`      // 主题模式: light/dark/system
+	ColorTheme string `json:"colorTheme"` // 颜色主题: default/pure-white/forest-green/...
+	UpdateTime string `json:"updateTime,omitempty"`
+}
+
+// ThemeConfigResp 主题配置响应
+type ThemeConfigResp struct {
+	Code   int          `json:"code"`
+	Msg    string       `json:"msg"`
+	Config *ThemeConfig `json:"config,omitempty"`
+}
+
+// ThemeConfigSaveReq 保存主题配置请求
+type ThemeConfigSaveReq struct {
+	Theme      string `json:"theme"`
+	ColorTheme string `json:"colorTheme"`
 }

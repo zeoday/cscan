@@ -388,3 +388,33 @@ func NucleiTemplateDownloadHandler(svcCtx *svc.ServiceContext) http.HandlerFunc 
 		httpx.OkJson(w, resp)
 	}
 }
+
+// NucleiTemplateDownloadStatusHandler 查询下载状态
+func NucleiTemplateDownloadStatusHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.NucleiTemplateDownloadStatusReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		status := logic.GetDownloadStatus(req.TaskId)
+		if status == nil {
+			httpx.OkJson(w, &types.NucleiTemplateDownloadStatusResp{
+				Code:   404,
+				Msg:    "任务不存在",
+				Status: "not_found",
+			})
+			return
+		}
+
+		httpx.OkJson(w, &types.NucleiTemplateDownloadStatusResp{
+			Code:          0,
+			Msg:           "success",
+			Status:        status.Status,
+			Progress:      status.Progress,
+			TemplateCount: status.TemplateCount,
+			Error:         status.Error,
+		})
+	}
+}

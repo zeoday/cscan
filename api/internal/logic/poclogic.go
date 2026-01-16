@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"cscan/api/internal/svc"
@@ -15,6 +16,7 @@ import (
 	"cscan/rpc/task/pb"
 	"cscan/scanner"
 
+	"github.com/projectdiscovery/nuclei/v3/pkg/installer"
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.mongodb.org/mongo-driver/bson"
 	"gopkg.in/yaml.v3"
@@ -1270,6 +1272,21 @@ func parseAuthor(author interface{}) string {
 
 // ==================== Nuclei模板库下载 ====================
 
+// 下载任务状态
+type DownloadTaskStatus struct {
+	Status        string // pending/downloading/completed/failed
+	Progress      int    // 进度百分比 0-100
+	TemplateCount int    // 已下载模板数量
+	Error         string // 错误信息
+	StartTime     time.Time
+}
+
+// 全局下载任务状态存储
+var (
+	downloadTasks   = make(map[string]*DownloadTaskStatus)
+	downloadTasksMu sync.RWMutex
+)
+
 type NucleiTemplateDownloadLogic struct {
 	logx.Logger
 	ctx    context.Context
@@ -1285,117 +1302,206 @@ func NewNucleiTemplateDownloadLogic(ctx context.Context, svcCtx *svc.ServiceCont
 }
 
 func (l *NucleiTemplateDownloadLogic) DownloadTemplates(req *types.NucleiTemplateDownloadReq) (resp *types.NucleiTemplateDownloadResp, err error) {
-	// 默认使用 auto 自动检测
-	region := req.Region
-	if region == "" {
-		region = "auto"
-	}
+	// 生成任务ID
+	taskId := fmt.Sprintf("dl_%d", time.Now().UnixNano())
 
-	// 验证 region 参数
-	if region != "auto" && region != "github" && region != "gitee" {
-		return &types.NucleiTemplateDownloadResp{
-			Code: 400,
-			Msg:  "无效的 region 参数，支持: auto, github, gitee",
-		}, nil
+	// 初始化任务状态
+	downloadTasksMu.Lock()
+	downloadTasks[taskId] = &DownloadTaskStatus{
+		Status:    "pending",
+		Progress:  0,
+		StartTime: time.Now(),
 	}
+	downloadTasksMu.Unlock()
 
 	// 异步执行下载任务
-	go l.downloadTemplatesAsync(region, req.Force)
+	go l.downloadTemplatesWithProgress(taskId, req.Force)
 
 	return &types.NucleiTemplateDownloadResp{
-		Code: 0,
-		Msg:  "模板库下载任务已启动，请稍后刷新查看",
+		Code:   0,
+		Msg:    "模板库下载任务已启动",
+		TaskId: taskId,
 	}, nil
 }
 
-func (l *NucleiTemplateDownloadLogic) downloadTemplatesAsync(region string, force bool) {
-	logx.Infof("[Nuclei Templates] Starting download task, region=%s, force=%v", region, force)
+// GetDownloadStatus 获取下载状态
+func GetDownloadStatus(taskId string) *DownloadTaskStatus {
+	downloadTasksMu.RLock()
+	defer downloadTasksMu.RUnlock()
+	if status, ok := downloadTasks[taskId]; ok {
+		return status
+	}
+	return nil
+}
 
-	// 获取数据目录（优先使用环境变量，否则使用默认路径）
+// updateDownloadStatus 更新下载状态
+func updateDownloadStatus(taskId string, status string, progress int, templateCount int, errMsg string) {
+	downloadTasksMu.Lock()
+	defer downloadTasksMu.Unlock()
+	if task, ok := downloadTasks[taskId]; ok {
+		task.Status = status
+		task.Progress = progress
+		task.TemplateCount = templateCount
+		task.Error = errMsg
+	}
+}
+
+func (l *NucleiTemplateDownloadLogic) downloadTemplatesWithProgress(taskId string, force bool) {
+	logx.Infof("[Nuclei Templates] Starting download task %s, force=%v", taskId, force)
+
+	// 更新状态为下载中
+	updateDownloadStatus(taskId, "downloading", 5, 0, "")
+
+	// 获取数据目录
 	dataDir := os.Getenv("DATA_DIR")
 	if dataDir == "" {
 		dataDir = "/app/data"
 	}
-	templatesDir := dataDir + "/nuclei-templates"
 	lockFile := dataDir + "/.nuclei-templates-initialized"
+
+	// Nuclei 默认模板目录
+	homeDir, _ := os.UserHomeDir()
+	templatesDir := filepath.Join(homeDir, "nuclei-templates")
 
 	// 检查是否已初始化（非强制模式下）
 	if !force {
 		if _, err := os.Stat(lockFile); err == nil {
-			// 检查模板目录是否存在且非空
 			if entries, err := os.ReadDir(templatesDir); err == nil && len(entries) > 0 {
-				logx.Info("[Nuclei Templates] Template library already initialized, skipping...")
+				templateCount := l.countTemplates(templatesDir)
+				logx.Info("[Nuclei Templates] Template library already initialized")
+				updateDownloadStatus(taskId, "completed", 100, templateCount, "")
 				return
 			}
 		}
 	}
 
-	// 删除已存在的模板目录（无论是否强制，只要需要下载就清理）
-	logx.Info("[Nuclei Templates] Cleaning existing templates directory...")
-	if err := os.Remove(lockFile); err != nil && !os.IsNotExist(err) {
-		logx.Errorf("[Nuclei Templates] Failed to remove lock file: %v", err)
-	}
-	if err := os.RemoveAll(templatesDir); err != nil && !os.IsNotExist(err) {
-		logx.Errorf("[Nuclei Templates] Failed to remove templates directory: %v", err)
-		return
+	// 强制更新时，删除锁文件
+	if force {
+		updateDownloadStatus(taskId, "downloading", 10, 0, "")
+		logx.Info("[Nuclei Templates] Force update requested, removing lock file...")
+		_ = os.Remove(lockFile)
+		// 强制更新时也删除模板目录
+		_ = os.RemoveAll(templatesDir)
 	}
 
-	// 确保父目录存在
+	// 确保数据目录存在
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		logx.Errorf("[Nuclei Templates] Failed to create data directory: %v", err)
+		updateDownloadStatus(taskId, "failed", 0, 0, "创建数据目录失败: "+err.Error())
 		return
 	}
 
-	// 自动检测地区
-	if region == "auto" {
-		region = l.detectRegion()
+	updateDownloadStatus(taskId, "downloading", 10, 0, "")
+
+	// 检查模板目录是否已存在且有内容
+	if entries, err := os.ReadDir(templatesDir); err == nil && len(entries) > 0 {
+		templateCount := l.countTemplates(templatesDir)
+		if templateCount > 0 {
+			logx.Infof("[Nuclei Templates] Templates already exist: %d files", templateCount)
+			updateDownloadStatus(taskId, "completed", 100, templateCount, "")
+			return
+		}
 	}
 
-	// 根据地区选择下载源列表
-	var repoURLs []string
-	if region == "github" {
-		repoURLs = []string{
-			"https://github.com/projectdiscovery/nuclei-templates.git",
+	// 启动进度模拟
+	done := make(chan bool)
+	go func() {
+		progress := 10
+		ticker := time.NewTicker(800 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if progress < 85 {
+					progress += 3
+					count := l.countTemplates(templatesDir)
+					updateDownloadStatus(taskId, "downloading", progress, count, "")
+				}
+			}
 		}
-		logx.Info("[Nuclei Templates] Using GitHub official repository")
-	} else {
-		// 国内镜像列表，按优先级排序
-		repoURLs = []string{
-			"https://gitclone.com/github.com/projectdiscovery/nuclei-templates.git",
-			"https://gh-proxy.org/https://github.com/projectdiscovery/nuclei-templates.git",
-			"https://gh-proxy.com/https://github.com/projectdiscovery/nuclei-templates.git",
-			"https://ghproxy.cn/https://github.com/projectdiscovery/nuclei-templates.git",
-		}
-		logx.Info("[Nuclei Templates] Using China mirrors")
+	}()
+
+	// 尝试多种下载方式
+	var downloadErr error
+	
+	// 方式1: 尝试使用 Nuclei SDK
+	logx.Info("[Nuclei Templates] Trying Nuclei SDK...")
+	updateDownloadStatus(taskId, "downloading", 15, 0, "")
+	
+	installer.HideProgressBar = true
+	installer.HideUpdateChangesTable = true
+	installer.HideReleaseNotes = true
+
+	tm := &installer.TemplateManager{
+		DisablePublicTemplates: false,
 	}
 
-	// 依次尝试下载
-	var lastErr error
-	var successURL string
-	for _, repoURL := range repoURLs {
-		logx.Infof("[Nuclei Templates] Trying to download from %s...", repoURL)
+	downloadErr = tm.FreshInstallIfNotExists()
+	
+	// 如果 SDK 失败，尝试使用 git clone
+	if downloadErr != nil {
+		logx.Error("[Nuclei Templates] SDK failed: %v, trying git clone...", downloadErr)
+		updateDownloadStatus(taskId, "downloading", 25, 0, "")
 		
-		// 每次尝试前确保目录不存在
+		// 清理可能的部分下载
 		_ = os.RemoveAll(templatesDir)
 		
-		// 配置 git 环境变量，禁用 SSL 验证（解决 schannel 问题）
-		cmd := exec.Command("git", "clone", "--depth", "1", repoURL, templatesDir)
-		cmd.Env = append(os.Environ(),
-			"GIT_SSL_NO_VERIFY=true",
-			"GIT_TERMINAL_PROMPT=0",
-		)
-		output, err := cmd.CombinedOutput()
-		if err == nil {
-			successURL = repoURL
-			logx.Infof("[Nuclei Templates] Successfully downloaded from %s", repoURL)
-			break
+		// 尝试多个镜像源
+		mirrors := []string{
+			"https://github.com/projectdiscovery/nuclei-templates.git",
+			"https://ghproxy.com/https://github.com/projectdiscovery/nuclei-templates.git",
+			"https://mirror.ghproxy.com/https://github.com/projectdiscovery/nuclei-templates.git",
 		}
-		lastErr = fmt.Errorf("%v, output: %s", err, string(output))
-		logx.Errorf("[Nuclei Templates] Failed to download from %s: %v", repoURL, lastErr)
+		
+		for i, mirror := range mirrors {
+			logx.Infof("[Nuclei Templates] Trying mirror %d: %s", i+1, mirror)
+			updateDownloadStatus(taskId, "downloading", 30+i*15, 0, "")
+			
+			// 每次尝试前清理目录
+			_ = os.RemoveAll(templatesDir)
+			
+			cmd := exec.Command("git", "clone", "--depth", "1", mirror, templatesDir)
+			cmd.Env = append(os.Environ(),
+				"GIT_SSL_NO_VERIFY=true",
+				"GIT_TERMINAL_PROMPT=0",
+			)
+			
+			output, err := cmd.CombinedOutput()
+			if err == nil {
+				logx.Infof("[Nuclei Templates] Successfully cloned from %s", mirror)
+				downloadErr = nil
+				break
+			}
+			logx.Infof("[Nuclei Templates] Mirror %s failed: %v, output: %s", mirror, err, string(output))
+			downloadErr = fmt.Errorf("git clone failed: %v", err)
+		}
 	}
 
-	if successURL == "" {
-		logx.Errorf("[Nuclei Templates] All download sources failed, last error: %v", lastErr)
+	// 方式3: 如果网络下载都失败，尝试使用 Docker 内置的兜底模板
+	if downloadErr != nil {
+		builtinDir := "/app/nuclei-templates-builtin"
+		if info, err := os.Stat(builtinDir); err == nil && info.IsDir() {
+			logx.Info("[Nuclei Templates] Using builtin templates as fallback...")
+			updateDownloadStatus(taskId, "downloading", 80, 0, "")
+			
+			// 复制内置模板到目标目录
+			cmd := exec.Command("cp", "-r", builtinDir, templatesDir)
+			if output, err := cmd.CombinedOutput(); err == nil {
+				logx.Info("[Nuclei Templates] Successfully copied builtin templates")
+				downloadErr = nil
+			} else {
+				logx.Errorf("[Nuclei Templates] Failed to copy builtin templates: %v, output: %s", err, string(output))
+			}
+		}
+	}
+
+	close(done)
+
+	if downloadErr != nil {
+		logx.Errorf("[Nuclei Templates] All download methods failed: %v", downloadErr)
+		updateDownloadStatus(taskId, "failed", 0, 0, "下载失败，请使用上传ZIP包方式导入模板")
 		return
 	}
 
@@ -1403,33 +1509,29 @@ func (l *NucleiTemplateDownloadLogic) downloadTemplatesAsync(region string, forc
 	templateCount := l.countTemplates(templatesDir)
 	logx.Infof("[Nuclei Templates] Found %d template files", templateCount)
 
+	if templateCount == 0 {
+		updateDownloadStatus(taskId, "failed", 0, 0, "下载完成但未找到模板文件")
+		return
+	}
+
 	// 创建锁文件
-	lockContent := fmt.Sprintf("initialized_at=%s\nsource=%s\nregion=%s\ntemplate_count=%d\n",
-		fmt.Sprintf("%v", l.ctx.Value("time")), successURL, region, templateCount)
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
-		logx.Errorf("[Nuclei Templates] Failed to create lock file: %v", err)
-	}
+	lockContent := fmt.Sprintf("initialized_at=%s\nsource=nuclei-templates\ntemplate_count=%d\n",
+		time.Now().UTC().Format(time.RFC3339), templateCount)
+	_ = os.WriteFile(lockFile, []byte(lockContent), 0644)
 
+	updateDownloadStatus(taskId, "completed", 100, templateCount, "")
 	logx.Info("[Nuclei Templates] Download completed successfully")
+
+	// 5分钟后清理任务状态
+	go func() {
+		time.Sleep(5 * time.Minute)
+		downloadTasksMu.Lock()
+		delete(downloadTasks, taskId)
+		downloadTasksMu.Unlock()
+	}()
 }
 
-// detectRegion 自动检测地区（通过测试 GitHub 连接）
-func (l *NucleiTemplateDownloadLogic) detectRegion() string {
-	logx.Info("[Nuclei Templates] Auto-detecting region...")
 
-	// 尝试连接 GitHub（超时 5 秒）
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", "-h", "https://github.com/projectdiscovery/nuclei-templates.git")
-	if err := cmd.Run(); err == nil {
-		logx.Info("[Nuclei Templates] GitHub accessible, using GitHub source")
-		return "github"
-	}
-
-	logx.Info("[Nuclei Templates] GitHub not accessible, using China mirrors")
-	return "china"
-}
 
 // countTemplates 统计模板文件数量
 func (l *NucleiTemplateDownloadLogic) countTemplates(dir string) int {

@@ -60,6 +60,8 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{Method: http.MethodPost, Path: "/api/v1/login", Handler: user.LoginHandler(svcCtx)},
+			// 全局主题配置（无需认证，所有人可获取）
+			{Method: http.MethodPost, Path: "/api/v1/theme/config/get", Handler: notify.ThemeConfigGetHandler(svcCtx)},
 			// Worker安装相关（无需认证，Worker需要调用）
 			{Method: http.MethodGet, Path: "/api/v1/worker/download", Handler: worker.WorkerDownloadHandler(svcCtx)},
 			{Method: http.MethodPost, Path: "/api/v1/worker/validate", Handler: worker.WorkerValidateKeyHandler(svcCtx)},
@@ -247,6 +249,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/categories", Handler: poc.NucleiTemplateCategoriesHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/sync", Handler: poc.NucleiTemplateSyncHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/download", Handler: poc.NucleiTemplateDownloadHandler(svcCtx)},
+		{Method: http.MethodGet, Path: "/api/v1/poc/nuclei/download/status", Handler: poc.NucleiTemplateDownloadStatusHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/clear", Handler: poc.NucleiTemplateClearHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/updateEnabled", Handler: poc.NucleiTemplateUpdateEnabledHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/poc/nuclei/detail", Handler: poc.NucleiTemplateDetailHandler(svcCtx)},
@@ -338,6 +341,9 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/notify/providers", Handler: notify.NotifyProviderListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/notify/highrisk/config/get", Handler: notify.HighRiskFilterConfigGetHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/notify/highrisk/config/save", Handler: notify.HighRiskFilterConfigSaveHandler(svcCtx)},
+
+		// 全局主题配置（需要认证才能保存）
+		{Method: http.MethodPost, Path: "/api/v1/theme/config/save", Handler: notify.ThemeConfigSaveHandler(svcCtx)},
 
 		// 资产指纹和端口统计
 		{Method: http.MethodPost, Path: "/api/v1/asset/fingerprints/list", Handler: asset.AssetFingerprintsListHandler(svcCtx)},

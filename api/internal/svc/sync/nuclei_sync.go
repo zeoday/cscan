@@ -116,19 +116,28 @@ func (s *NucleiSyncService) GetStats() map[string]int {
 }
 
 // getNucleiTemplatesDir 获取Nuclei模板目录
+// 优先级：用户目录 > Docker内置兜底目录
 func getNucleiTemplatesDir() string {
 	homeDir, _ := os.UserHomeDir()
 	possiblePaths := []string{
+		// Nuclei 内置更新功能的默认目录（优先）
 		filepath.Join(homeDir, "nuclei-templates"),
+		// 其他可能的位置
 		filepath.Join(homeDir, ".local", "nuclei-templates"),
 		filepath.Join(homeDir, ".nuclei-templates"),
 		"/opt/nuclei-templates",
+		"/app/data/nuclei-templates",
+		// Docker 构建时预下载的兜底模板（最后使用）
+		"/app/nuclei-templates-builtin",
 		"C:\\nuclei-templates",
 	}
 
 	for _, path := range possiblePaths {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return path
+			// 检查目录是否有内容
+			if entries, err := os.ReadDir(path); err == nil && len(entries) > 0 {
+				return path
+			}
 		}
 	}
 	return ""

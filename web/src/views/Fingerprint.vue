@@ -1162,7 +1162,7 @@ SpringBoot-Actuator:
         <template #trigger>
           <el-button type="primary">{{ $t('fingerprint.selectFile') }}</el-button>
         </template>
-        <span style="margin-left: 10px; color: #909399">{{ httpServiceImportFileName || $t('fingerprint.noFileSelected') }}</span>
+        <span class="text-muted" style="margin-left: 10px">{{ httpServiceImportFileName || $t('fingerprint.noFileSelected') }}</span>
       </el-upload>
       
       <el-input
@@ -1735,11 +1735,11 @@ async function handleImportFingerprints() {
     // 显示导入结果
     let resultHtml = `<div style="text-align: center; font-size: 14px;">
       <p style="margin-bottom: 10px;">批量导入完成</p>
-      <p><strong style="color: #67c23a; font-size: 20px;">${totalImported}</strong> 个指纹导入成功</p>
-      <p><strong style="color: #909399; font-size: 20px;">${totalSkipped}</strong> 个指纹已跳过</p>`
+      <p><strong class="text-success" style="font-size: 20px;">${totalImported}</strong> 个指纹导入成功</p>
+      <p><strong class="text-muted" style="font-size: 20px;">${totalSkipped}</strong> 个指纹已跳过</p>`
     
     if (failedFiles.length > 0) {
-      resultHtml += `<p style="color: #f56c6c; margin-top: 10px;">失败文件：</p>
+      resultHtml += `<p class="text-danger" style="margin-top: 10px;">失败文件：</p>
         <div style="text-align: left; font-size: 12px; max-height: 100px; overflow-y: auto;">
           ${failedFiles.map(f => `<div>${f}</div>`).join('')}
         </div>`
@@ -1826,8 +1826,8 @@ async function handleImportBuiltinFingerprints() {
       ElMessageBox.alert(
         `<div style="text-align: center; font-size: 14px;">
           <p style="margin-bottom: 10px;">导入完成</p>
-          <p><strong style="color: #67c23a; font-size: 20px;">${res.imported || 0}</strong> 个指纹导入成功</p>
-          <p><strong style="color: #909399; font-size: 20px;">${res.skipped || 0}</strong> 个指纹已跳过</p>
+          <p><strong class="text-success" style="font-size: 20px;">${res.imported || 0}</strong> 个指纹导入成功</p>
+          <p><strong class="text-muted" style="font-size: 20px;">${res.skipped || 0}</strong> 个指纹已跳过</p>
         </div>`,
         '导入结果',
         {
@@ -2847,8 +2847,8 @@ async function handleImportActiveFingerprints() {
       ElMessageBox.alert(
         `<div style="text-align: center; font-size: 14px;">
           <p style="margin-bottom: 10px;">导入完成</p>
-          <p><strong style="color: #67c23a; font-size: 20px;">${res.imported || 0}</strong> 个指纹新增</p>
-          <p><strong style="color: #e6a23c; font-size: 20px;">${res.updated || 0}</strong> 个指纹更新</p>
+          <p><strong class="text-success" style="font-size: 20px;">${res.imported || 0}</strong> 个指纹新增</p>
+          <p><strong class="text-warning" style="font-size: 20px;">${res.updated || 0}</strong> 个指纹更新</p>
         </div>`,
         '导入结果',
         {

@@ -428,7 +428,7 @@ function handleCommand(command) {
 
 .main {
   background: hsl(var(--background));
-  padding: 20px;
+  padding: 20px 200px;
   overflow-y: auto;
   transition: background 0.3s;
 }

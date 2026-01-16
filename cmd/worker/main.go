@@ -27,11 +27,6 @@ var (
 	workerName  = flag.String("n", getEnvOrDefault("CSCAN_NAME", ""), "worker name (default: hostname-pid)")
 	concurrency = flag.Int("c", getEnvIntOrDefault("CSCAN_CONCURRENCY", 5), "concurrency")
 	installKey  = flag.String("k", getEnvOrDefault("CSCAN_KEY", ""), "install key for authentication")
-
-	// 废弃参数（保留兼容性，但会输出警告）
-	redisAddr = flag.String("r", "", "[DEPRECATED] redis address - no longer needed, will be ignored")
-	redisPass = flag.String("rp", "", "[DEPRECATED] redis password - no longer needed, will be ignored")
-	apiAddr   = flag.String("a", "", "[DEPRECATED] use -s instead for API server address")
 )
 
 // getEnvOrDefault 获取环境变量，如果不存在则返回默认值
@@ -106,21 +101,6 @@ func main() {
 	// 禁用统计日志
 	stat.DisableLog()
 	logx.DisableStat()
-
-	// 检查废弃参数并输出警告
-	if *redisAddr != "" {
-		fmt.Println("[Worker] WARNING: -r (redis address) is deprecated and will be ignored. Worker now communicates through API only.")
-	}
-	if *redisPass != "" {
-		fmt.Println("[Worker] WARNING: -rp (redis password) is deprecated and will be ignored.")
-	}
-	if *apiAddr != "" {
-		fmt.Println("[Worker] WARNING: -a is deprecated, please use -s for API server address.")
-		// 如果用户使用了旧的 -a 参数，将其值赋给 serverAddr
-		if *serverAddr == "http://localhost:8888" {
-			*serverAddr = *apiAddr
-		}
-	}
 
 	// 生成Worker名称
 	name := *workerName

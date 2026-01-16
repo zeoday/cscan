@@ -7,20 +7,12 @@
           <template #header>
             <div class="card-header">
               <span>{{ $t('poc.nucleiTemplateLib') }}</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+              <span class="card-header-hint">
                 {{ $t('poc.totalTemplates', { count: templateStats.total || 0 }) }}
               </span>
-              <el-dropdown style="margin-left: auto" @command="handleSyncCommand">
-                <el-button type="primary" size="small" :loading="syncLoading">
-                  <el-icon><Refresh /></el-icon>{{ $t('poc.syncTemplate') }}<el-icon class="el-icon--right"><arrow-down /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="download">{{ $t('poc.downloadTemplateLib') }}</el-dropdown-item>
-                    <el-dropdown-item command="local">{{ $t('poc.importFromLocal') }}</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button type="primary" size="small" style="margin-left: auto" :loading="syncLoading" @click="handleOpenDownloadDialog">
+                <el-icon><Refresh /></el-icon>{{ $t('poc.syncTemplate') }}
+              </el-button>
               <el-button type="danger" size="small" plain style="margin-left: 10px" @click="handleClearTemplates">
                 {{ $t('poc.clearTemplates') }}
               </el-button>
@@ -95,7 +87,7 @@
                 <el-tag v-for="tag in (row.tags || [])" :key="tag" size="small" style="margin-right: 3px">
                   {{ tag }}
                 </el-tag>
-                <span v-if="row.tags && row.tags.length > 4" style="color: #909399">+{{ row.tags.length - 4 }}</span>
+                <span v-if="row.tags && row.tags.length > 4" class="more-count">+{{ row.tags.length - 4 }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="author" :label="$t('poc.author')" width="100" show-overflow-tooltip />
@@ -125,7 +117,7 @@
           <template #header>
             <div class="card-header">
               <span>{{ $t('poc.appTagMappingConfig') }}</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+              <span class="card-header-hint">
                 {{ $t('poc.totalMappings', { count: tagMappings.length || 0 }) }}
               </span>
               <el-button type="primary" size="small" style="margin-left: auto" @click="showTagMappingForm()">
@@ -169,7 +161,7 @@
           <template #header>
             <div class="card-header">
               <span>{{ $t('poc.customNucleiPoc') }}</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+              <span class="card-header-hint">
                 {{ $t('poc.totalPocs', { count: pocPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto">
@@ -270,7 +262,7 @@
           <template #header>
             <div class="card-header">
               <span>{{ $t('poc.dirscanDictManage') }}</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+              <span class="card-header-hint">
                 {{ $t('poc.totalDicts', { count: dirscanDictPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto">
@@ -330,7 +322,7 @@
           <template #header>
             <div class="card-header">
               <span>{{ $t('poc.subdomainDictManage') }}</span>
-              <span style="color: #909399; font-size: 13px; margin-left: 10px">
+              <span class="text-muted" style="font-size: 13px; margin-left: 10px">
                 {{ $t('poc.totalDicts', { count: subdomainDictPagination.total || 0 }) }}
               </span>
               <div style="margin-left: auto">
@@ -396,7 +388,7 @@
         </el-form-item>
         <el-form-item :label="$t('poc.pathListLabel')" prop="content">
           <div style="width: 100%">
-            <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text">
               {{ $t('poc.pathListHint') }}
             </div>
             <el-input
@@ -405,7 +397,7 @@
               :rows="15"
               placeholder="/admin&#10;/login&#10;/api&#10;/backup&#10;/.git&#10;/config"
             />
-            <div style="margin-top: 8px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text" style="margin-top: 8px">
               {{ $t('poc.currentPathCount') }}: {{ countDictPaths(dirscanDictForm.content) }}
             </div>
           </div>
@@ -431,7 +423,7 @@
         </el-form-item>
         <el-form-item :label="$t('poc.wordListLabel')" prop="content">
           <div style="width: 100%">
-            <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text">
               {{ $t('poc.wordListHint') }}
             </div>
             <el-input
@@ -440,7 +432,7 @@
               :rows="15"
               placeholder="www&#10;mail&#10;ftp&#10;admin&#10;api&#10;dev&#10;test"
             />
-            <div style="margin-top: 8px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text" style="margin-top: 8px">
               {{ $t('poc.currentWordCount') }}: {{ countSubdomainWords(subdomainDictForm.content) }}
             </div>
           </div>
@@ -467,7 +459,7 @@
             :placeholder="$t('poc.nucleiTagsPlaceholder')"
             style="width: 100%"
           />
-          <div style="color: #909399; font-size: 12px; margin-top: 4px;">
+          <div class="text-muted hint-text" style="margin-top: 4px;">
             {{ $t('poc.commonTags') }}
           </div>
         </el-form-item>
@@ -490,7 +482,7 @@
         <el-form-item :label="$t('poc.yamlContent')" prop="content">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-              <span style="color: #909399; font-size: 12px">{{ $t('poc.yamlHint') }}</span>
+              <span class="text-muted hint-text">{{ $t('poc.yamlHint') }}</span>
               <el-button type="primary" size="small" @click="showAiAssistDialog" :icon="MagicStick">{{ $t('poc.aiAssist') }}</el-button>
             </div>
             <div class="yaml-editor-wrapper">
@@ -573,7 +565,7 @@
             </el-form-item>
             <el-form-item :label="$t('poc.serverAddress')">
               <el-input v-model="aiConfig.baseUrl" placeholder="http://127.0.0.1:8045" />
-              <div style="color: #909399; font-size: 12px; margin-top: 4px;">
+              <div class="text-muted hint-text" style="margin-top: 4px;">
                 {{ aiConfig.protocol === 'openai' ? 'OpenAI: /v1/chat/completions' : aiConfig.protocol === 'anthropic' ? 'Anthropic: /v1/messages' : 'Gemini: /v1beta/models/...' }}
               </div>
             </el-form-item>
@@ -668,10 +660,10 @@
               style="display: none" 
               @change="handleCustomPocFolderSelect"
             />
-            <div style="margin-top: 8px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text" style="margin-top: 8px">
               {{ $t('poc.folderSelectHint') }}
             </div>
-            <div v-if="uploadedFileCount > 0" style="margin-top: 10px; color: #67c23a; font-size: 13px">
+            <div v-if="uploadedFileCount > 0" class="text-success" style="margin-top: 10px; font-size: 13px">
               <el-icon><UploadFilled /></el-icon> {{ $t('poc.scannedFiles', { count: uploadedFileCount }) }}
             </div>
           </div>
@@ -679,7 +671,7 @@
         <!-- XRAY格式：文本粘贴 -->
         <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'text'" :label="$t('poc.yamlContent')">
           <div style="width: 100%">
-            <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text">
               {{ $t('poc.xrayPasteHint') }}
             </div>
             <div class="yaml-editor-wrapper">
@@ -713,11 +705,11 @@
               <template #tip>
                 <div class="el-upload__tip">
                   {{ $t('poc.uploadTip') }}
-                  <span style="color: #e6a23c">{{ $t('poc.xrayConvertNote') }}</span>
+                  <span class="text-warning">{{ $t('poc.xrayConvertNote') }}</span>
                 </div>
               </template>
             </el-upload>
-            <div v-if="uploadedFileCount > 0" style="margin-top: 10px; color: #67c23a; font-size: 13px">
+            <div v-if="uploadedFileCount > 0" class="text-success" style="margin-top: 10px; font-size: 13px">
               <el-icon><UploadFilled /></el-icon> {{ $t('poc.uploadedFiles', { count: uploadedFileCount }) }}
             </div>
           </div>
@@ -745,7 +737,7 @@
               <el-tag v-for="tag in (row.tags || []).slice(0, 3)" :key="tag" size="small" style="margin-right: 3px">
                 {{ tag }}
               </el-tag>
-              <span v-if="row.tags && row.tags.length > 3" style="color: #909399">+{{ row.tags.length - 3 }}</span>
+              <span v-if="row.tags && row.tags.length > 3" class="text-muted">+{{ row.tags.length - 3 }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="$t('poc.operation')" width="120">
@@ -810,41 +802,80 @@
       </template>
     </el-dialog>
 
-    <!-- 下载Nuclei模板库对话框 -->
-    <el-dialog v-model="downloadTemplateDialogVisible" :title="$t('poc.downloadTemplateLib')" width="600px">
-      <el-form label-width="120px">
-        <el-form-item :label="$t('poc.downloadSource')">
-          <el-radio-group v-model="downloadTemplateRegion">
-            <el-radio value="auto">{{ $t('poc.autoDetect') }}</el-radio>
-            <el-radio value="github">GitHub ({{ $t('poc.international') }})</el-radio>
-            <el-radio value="gitee">Gitee ({{ $t('poc.china') }})</el-radio>
-          </el-radio-group>
-          <div style="margin-top: 8px; color: #909399; font-size: 12px">
-            {{ $t('poc.downloadSourceTip') }}
+    <!-- 同步Nuclei模板库对话框 -->
+    <el-dialog 
+      v-model="downloadTemplateDialogVisible" 
+      :title="$t('poc.syncTemplateLib')" 
+      width="550px"
+      :close-on-click-modal="!downloadTemplateLoading"
+      :close-on-press-escape="!downloadTemplateLoading"
+      :show-close="!downloadTemplateLoading"
+    >
+      <!-- 处理中显示进度 -->
+      <div v-if="downloadTemplateLoading" class="download-progress">
+        <el-progress 
+          :percentage="downloadProgress" 
+          :status="downloadStatus === 'failed' ? 'exception' : (downloadStatus === 'completed' ? 'success' : '')"
+          :stroke-width="20"
+          striped
+          striped-flow
+        />
+        <div class="progress-info">
+          <span v-if="downloadStatus === 'pending'">{{ $t('poc.downloadPreparing') }}</span>
+          <span v-else-if="downloadStatus === 'downloading'">{{ $t('poc.downloadInProgress') }}</span>
+          <span v-else-if="downloadStatus === 'extracting'">{{ $t('poc.extracting') }}</span>
+          <span v-else-if="downloadStatus === 'completed'">{{ $t('poc.downloadCompleted') }}</span>
+          <span v-else-if="downloadStatus === 'failed'" class="error-text">{{ downloadError }}</span>
+          <span v-if="downloadTemplateCount > 0" class="template-count">
+            {{ $t('poc.downloadedTemplates', { count: downloadTemplateCount }) }}
+          </span>
+        </div>
+      </div>
+      
+      <!-- 上传ZIP包 -->
+      <template v-else>
+        <div class="upload-section">
+          <el-upload
+            ref="zipUploadRef"
+            drag
+            :auto-upload="false"
+            :limit="1"
+            accept=".zip"
+            :on-change="handleZipFileChange"
+            :on-exceed="handleZipExceed"
+          >
+            <el-icon class="el-icon--upload"><Upload /></el-icon>
+            <div class="el-upload__text">
+              {{ $t('poc.dragZipHere') }} <em>{{ $t('poc.clickToSelect') }}</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                {{ $t('poc.zipTip') }}
+              </div>
+            </template>
+          </el-upload>
+          <div v-if="selectedZipFile" class="selected-file">
+            <el-tag type="success">{{ selectedZipFile.name }} ({{ formatFileSize(selectedZipFile.size) }})</el-tag>
           </div>
-        </el-form-item>
-        <el-form-item :label="$t('poc.forceDownload')">
-          <el-switch v-model="downloadTemplateForce" />
-          <div style="margin-top: 8px; color: #909399; font-size: 12px">
-            {{ $t('poc.forceDownloadTip') }}
-          </div>
-        </el-form-item>
-      </el-form>
-      <el-alert type="info" :closable="false" show-icon style="margin-top: 15px">
-        <template #title>
-          {{ $t('poc.downloadNote') }}
-        </template>
-        <template #default>
-          <div style="margin-top: 5px; color: #909399; font-size: 12px">
-            {{ $t('poc.downloadNoteTip') }}
-          </div>
-        </template>
-      </el-alert>
+        </div>
+      </template>
+      
       <template #footer>
-        <el-button @click="downloadTemplateDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
-        <el-button type="primary" @click="handleDownloadTemplates" :loading="downloadTemplateLoading">
-          {{ $t('poc.startDownload') }}
-        </el-button>
+        <template v-if="downloadStatus === 'completed'">
+          <el-button type="primary" @click="handleDownloadComplete">{{ $t('poc.done') }}</el-button>
+        </template>
+        <template v-else-if="downloadStatus === 'failed'">
+          <el-button @click="resetDownloadDialog">{{ $t('poc.retry') }}</el-button>
+        </template>
+        <template v-else-if="!downloadTemplateLoading">
+          <el-button @click="downloadTemplateDialogVisible = false">{{ $t('poc.cancel') }}</el-button>
+          <el-button type="primary" @click="handleUploadZip" :disabled="!selectedZipFile">
+            {{ $t('poc.startImport') }}
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button disabled>{{ $t('poc.processing') }}...</el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -905,7 +936,7 @@
             <el-tag v-for="tpl in selectedTemplates.slice(0, 10)" :key="tpl.id" size="small" style="margin-right: 5px; margin-bottom: 5px">
               {{ tpl.name || tpl.id }}
             </el-tag>
-            <span v-if="selectedTemplates.length > 10" style="color: #909399">+{{ selectedTemplates.length - 10 }}</span>
+            <span v-if="selectedTemplates.length > 10" class="text-muted">+{{ selectedTemplates.length - 10 }}</span>
           </div>
         </el-form-item>
         <el-form-item :label="$t('poc.targetUrlLabel')">
@@ -915,7 +946,7 @@
                 <el-radio-button value="text">{{ $t('poc.textInput') }}</el-radio-button>
                 <el-radio-button value="file">{{ $t('poc.fileUpload') }}</el-radio-button>
               </el-radio-group>
-              <span style="color: #909399; font-size: 12px;">
+              <span class="text-muted hint-text">
                 {{ batchTargetInputType === 'text' ? $t('poc.oneUrlPerLine') : $t('poc.supportsTxtFile') }}
               </span>
             </div>
@@ -942,7 +973,7 @@
                 <div class="el-upload__tip">{{ $t('poc.onlyTxtFile') }}</div>
               </template>
             </el-upload>
-            <div v-if="batchTargetUrls.length > 0" style="margin-top: 8px; color: #67c23a; font-size: 12px;">
+            <div v-if="batchTargetUrls.length > 0" class="text-success hint-text" style="margin-top: 8px;">
               {{ $t('poc.parsedUrls', { count: batchTargetUrls.length }) }}
             </div>
           </div>
@@ -1038,7 +1069,7 @@
             {{ $t('poc.scanAssetsTip') }}
           </template>
           <template #default>
-            <div style="margin-top: 5px; color: #909399; font-size: 12px">
+            <div class="text-muted hint-text" style="margin-top: 5px">
               {{ $t('poc.scanAssetsTipDetail') }}
             </div>
           </template>
@@ -1103,7 +1134,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete, MagicStick, FolderOpened } from '@element-plus/icons-vue'
-import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, downloadNucleiTemplates, clearNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc, getAIConfig, saveAIConfig, validatePocSyntax } from '@/api/poc'
+import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, downloadNucleiTemplates, getDownloadStatus, clearNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc, getAIConfig, saveAIConfig, validatePocSyntax } from '@/api/poc'
 import { getDirScanDictList, saveDirScanDict, deleteDirScanDict, clearDirScanDict } from '@/api/dirscan'
 import { getSubdomainDictList, saveSubdomainDict, deleteSubdomainDict, clearSubdomainDict } from '@/api/subdomain'
 import jsYaml from 'js-yaml'
@@ -1159,8 +1190,16 @@ const currentTemplate = ref({})
 // 下载模板库
 const downloadTemplateDialogVisible = ref(false)
 const downloadTemplateLoading = ref(false)
-const downloadTemplateRegion = ref('auto')
 const downloadTemplateForce = ref(false)
+const downloadTaskId = ref('')
+const downloadProgress = ref(0)
+const downloadStatus = ref('') // pending/downloading/extracting/completed/failed
+const downloadTemplateCount = ref(0)
+const downloadError = ref('')
+const syncTabActive = ref('upload')
+const selectedZipFile = ref(null)
+const zipUploadRef = ref(null)
+let downloadStatusTimer = null
 
 // 标签映射
 const tagMappings = ref([])
@@ -1540,15 +1579,133 @@ async function loadNucleiTemplates() {
   }
 }
 
+// 打开同步模板对话框
+function handleOpenDownloadDialog() {
+  resetDownloadDialog()
+  downloadTemplateDialogVisible.value = true
+}
+
 async function handleSyncCommand(command) {
   if (command === 'download') {
     // 显示下载对话框
+    resetDownloadDialog()
     downloadTemplateDialogVisible.value = true
-    downloadTemplateRegion.value = 'auto'
-    downloadTemplateForce.value = false
   } else if (command === 'local') {
     forceImport.value = false
     folderInputRef.value?.click()
+  }
+}
+
+// 重置下载对话框状态
+function resetDownloadDialog() {
+  downloadTemplateForce.value = false
+  downloadTemplateLoading.value = false
+  downloadTaskId.value = ''
+  downloadProgress.value = 0
+  downloadStatus.value = ''
+  downloadTemplateCount.value = 0
+  downloadError.value = ''
+  selectedZipFile.value = null
+  syncTabActive.value = 'upload'
+  if (zipUploadRef.value) {
+    zipUploadRef.value.clearFiles()
+  }
+  if (downloadStatusTimer) {
+    clearInterval(downloadStatusTimer)
+    downloadStatusTimer = null
+  }
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+// 处理ZIP文件选择
+function handleZipFileChange(file) {
+  if (file.raw.type !== 'application/zip' && !file.name.endsWith('.zip')) {
+    ElMessage.error(t('poc.onlyZipAllowed'))
+    zipUploadRef.value?.clearFiles()
+    selectedZipFile.value = null
+    return
+  }
+  selectedZipFile.value = file.raw
+}
+
+function handleZipExceed() {
+  ElMessage.warning(t('poc.onlyOneFile'))
+}
+
+// 上传ZIP包并解析
+async function handleUploadZip() {
+  if (!selectedZipFile.value) return
+  
+  downloadTemplateLoading.value = true
+  downloadStatus.value = 'extracting'
+  downloadProgress.value = 10
+  
+  try {
+    const zip = await JSZip.loadAsync(selectedZipFile.value)
+    downloadProgress.value = 30
+    
+    // 查找所有yaml文件
+    const yamlFiles = []
+    const filePromises = []
+    
+    zip.forEach((relativePath, zipEntry) => {
+      if (!zipEntry.dir && (relativePath.endsWith('.yaml') || relativePath.endsWith('.yml'))) {
+        // 跳过隐藏文件和特殊目录
+        if (relativePath.includes('/.') || relativePath.startsWith('.')) return
+        filePromises.push(
+          zipEntry.async('string').then(content => {
+            yamlFiles.push({ path: relativePath, content })
+          })
+        )
+      }
+    })
+    
+    await Promise.all(filePromises)
+    downloadProgress.value = 60
+    downloadTemplateCount.value = yamlFiles.length
+    
+    if (yamlFiles.length === 0) {
+      downloadStatus.value = 'failed'
+      downloadError.value = t('poc.noTemplatesInZip')
+      downloadTemplateLoading.value = false
+      return
+    }
+    
+    // 批量同步到数据库
+    downloadStatus.value = 'downloading'
+    downloadProgress.value = 70
+    
+    const batchSize = 200
+    let successCount = 0
+    
+    for (let i = 0; i < yamlFiles.length; i += batchSize) {
+      const batch = yamlFiles.slice(i, i + batchSize)
+      const res = await syncNucleiTemplates({
+        templates: batch,
+        force: i === 0 && downloadTemplateForce.value
+      })
+      if (res.code === 0) {
+        successCount += res.successCount || batch.length
+      }
+      downloadProgress.value = 70 + Math.floor((i / yamlFiles.length) * 25)
+    }
+    
+    downloadProgress.value = 100
+    downloadStatus.value = 'completed'
+    downloadTemplateCount.value = successCount
+    downloadTemplateLoading.value = false
+    
+  } catch (error) {
+    console.error('解析ZIP失败:', error)
+    downloadStatus.value = 'failed'
+    downloadError.value = t('poc.zipParseFailed') + ': ' + (error.message || '')
+    downloadTemplateLoading.value = false
   }
 }
 
@@ -1556,28 +1713,99 @@ async function handleSyncCommand(command) {
 async function handleDownloadTemplates() {
   try {
     downloadTemplateLoading.value = true
+    downloadStatus.value = 'pending'
+    downloadProgress.value = 0
+    
     const res = await downloadNucleiTemplates({
-      region: downloadTemplateRegion.value,
       force: downloadTemplateForce.value
     })
     
-    if (res.code === 0) {
-      ElMessage.success(res.msg || '模板库下载任务已启动')
-      downloadTemplateDialogVisible.value = false
-      
-      // 提示用户稍后刷新
-      ElMessage.info({
-        message: '模板下载需要一些时间，请稍后刷新页面查看',
-        duration: 5000
-      })
+    if (res.code === 0 && res.taskId) {
+      downloadTaskId.value = res.taskId
+      // 开始轮询状态
+      startPollingStatus()
     } else {
-      ElMessage.error(res.msg || '下载失败')
+      downloadStatus.value = 'failed'
+      downloadError.value = res.msg || '启动下载失败'
+      downloadTemplateLoading.value = false
     }
   } catch (error) {
     console.error('下载模板库失败:', error)
-    ElMessage.error('下载失败: ' + (error.message || '未知错误'))
-  } finally {
+    downloadStatus.value = 'failed'
+    downloadError.value = error.message || '未知错误'
     downloadTemplateLoading.value = false
+  }
+}
+
+// 开始轮询下载状态
+function startPollingStatus() {
+  if (downloadStatusTimer) {
+    clearInterval(downloadStatusTimer)
+  }
+  
+  downloadStatusTimer = setInterval(async () => {
+    try {
+      const res = await getDownloadStatus(downloadTaskId.value)
+      if (res.code === 0) {
+        downloadStatus.value = res.status
+        downloadProgress.value = res.progress
+        downloadTemplateCount.value = res.templateCount
+        
+        if (res.status === 'completed' || res.status === 'failed') {
+          clearInterval(downloadStatusTimer)
+          downloadStatusTimer = null
+          downloadTemplateLoading.value = false
+          
+          if (res.status === 'failed') {
+            downloadError.value = res.error || '下载失败'
+          }
+        }
+      } else if (res.code === 404) {
+        // 任务不存在
+        clearInterval(downloadStatusTimer)
+        downloadStatusTimer = null
+        downloadStatus.value = 'failed'
+        downloadError.value = '任务已过期'
+        downloadTemplateLoading.value = false
+      }
+    } catch (error) {
+      console.error('查询下载状态失败:', error)
+    }
+  }, 1000) // 每秒查询一次
+}
+
+// 下载完成后同步到数据库
+async function handleDownloadComplete() {
+  // 如果是上传ZIP方式，已经同步完成，直接关闭并刷新
+  if (syncTabActive.value === 'upload') {
+    downloadTemplateDialogVisible.value = false
+    resetDownloadDialog()
+    ElMessage.success(t('poc.syncSuccess'))
+    loadNucleiTemplateCategories()
+    loadNucleiTemplates()
+    return
+  }
+  
+  // 在线下载方式，需要触发同步
+  downloadTemplateDialogVisible.value = false
+  resetDownloadDialog()
+  
+  syncLoading.value = true
+  try {
+    const res = await syncNucleiTemplates({ force: false })
+    if (res.code === 0) {
+      ElMessage.success(t('poc.syncStarted'))
+      setTimeout(() => {
+        loadNucleiTemplateCategories()
+        loadNucleiTemplates()
+      }, 2000)
+    } else {
+      ElMessage.error(res.msg || t('poc.syncFailed'))
+    }
+  } catch (error) {
+    ElMessage.error(t('poc.syncFailed') + ': ' + (error.message || ''))
+  } finally {
+    syncLoading.value = false
   }
 }
 
@@ -3305,6 +3533,11 @@ let pollTimer = null
 onUnmounted(() => {
   cleanupValidation()
   cleanupScanAssets()
+  // 清理下载状态轮询
+  if (downloadStatusTimer) {
+    clearInterval(downloadStatusTimer)
+    downloadStatusTimer = null
+  }
 })
 
 // 清理验证相关资源
@@ -4349,19 +4582,48 @@ function countSubdomainWords(content) {
     justify-content: flex-end;
   }
 
+  .download-progress {
+    padding: 20px 0;
+    
+    .progress-info {
+      margin-top: 15px;
+      text-align: center;
+      color: var(--el-text-color-secondary);
+      font-size: 14px;
+      
+      .error-text {
+        color: var(--el-color-danger);
+      }
+      
+      .template-count {
+        display: block;
+        margin-top: 8px;
+        color: var(--el-color-success);
+        font-weight: 500;
+      }
+    }
+  }
+
+  .upload-section {
+    .selected-file {
+      margin-top: 15px;
+      text-align: center;
+    }
+  }
+
   .template-content-wrapper {
     :deep(.el-textarea__inner) {
-      background-color: #1e1e1e;
-      color: #d4d4d4;
-      border: 1px solid #3c3c3c;
+      background-color: var(--code-bg);
+      color: var(--code-text);
+      border: 1px solid var(--code-border);
     }
   }
 
   .yaml-editor-wrapper {
     :deep(.el-textarea__inner) {
-      background-color: #1e1e1e;
-      color: #d4d4d4;
-      border: 1px solid #3c3c3c;
+      background-color: var(--code-bg);
+      color: var(--code-text);
+      border: 1px solid var(--code-border);
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 13px;
     }
@@ -4384,8 +4646,8 @@ function countSubdomainWords(content) {
     }
 
     .logs-content {
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--code-bg);
+      color: var(--code-text);
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 12px;
       padding: 10px;
@@ -4442,8 +4704,8 @@ function countSubdomainWords(content) {
       padding: 12px 15px;
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 13px;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--code-bg);
+      color: var(--code-text);
       white-space: pre-wrap;
       word-break: break-all;
       max-height: 300px;
@@ -4472,8 +4734,8 @@ function countSubdomainWords(content) {
     }
 
     .logs-content {
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--code-bg);
+      color: var(--code-text);
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 12px;
       padding: 10px;

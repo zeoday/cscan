@@ -16,16 +16,23 @@ COPY . .
 # 编译 API 服务 - 自动适配当前架构
 RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /cscan-api ./api/cscan.go
 
+# 下载 nuclei-templates 作为兜底（构建时网络通畅）
+RUN git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git /nuclei-templates && \
+    rm -rf /nuclei-templates/.git
+
 # 运行镜像
 FROM alpine:3.19
 
 WORKDIR /app
 
-# 安装证书和依赖 (添加envsubst支持)
+# 安装证书和依赖
 RUN apk add --no-cache ca-certificates tzdata libpcap gettext
 
 # 复制 poc 目录
 COPY poc/ ./poc/
+
+# 复制预下载的 nuclei-templates（兜底模板）
+COPY --from=builder /nuclei-templates /app/nuclei-templates-builtin
 
 # 设置时区
 ENV TZ=Asia/Shanghai
@@ -34,12 +41,8 @@ ENV TZ=Asia/Shanghai
 COPY --from=builder /cscan-api .
 COPY docker/cscan-api.yaml ./etc/cscan-api.yaml.template
 COPY docker/entrypoint.sh ./
-COPY docker/init-nuclei-templates.sh ./
 
-RUN chmod +x ./entrypoint.sh ./init-nuclei-templates.sh
-
-# 支持配置 Nuclei 模板下载源（auto/github/gitee）
-ENV NUCLEI_REGION=auto
+RUN chmod +x ./entrypoint.sh
 
 EXPOSE 8888
 

@@ -97,12 +97,7 @@ const routes = [
         component: lazyLoad(() => import('@/views/CronTask.vue')),
         meta: { title: '定时扫描', icon: 'Timer' }
       },
-      {
-        path: 'vul',
-        name: 'Vul',
-        component: lazyLoad(() => import('@/views/Vul.vue')),
-        meta: { title: '漏洞管理', icon: 'Warning', hidden: true }
-      },
+
       {
         path: 'online-search',
         name: 'OnlineSearch',

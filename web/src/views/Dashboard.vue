@@ -80,7 +80,6 @@
             <div v-if="vulStats.total === 0" class="no-data">{{ $t('dashboard.noVulData') }}</div>
             <div v-else ref="vulCategoryChartRef" class="chart-container"></div>
           </div>
-          <div class="view-all-btn" @click="$router.push('/vul')">{{ $t('dashboard.viewAll') }}</div>
         </div>
 
 
@@ -152,7 +151,6 @@
             </div>
             <div v-if="recentVuls.length === 0" class="no-data">{{ $t('dashboard.noVuls') }}</div>
           </div>
-          <div class="view-all-btn" @click="$router.push('/vul')">{{ $t('dashboard.viewAll') }}</div>
         </div>
 
         <!-- Worker状态 -->
