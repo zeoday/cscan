@@ -25,6 +25,14 @@
         </el-form-item>
 
         <template v-if="filterConfig.enabled">
+          <el-divider content-position="left">{{ $t('highRiskFilter.newAssetNotify') }}</el-divider>
+          <el-form-item :label="$t('highRiskFilter.newAssetNotifyLabel')">
+            <el-switch v-model="filterConfig.newAssetNotify" />
+            <span class="hint-secondary" style="margin-left: 10px">
+              {{ $t('highRiskFilter.newAssetNotifyHint') }}
+            </span>
+          </el-form-item>
+
           <el-divider content-position="left">{{ $t('highRiskFilter.highRiskFingerprints') }}</el-divider>
           <el-form-item :label="$t('highRiskFilter.selectFingerprint')">
             <el-select 
@@ -93,6 +101,11 @@
         <span>{{ $t('highRiskFilter.configPreview') }}</span>
       </template>
       <el-descriptions :column="1" border>
+        <el-descriptions-item :label="$t('highRiskFilter.newAssetNotifyLabel')">
+          <el-tag :type="filterConfig.newAssetNotify ? 'success' : 'info'" size="small">
+            {{ filterConfig.newAssetNotify ? $t('highRiskFilter.enabled') : $t('highRiskFilter.disabled') }}
+          </el-tag>
+        </el-descriptions-item>
         <el-descriptions-item :label="$t('highRiskFilter.highRiskFingerprints')">
           <el-tag v-for="fp in filterConfig.highRiskFingerprints" :key="fp" style="margin-right: 5px; margin-bottom: 5px">
             {{ fp }}
@@ -138,7 +151,8 @@ const filterConfig = reactive({
   enabled: false,
   highRiskFingerprints: [],
   highRiskPorts: [],
-  highRiskPocSeverities: []
+  highRiskPocSeverities: [],
+  newAssetNotify: false
 })
 
 onMounted(() => {
@@ -196,6 +210,7 @@ async function loadFilterConfig() {
       filterConfig.highRiskFingerprints = res.config.highRiskFingerprints || []
       filterConfig.highRiskPorts = res.config.highRiskPorts || []
       filterConfig.highRiskPocSeverities = res.config.highRiskPocSeverities || []
+      filterConfig.newAssetNotify = res.config.newAssetNotify || false
     }
   } catch (e) {
     console.error('Load filter config error:', e)
@@ -210,7 +225,8 @@ async function saveConfig() {
       enabled: filterConfig.enabled,
       highRiskFingerprints: filterConfig.highRiskFingerprints,
       highRiskPorts: filterConfig.highRiskPorts,
-      highRiskPocSeverities: filterConfig.highRiskPocSeverities
+      highRiskPocSeverities: filterConfig.highRiskPocSeverities,
+      newAssetNotify: filterConfig.newAssetNotify
     })
     if (res.code === 0) {
       ElMessage.success(t('common.operationSuccess'))

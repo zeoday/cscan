@@ -75,6 +75,19 @@
             </div>
             <div class="stat-column filter-column">
               <el-checkbox v-model="searchForm.onlyUpdated">{{ $t('asset.onlyUpdated') }}</el-checkbox>
+              <el-select 
+                v-model="searchForm.updatedWithinDays" 
+                :placeholder="$t('asset.updatedWithinDays')" 
+                clearable 
+                size="small" 
+                style="width: 140px; margin-top: 8px"
+                @change="handleSearch"
+              >
+                <el-option :label="$t('asset.last1Day')" :value="1" />
+                <el-option :label="$t('asset.last3Days')" :value="3" />
+                <el-option :label="$t('asset.last7Days')" :value="7" />
+                <el-option :label="$t('asset.last30Days')" :value="30" />
+              </el-select>
             </div>
           </div>
         </el-tab-pane>
@@ -113,7 +126,7 @@
           </el-dropdown>
         </div>
       </div>
-      <el-table :data="tableData" v-loading="loading" stripe size="small" max-height="500" @selection-change="handleSelectionChange">
+      <el-table :data="tableData" v-loading="loading" stripe size="small" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="40" />
         <el-table-column type="index" :label="$t('asset.index')" width="60" />
         <el-table-column :label="$t('dashboard.asset')" min-width="200">
@@ -353,20 +366,31 @@
     </el-dialog>
 
     <!-- 历史记录对话框 -->
-    <el-dialog v-model="historyVisible" :title="$t('asset.scanHistory')" width="900px">
+    <el-dialog v-model="historyVisible" :title="$t('asset.scanHistory')" width="1000px">
       <div v-if="currentHistoryAsset" style="margin-bottom: 15px">
         <el-tag type="info">{{ currentHistoryAsset.authority }}</el-tag>
       </div>
       <el-table :data="historyList" v-loading="historyLoading" stripe size="small" max-height="500">
         <el-table-column prop="createTime" :label="$t('asset.scanTime')" width="160" />
-        <el-table-column prop="title" :label="$t('asset.pageTitle')" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="title" :label="$t('asset.pageTitle')" min-width="120" show-overflow-tooltip />
         <el-table-column prop="httpStatus" :label="$t('asset.statusCode')" width="80" />
-        <el-table-column :label="$t('asset.fingerprint')" min-width="150">
+        <el-table-column :label="$t('asset.fingerprint')" min-width="120">
           <template #default="{ row }">
             <el-tag v-for="app in (row.app || []).slice(0, 3)" :key="app" size="small" type="success" style="margin: 2px">
               {{ getAppName(app) }}
             </el-tag>
             <span v-if="(row.app || []).length > 3" class="more-apps">+{{ (row.app || []).length - 3 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('asset.changes')" min-width="200">
+          <template #default="{ row }">
+            <div v-if="row.changes && row.changes.length > 0" class="changes-cell">
+              <el-tag v-for="(change, idx) in row.changes.slice(0, 3)" :key="idx" size="small" type="warning" style="margin: 2px" :title="`${change.oldValue} → ${change.newValue}`">
+                {{ $t('asset.field.' + change.field, change.field) }}
+              </el-tag>
+              <span v-if="row.changes.length > 3" class="more-changes">+{{ row.changes.length - 3 }}</span>
+            </div>
+            <span v-else class="no-changes">-</span>
           </template>
         </el-table-column>
         <el-table-column :label="$t('common.operation')" width="100">
@@ -382,7 +406,7 @@
     </el-dialog>
 
     <!-- 历史详情对话框 -->
-    <el-dialog v-model="historyDetailVisible" :title="$t('asset.scanHistory')" width="800px">
+    <el-dialog v-model="historyDetailVisible" :title="$t('asset.scanHistory')" width="900px">
       <el-descriptions :column="2" border size="small" v-if="currentHistoryDetail">
         <el-descriptions-item :label="$t('asset.scanTime')" :span="2">{{ currentHistoryDetail.createTime }}</el-descriptions-item>
         <el-descriptions-item :label="$t('asset.pageTitle')" :span="2">{{ currentHistoryDetail.title || '-' }}</el-descriptions-item>
@@ -393,6 +417,36 @@
           <span v-if="!(currentHistoryDetail.app || []).length">-</span>
         </el-descriptions-item>
       </el-descriptions>
+      
+      <!-- 变更详情 -->
+      <el-card v-if="currentHistoryDetail && currentHistoryDetail.changes && currentHistoryDetail.changes.length > 0" style="margin-top: 15px">
+        <template #header>
+          <span>{{ $t('asset.changeDetails') }}</span>
+        </template>
+        <el-table :data="currentHistoryDetail.changes" stripe size="small">
+          <el-table-column prop="field" :label="$t('asset.changedField')" width="120">
+            <template #default="{ row }">
+              <el-tag size="small">{{ $t('asset.field.' + row.field, row.field) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="oldValue" :label="$t('asset.oldValue')" min-width="200">
+            <template #default="{ row }">
+              <span class="change-value old-value">{{ row.oldValue || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column width="50" align="center">
+            <template #default>
+              <el-icon><Right /></el-icon>
+            </template>
+          </el-table-column>
+          <el-table-column prop="newValue" :label="$t('asset.newValue')" min-width="200">
+            <template #default="{ row }">
+              <span class="change-value new-value">{{ row.newValue || '-' }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+      
       <el-tabs v-model="historyDetailTab" style="margin-top: 15px" v-if="currentHistoryDetail">
         <el-tab-pane label="Header" name="header">
           <div class="detail-content-box">
@@ -481,7 +535,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Right } from '@element-plus/icons-vue'
 import { getAssetList, getAssetStat, batchDeleteAsset, clearAsset, importAsset } from '@/api/asset'
 import { useWorkspaceStore } from '@/stores/workspace'
 import request from '@/api/request'
@@ -526,7 +580,7 @@ const importTargetCount = computed(() => {
 })
 
 const stat = reactive({ topPorts: [], topService: [], topApp: [], topIconHash: [] })
-const searchForm = reactive({ host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false, iconHash: '' })
+const searchForm = reactive({ host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false, iconHash: '', updatedWithinDays: null })
 const pagination = reactive({ page: 1, pageSize: 50, total: 0 })
 
 function handleWorkspaceChanged() { pagination.page = 1; loadData(); loadStat() }
@@ -595,7 +649,8 @@ async function loadData() {
       page: pagination.page, pageSize: pagination.pageSize,
       host: searchForm.host, port: searchForm.port, service: searchForm.service,
       title: searchForm.title, app: searchForm.app, orgId: searchForm.orgId,
-      onlyUpdated: searchForm.onlyUpdated, iconHash: searchForm.iconHash
+      onlyUpdated: searchForm.onlyUpdated, iconHash: searchForm.iconHash,
+      updatedWithinDays: searchForm.updatedWithinDays || 0
     })
     if (res.code === 0) { tableData.value = res.list || []; pagination.total = res.total }
   } finally { loading.value = false }
@@ -681,7 +736,7 @@ function cleanAppName(app) {
 
 function handleSearch() { pagination.page = 1; loadData() }
 function handleReset() {
-  Object.assign(searchForm, { host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false, iconHash: '' })
+  Object.assign(searchForm, { host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false, iconHash: '', updatedWithinDays: null })
   handleSearch(); loadStat()
 }
 
@@ -1361,6 +1416,36 @@ defineExpose({ refresh })
     color: var(--el-color-primary);
     text-decoration: none;
     &:hover { text-decoration: underline; }
+  }
+  
+  /* 变更详情样式 */
+  .changes-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+  }
+  .more-changes {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    margin-left: 4px;
+  }
+  .no-changes {
+    color: var(--el-text-color-placeholder);
+    font-size: 12px;
+  }
+  .change-value {
+    font-size: 12px;
+    word-break: break-all;
+    max-height: 60px;
+    overflow: auto;
+    display: block;
+  }
+  .old-value {
+    color: var(--el-color-danger);
+  }
+  .new-value {
+    color: var(--el-color-success);
   }
 }
 </style>

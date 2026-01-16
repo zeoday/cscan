@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"cscan/api/internal/logic/common"
 	"cscan/api/internal/svc"
@@ -18,6 +19,14 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// formatTimeIfNotZero 格式化时间，如果是零值则返回空字符串
+func formatTimeIfNotZero(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Local().Format("2006-01-02 15:04:05")
+}
 
 // cleanAppName 清理指纹名称，去掉类似 [custom(xxx)] 的后缀
 func cleanAppName(app string) string {
@@ -212,6 +221,13 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 	if req.OnlyUpdated {
 		filter["update"] = true
 	}
+	// 时间范围筛选：最近N天内更新的资产
+	if req.UpdatedWithinDays > 0 {
+		cutoffTime := time.Now().AddDate(0, 0, -req.UpdatedWithinDays)
+		filter["last_status_change_time"] = bson.M{"$gte": cutoffTime}
+		// 同时要求是已更新状态
+		filter["update"] = true
+	}
 	// 排除CDN/Cloud资产
 	if req.ExcludeCdn {
 		filter["cdn"] = bson.M{"$ne": true}
@@ -354,6 +370,8 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 			IsUpdated:  a.IsUpdated,
 			CreateTime: a.CreateTime.Local().Format("2006-01-02 15:04:05"),
 			UpdateTime: a.UpdateTime.Local().Format("2006-01-02 15:04:05"),
+			LastStatusChangeTime: formatTimeIfNotZero(a.LastStatusChangeTime),
+			FirstSeenTaskId:      a.FirstSeenTaskId,
 			// 组织信息
 			OrgId:   a.OrgId,
 			OrgName: orgName,
@@ -686,6 +704,16 @@ func (l *AssetHistoryLogic) AssetHistory(req *types.AssetHistoryReq, workspaceId
 
 	list := make([]types.AssetHistoryItem, 0, len(histories))
 	for _, h := range histories {
+		// 转换变更详情
+		var changes []types.FieldChange
+		for _, c := range h.Changes {
+			changes = append(changes, types.FieldChange{
+				Field:    c.Field,
+				OldValue: c.OldValue,
+				NewValue: c.NewValue,
+			})
+		}
+		
 		list = append(list, types.AssetHistoryItem{
 			Id:         h.Id.Hex(),
 			Authority:  h.Authority,
@@ -702,6 +730,7 @@ func (l *AssetHistoryLogic) AssetHistory(req *types.AssetHistoryReq, workspaceId
 			Screenshot: h.Screenshot,
 			TaskId:     h.TaskId,
 			CreateTime: h.CreateTime.Local().Format("2006-01-02 15:04:05"),
+			Changes:    changes,
 		})
 	}
 

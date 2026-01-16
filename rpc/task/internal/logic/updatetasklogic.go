@@ -250,6 +250,7 @@ func (l *UpdateTaskLogic) sendTaskNotification(workspaceId, mainTaskId, status s
 				HighRiskFingerprints: c.HighRiskFilter.HighRiskFingerprints,
 				HighRiskPorts:        c.HighRiskFilter.HighRiskPorts,
 				HighRiskPocSeverities: c.HighRiskFilter.HighRiskPocSeverities,
+				NewAssetNotify:       c.HighRiskFilter.NewAssetNotify,
 			}
 		}
 		configItems = append(configItems, item)

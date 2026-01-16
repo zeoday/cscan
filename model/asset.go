@@ -59,9 +59,11 @@ type Asset struct {
 	IsUpdated     bool               `bson:"update" json:"isUpdated"`
 	TaskId        string             `bson:"taskId" json:"taskId"`
 	LastTaskId    string             `bson:"last_task_id,omitempty" json:"lastTaskId"` // 上一个发现此资产的任务ID
+	FirstSeenTaskId string           `bson:"first_seen_task_id,omitempty" json:"firstSeenTaskId"` // 首次发现此资产的任务ID
 	Source        string             `bson:"source,omitempty" json:"source"`
 	CreateTime    time.Time          `bson:"create_time" json:"createTime"`
 	UpdateTime    time.Time          `bson:"update_time" json:"updateTime"`
+	LastStatusChangeTime time.Time   `bson:"last_status_change_time,omitempty" json:"lastStatusChangeTime"` // 标签状态最后变化时间
 
 	// 新增字段 - 风险评分
 	RiskScore float64 `bson:"risk_score,omitempty" json:"riskScore,omitempty"` // 0-100
@@ -257,6 +259,11 @@ func (m *AssetModel) Count(ctx context.Context, filter bson.M) (int64, error) {
 // CountByTaskId 根据任务ID统计资产数量
 func (m *AssetModel) CountByTaskId(ctx context.Context, taskId string) (int64, error) {
 	return m.coll.CountDocuments(ctx, bson.M{"taskId": taskId})
+}
+
+// CountNewByTaskId 根据任务ID统计新发现的资产数量
+func (m *AssetModel) CountNewByTaskId(ctx context.Context, taskId string) (int64, error) {
+	return m.coll.CountDocuments(ctx, bson.M{"taskId": taskId, "new": true})
 }
 
 // FindByTaskId 根据任务ID查找资产列表
@@ -463,6 +470,15 @@ type AssetHistory struct {
 	Screenshot string             `bson:"screenshot,omitempty" json:"screenshot"`
 	TaskId     string             `bson:"taskId" json:"taskId"`
 	CreateTime time.Time          `bson:"create_time" json:"createTime"`
+	// 变更详情
+	Changes    []FieldChange      `bson:"changes,omitempty" json:"changes,omitempty"`
+}
+
+// FieldChange 字段变更记录
+type FieldChange struct {
+	Field    string `bson:"field" json:"field"`       // 变更的字段名
+	OldValue string `bson:"oldValue" json:"oldValue"` // 旧值
+	NewValue string `bson:"newValue" json:"newValue"` // 新值
 }
 
 // AssetHistoryModel 资产历史模型

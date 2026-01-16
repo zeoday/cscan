@@ -132,6 +132,11 @@ func shouldNotifyByHighRisk(filter *HighRiskFilter, result *NotifyResult) bool {
 		return false
 	}
 
+	// 检查新资产发现通知
+	if filter.NewAssetNotify && result.HighRiskInfo.NewAssetCount > 0 {
+		return true
+	}
+
 	// 检查高危指纹
 	if len(filter.HighRiskFingerprints) > 0 && len(result.HighRiskInfo.HighRiskFingerprints) > 0 {
 		for _, configFp := range filter.HighRiskFingerprints {

@@ -49,6 +49,7 @@ func (l *HighRiskFilterConfigGetLogic) HighRiskFilterConfigGet() (*types.HighRis
 				HighRiskFingerprints:  []string{},
 				HighRiskPorts:         []int{},
 				HighRiskPocSeverities: []string{},
+				NewAssetNotify:        false,
 			},
 		}, nil
 	}
@@ -83,6 +84,7 @@ func (l *HighRiskFilterConfigSaveLogic) HighRiskFilterConfigSave(req *types.High
 		HighRiskFingerprints:  req.HighRiskFingerprints,
 		HighRiskPorts:         req.HighRiskPorts,
 		HighRiskPocSeverities: req.HighRiskPocSeverities,
+		NewAssetNotify:        req.NewAssetNotify,
 		UpdateTime:            time.Now().Format("2006-01-02 15:04:05"),
 	}
 	

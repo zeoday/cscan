@@ -90,7 +90,7 @@
               <el-badge :value="items.length" :max="999" type="primary" style="margin-left: 10px" />
             </div>
           </template>
-          <el-table :data="items" stripe size="small" max-height="400" @sort-change="handleSortChange">
+          <el-table :data="items" stripe size="small" @sort-change="handleSortChange">
             <el-table-column prop="url" label="URL" min-width="300" show-overflow-tooltip>
               <template #default="{ row }">
                 <a :href="row.url" target="_blank" rel="noopener" class="url-link">{{ row.url }}</a>

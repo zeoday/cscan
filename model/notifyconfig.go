@@ -31,6 +31,7 @@ type HighRiskFilter struct {
 	HighRiskFingerprints []string `bson:"high_risk_fingerprints" json:"highRiskFingerprints"` // 高危指纹列表
 	HighRiskPorts        []int    `bson:"high_risk_ports" json:"highRiskPorts"`               // 高危端口列表
 	HighRiskPocSeverities []string `bson:"high_risk_poc_severities" json:"highRiskPocSeverities"` // 高危POC严重级别: critical, high
+	NewAssetNotify       bool     `bson:"new_asset_notify" json:"newAssetNotify"`             // 新资产发现时通知
 }
 
 // NotifyConfigModel 通知配置模型

@@ -170,6 +170,8 @@ type Asset struct {
 	IsUpdated  bool     `json:"isUpdated"`
 	CreateTime string   `json:"createTime"`
 	UpdateTime string   `json:"updateTime"`
+	LastStatusChangeTime string `json:"lastStatusChangeTime,omitempty"` // 标签状态最后变化时间
+	FirstSeenTaskId      string `json:"firstSeenTaskId,omitempty"`      // 首次发现的任务ID
 	// 组织
 	OrgId   string `json:"orgId,omitempty"`
 	OrgName string `json:"orgName,omitempty"`
@@ -196,6 +198,8 @@ type AssetListReq struct {
 	SortByUpdate bool   `json:"sortByUpdate,optional"`
 	// 新增字段 - 按风险评分排序
 	SortByRisk bool `json:"sortByRisk,optional"`
+	// 新增字段 - 时间范围筛选（最近N天内更新的资产）
+	UpdatedWithinDays int `json:"updatedWithinDays,optional"` // 0表示不限制
 }
 
 type AssetListResp struct {
@@ -260,22 +264,30 @@ type AssetHistoryReq struct {
 	Limit   int    `json:"limit,default=20"`
 }
 
+// FieldChange 字段变更记录
+type FieldChange struct {
+	Field    string `json:"field"`    // 变更的字段名
+	OldValue string `json:"oldValue"` // 旧值
+	NewValue string `json:"newValue"` // 新值
+}
+
 type AssetHistoryItem struct {
-	Id         string   `json:"id"`
-	Authority  string   `json:"authority"`
-	Host       string   `json:"host"`
-	Port       int      `json:"port"`
-	Service    string   `json:"service"`
-	Title      string   `json:"title"`
-	App        []string `json:"app"`
-	HttpStatus string   `json:"httpStatus"`
-	HttpHeader string   `json:"httpHeader"`
-	HttpBody   string   `json:"httpBody"`
-	Banner     string   `json:"banner"`
-	IconHash   string   `json:"iconHash"`
-	Screenshot string   `json:"screenshot"`
-	TaskId     string   `json:"taskId"`
-	CreateTime string   `json:"createTime"`
+	Id         string        `json:"id"`
+	Authority  string        `json:"authority"`
+	Host       string        `json:"host"`
+	Port       int           `json:"port"`
+	Service    string        `json:"service"`
+	Title      string        `json:"title"`
+	App        []string      `json:"app"`
+	HttpStatus string        `json:"httpStatus"`
+	HttpHeader string        `json:"httpHeader"`
+	HttpBody   string        `json:"httpBody"`
+	Banner     string        `json:"banner"`
+	IconHash   string        `json:"iconHash"`
+	Screenshot string        `json:"screenshot"`
+	TaskId     string        `json:"taskId"`
+	CreateTime string        `json:"createTime"`
+	Changes    []FieldChange `json:"changes,omitempty"` // 变更详情
 }
 
 type AssetHistoryResp struct {
@@ -1894,6 +1906,7 @@ type HighRiskFilter struct {
 	HighRiskFingerprints []string `json:"highRiskFingerprints"` // 高危指纹列表
 	HighRiskPorts        []int    `json:"highRiskPorts"`        // 高危端口列表
 	HighRiskPocSeverities []string `json:"highRiskPocSeverities"` // 高危POC严重级别: critical, high
+	NewAssetNotify       bool     `json:"newAssetNotify"`       // 新资产发现时通知
 }
 
 // NotifyConfigListResp 通知配置列表响应
@@ -1989,6 +2002,7 @@ type HighRiskFilterConfig struct {
 	HighRiskFingerprints  []string `json:"highRiskFingerprints"`  // 高危指纹列表
 	HighRiskPorts         []int    `json:"highRiskPorts"`         // 高危端口列表
 	HighRiskPocSeverities []string `json:"highRiskPocSeverities"` // 高危POC严重级别
+	NewAssetNotify        bool     `json:"newAssetNotify"`        // 新资产发现时通知
 	UpdateTime            string   `json:"updateTime"`            // 更新时间
 }
 
@@ -2005,6 +2019,7 @@ type HighRiskFilterConfigSaveReq struct {
 	HighRiskFingerprints  []string `json:"highRiskFingerprints,optional"`
 	HighRiskPorts         []int    `json:"highRiskPorts,optional"`
 	HighRiskPocSeverities []string `json:"highRiskPocSeverities,optional"`
+	NewAssetNotify        bool     `json:"newAssetNotify,optional"`
 }
 
 // ==================== 资产指纹和端口统计 ====================

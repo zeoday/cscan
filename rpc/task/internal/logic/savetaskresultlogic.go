@@ -2,6 +2,8 @@ package logic
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"cscan/model"
@@ -12,6 +14,97 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// compareAssetChanges 比较资产变更，返回变更详情列表
+func compareAssetChanges(old *model.Asset, new *model.Asset) []model.FieldChange {
+	var changes []model.FieldChange
+
+	// 比较标题
+	if old.Title != new.Title {
+		changes = append(changes, model.FieldChange{
+			Field:    "title",
+			OldValue: truncateForChange(old.Title, 200),
+			NewValue: truncateForChange(new.Title, 200),
+		})
+	}
+
+	// 比较服务
+	if old.Service != new.Service {
+		changes = append(changes, model.FieldChange{
+			Field:    "service",
+			OldValue: old.Service,
+			NewValue: new.Service,
+		})
+	}
+
+	// 比较HTTP状态码
+	if old.HttpStatus != new.HttpStatus {
+		changes = append(changes, model.FieldChange{
+			Field:    "httpStatus",
+			OldValue: old.HttpStatus,
+			NewValue: new.HttpStatus,
+		})
+	}
+
+	// 比较指纹/应用
+	oldApps := sortedJoin(old.App)
+	newApps := sortedJoin(new.App)
+	if oldApps != newApps {
+		changes = append(changes, model.FieldChange{
+			Field:    "app",
+			OldValue: truncateForChange(oldApps, 500),
+			NewValue: truncateForChange(newApps, 500),
+		})
+	}
+
+	// 比较IconHash
+	if old.IconHash != new.IconHash {
+		changes = append(changes, model.FieldChange{
+			Field:    "iconHash",
+			OldValue: old.IconHash,
+			NewValue: new.IconHash,
+		})
+	}
+
+	// 比较Server
+	if old.Server != new.Server {
+		changes = append(changes, model.FieldChange{
+			Field:    "server",
+			OldValue: old.Server,
+			NewValue: new.Server,
+		})
+	}
+
+	// 比较Banner（截断）
+	if old.Banner != new.Banner {
+		changes = append(changes, model.FieldChange{
+			Field:    "banner",
+			OldValue: truncateForChange(old.Banner, 200),
+			NewValue: truncateForChange(new.Banner, 200),
+		})
+	}
+
+	return changes
+}
+
+// sortedJoin 排序后拼接字符串数组
+func sortedJoin(arr []string) string {
+	if len(arr) == 0 {
+		return ""
+	}
+	sorted := make([]string, len(arr))
+	copy(sorted, arr)
+	sort.Strings(sorted)
+	return strings.Join(sorted, ", ")
+}
+
+// truncateForChange 截断字符串用于变更记录
+func truncateForChange(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
 
 type SaveTaskResultLogic struct {
 	ctx    context.Context
@@ -122,7 +215,9 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 			asset.UpdateTime = now
 			asset.IsNewAsset = true
 			asset.IsUpdated = false
-			asset.LastTaskId = in.MainTaskId // 记录发现此资产的任务ID
+			asset.LastTaskId = ""                    // 新资产没有上一个任务
+			asset.FirstSeenTaskId = in.MainTaskId   // 记录首次发现的任务ID
+			asset.LastStatusChangeTime = now        // 记录状态变化时间
 
 			if err := assetModel.Insert(l.ctx, asset); err != nil {
 				l.Logger.Errorf("Insert asset failed: %v", err)
@@ -141,6 +236,9 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 				// 检查是否已存在同一任务的历史记录（避免重复）
 				exists, _ := historyModel.ExistsByAssetIdAndTaskId(l.ctx, existing.Id.Hex(), existing.TaskId)
 				if !exists {
+					// 计算变更详情
+					changes := compareAssetChanges(existing, asset)
+					
 					// 保存上一次扫描的状态作为历史记录
 					history := &model.AssetHistory{
 						AssetId:    existing.Id.Hex(),
@@ -158,6 +256,7 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 						Banner:     existing.Banner,
 						TaskId:     existing.TaskId, // 使用旧的任务ID
 						CreateTime: existing.UpdateTime, // 使用旧的更新时间
+						Changes:    changes, // 记录变更详情
 					}
 					if err := historyModel.Insert(l.ctx, history); err != nil {
 						l.Logger.Errorf("Insert asset history failed: %v", err)
@@ -189,6 +288,7 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 				updateFields["update"] = true
 				updateFields["new"] = false
 				updateFields["last_task_id"] = existing.TaskId // 记录上一个任务ID
+				updateFields["last_status_change_time"] = now  // 记录状态变化时间
 				updateAsset++
 			}
 			// 同一任务内的更新不改变 new/update 标签

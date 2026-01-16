@@ -159,6 +159,7 @@ func (l *IncrSubTaskDoneLogic) sendTaskNotification(workspaceId, mainTaskId, sta
 				HighRiskFingerprints: c.HighRiskFilter.HighRiskFingerprints,
 				HighRiskPorts:        c.HighRiskFilter.HighRiskPorts,
 				HighRiskPocSeverities: c.HighRiskFilter.HighRiskPocSeverities,
+				NewAssetNotify:       c.HighRiskFilter.NewAssetNotify,
 			}
 		}
 		configItems = append(configItems, item)
@@ -219,6 +220,7 @@ func (l *IncrSubTaskDoneLogic) sendTaskNotification(workspaceId, mainTaskId, sta
 func (l *IncrSubTaskDoneLogic) collectHighRiskInfo(workspaceId, mainTaskId string, configs []notify.ConfigItem) *notify.HighRiskInfo {
 	// 检查是否有配置启用了高危过滤
 	hasHighRiskFilter := false
+	hasNewAssetNotify := false
 	var allFingerprints []string
 	var allPorts []int
 	var allSeverities []string
@@ -229,6 +231,9 @@ func (l *IncrSubTaskDoneLogic) collectHighRiskInfo(workspaceId, mainTaskId strin
 			allFingerprints = append(allFingerprints, cfg.HighRiskFilter.HighRiskFingerprints...)
 			allPorts = append(allPorts, cfg.HighRiskFilter.HighRiskPorts...)
 			allSeverities = append(allSeverities, cfg.HighRiskFilter.HighRiskPocSeverities...)
+			if cfg.HighRiskFilter.NewAssetNotify {
+				hasNewAssetNotify = true
+			}
 		}
 	}
 
@@ -298,6 +303,15 @@ func (l *IncrSubTaskDoneLogic) collectHighRiskInfo(workspaceId, mainTaskId strin
 					info.HighRiskVulCount++
 				}
 			}
+		}
+	}
+
+	// 收集新资产数量（如果启用了新资产通知）
+	if hasNewAssetNotify {
+		assetModel := l.svcCtx.GetAssetModel(workspaceId)
+		newAssetCount, err := assetModel.CountNewByTaskId(l.ctx, mainTaskId)
+		if err == nil {
+			info.NewAssetCount = int(newAssetCount)
 		}
 	}
 
