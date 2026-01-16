@@ -1,7 +1,7 @@
 services:
   # Redis 
   redis:
-    image: redis:7-alpine
+    image: registry.cn-hangzhou.aliyuncs.com/txf7/redis:7-alpine
     container_name: cscan_redis
     command: redis-server --appendonly yes
     volumes:
@@ -19,7 +19,7 @@ services:
 
   # MongoDB 
   mongodb:
-    image: mongo:6
+    image: registry.cn-hangzhou.aliyuncs.com/txf7/mongo:6
     container_name: cscan_mongodb
     volumes:
       - cscan_mongodb_data:/data/db
