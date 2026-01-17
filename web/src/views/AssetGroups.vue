@@ -10,7 +10,7 @@
       </div>
       <div class="header-actions">
         <el-button type="primary" @click="showCreateGroupDialog = true">
-          <el-icon><Radar /></el-icon>
+          <el-icon><Compass /></el-icon>
           开始发现
         </el-button>
       </div>
@@ -177,7 +177,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Search,
   Refresh,
-  Radar,
+  Compass,
   FolderOpened,
   MoreFilled,
   Filter,
