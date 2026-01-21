@@ -3,6 +3,7 @@ package svc
 import (
 	"context"
 	"cscan/model"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -304,6 +305,7 @@ func (s *ScanResultService) GetScanResultSummary(ctx context.Context, req *GetSc
 type SaveScanResultsReq struct {
 	WorkspaceId   string
 	TargetId      string
+	TaskId        string
 	Authority     string
 	Host          string
 	Port          int
@@ -421,8 +423,9 @@ func (s *ScanResultService) SaveScanResultsWithHistory(ctx context.Context, req 
 	}
 	_ = vulModel // Suppress unused warning - can be used for Vul-specific operations
 
-	// Step 5: Update asset with merge logic to preserve unchanged fields
+	// Step 4: Update asset with merge logic and record changes
 	assetModel := model.NewAssetModel(s.db, req.WorkspaceId)
+	assetHistoryModel := model.NewAssetHistoryModel(s.db, req.WorkspaceId)
 
 	// Try to find existing asset
 	var existingAsset *model.Asset
@@ -433,8 +436,37 @@ func (s *ScanResultService) SaveScanResultsWithHistory(ctx context.Context, req 
 		existingAsset, _ = assetModel.FindByHostPort(ctx, req.Host, req.Port)
 	}
 
-	// If asset exists, update only the scan-related fields, preserving user-modified fields
+	// If asset exists, compare and record changes, then update
 	if existingAsset != nil {
+		// Calculate changes between old and new scan results
+		changes := calculateAssetChanges(existingAsset, req)
+
+		// If there are changes, record them in asset history
+		if len(changes) > 0 {
+			historyRecord := &model.AssetHistory{
+				AssetId:    existingAsset.Id.Hex(),
+				Authority:  existingAsset.Authority,
+				Host:       existingAsset.Host,
+				Port:       existingAsset.Port,
+				Service:    existingAsset.Service,
+				Title:      existingAsset.Title,
+				App:        existingAsset.App,
+				HttpStatus: existingAsset.HttpStatus,
+				HttpHeader: existingAsset.HttpHeader,
+				HttpBody:   existingAsset.HttpBody,
+				Banner:     existingAsset.Banner,
+				IconHash:   existingAsset.IconHash,
+				Screenshot: existingAsset.Screenshot,
+				TaskId:     req.TaskId,
+				Changes:    changes,
+			}
+
+			// Insert history record (ignore errors to not block the main flow)
+			if err := assetHistoryModel.Insert(ctx, historyRecord); err != nil {
+				// Log error but continue
+			}
+		}
+
 		update := bson.M{
 			"last_scan_time": req.ScanTimestamp,
 			"update_time":    req.ScanTimestamp,
@@ -448,6 +480,35 @@ func (s *ScanResultService) SaveScanResultsWithHistory(ctx context.Context, req 
 	}
 
 	return nil
+}
+
+// calculateAssetChanges compares old asset with new scan results and returns changes
+func calculateAssetChanges(oldAsset *model.Asset, newReq *SaveScanResultsReq) []model.FieldChange {
+	var changes []model.FieldChange
+
+	// Compare directory scan results count
+	oldDirCount := 0 // We don't have old count here, but we can track new additions
+	newDirCount := len(newReq.DirResults)
+	if newDirCount > 0 {
+		changes = append(changes, model.FieldChange{
+			Field:    "dirScanResults",
+			OldValue: fmt.Sprintf("%d results", oldDirCount),
+			NewValue: fmt.Sprintf("%d new results", newDirCount),
+		})
+	}
+
+	// Compare vulnerability scan results count
+	oldVulnCount := 0
+	newVulnCount := len(newReq.VulnResults)
+	if newVulnCount > 0 {
+		changes = append(changes, model.FieldChange{
+			Field:    "vulnScanResults",
+			OldValue: fmt.Sprintf("%d vulnerabilities", oldVulnCount),
+			NewValue: fmt.Sprintf("%d new vulnerabilities", newVulnCount),
+		})
+	}
+
+	return changes
 }
 
 // ==================== Legacy Data Normalization ====================

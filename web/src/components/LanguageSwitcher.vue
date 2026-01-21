@@ -1,6 +1,6 @@
-﻿<template>
-  <el-dropdown @command="handleCommand" trigger="click">
-    <div class="language-switcher">
+<template>
+  <el-dropdown @command="handleCommand" trigger="click" class="language-dropdown">
+    <div class="language-switcher" role="button" tabindex="0">
       <el-icon><Position /></el-icon>
       <span>{{ getCurrentLanguageLabel() }}</span>
       <el-icon class="arrow"><ArrowDown /></el-icon>
@@ -44,6 +44,10 @@ function handleCommand(locale) {
 </script>
 
 <style scoped>
+.language-dropdown {
+  vertical-align: middle;
+}
+
 .language-switcher {
   display: flex;
   align-items: center;
@@ -53,6 +57,7 @@ function handleCommand(locale) {
   cursor: pointer;
   transition: all 0.2s;
   color: hsl(var(--muted-foreground));
+  outline: none;
   
   &:hover {
     background: hsl(var(--accent));
@@ -65,16 +70,19 @@ function handleCommand(locale) {
   
   .arrow {
     font-size: 12px;
+    margin-left: 2px;
   }
   
   span {
     font-size: 14px;
+    font-weight: 500;
   }
 }
 
 :deep(.el-dropdown-menu__item.active) {
   color: hsl(var(--primary));
   background: hsl(var(--primary) / 0.1);
+  font-weight: 500;
 }
 </style>
 
