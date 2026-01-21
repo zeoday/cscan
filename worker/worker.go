@@ -504,15 +504,19 @@ func (w *Worker) processTaskLoop() {
 	for {
 		select {
 		case <-w.stopChan:
+			w.logger.Info("processTaskLoop: received stop signal, exiting")
 			return
 		case task := <-w.taskChan:
+			w.logger.Info("processTaskLoop: received task %s from channel", task.TaskId)
 			// 在执行前检查任务是否已被停止
 			ctx := context.Background()
 			if ctrl := w.checkTaskControl(ctx, task.TaskId); ctrl == "STOP" {
 				w.taskLog(task.TaskId, LevelInfo, "Task %s skipped because it was stopped while waiting in queue", task.TaskId)
 				continue
 			}
+			w.logger.Info("processTaskLoop: calling executeTask for task %s", task.TaskId)
 			w.executeTask(task)
+			w.logger.Info("processTaskLoop: executeTask completed for task %s", task.TaskId)
 		}
 	}
 }
@@ -716,7 +720,9 @@ func (w *Worker) pullTask() bool {
 			TaskName:    "scan",
 			Config:      resp.Config,
 		}
+		w.logger.Info("pullTask: pushing task %s to taskChan (channel size: %d/%d)", task.TaskId, len(w.taskChan), cap(w.taskChan))
 		w.taskChan <- task
+		w.logger.Info("pullTask: task %s pushed to taskChan successfully", task.TaskId)
 		return true
 	}
 	return false
@@ -905,8 +911,21 @@ func (w *Worker) createTaskContext(parentCtx context.Context, taskId string) (co
 
 // executeTask 执行任务
 func (w *Worker) executeTask(task *scheduler.TaskInfo) {
+	// 添加 panic 恢复机制，防止单个任务的 panic 导致整个 Worker 挂掉
+	defer func() {
+		if r := recover(); r != nil {
+			w.taskLog(task.TaskId, LevelError, "Task execution panic recovered: %v, stack: %s", r, string(getStackTrace()))
+			// 更新任务状态为失败
+			ctx := context.Background()
+			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, fmt.Sprintf("Task panic: %v", r))
+		}
+	}()
+
 	baseCtx := context.Background()
 	startTime := time.Now()
+	
+	// 添加函数入口日志
+	w.taskLog(task.TaskId, LevelInfo, "=== executeTask START === TaskId: %s, MainTaskId: %s", task.TaskId, task.MainTaskId)
 
 	// 获取资源槽位（优先使用自适应调度器）
 	if w.adaptiveScheduler != nil {
@@ -955,73 +974,141 @@ func (w *Worker) executeTask(task *scheduler.TaskInfo) {
 		w.taskLog(task.TaskId, LevelInfo, "Task %s was stopped before execution", task.TaskId)
 		return
 	}
+	w.taskLog(task.TaskId, LevelInfo, "Step 1: Control check passed")
 
 	// 创建带有任务控制信号检查的上下文
 	ctx, cancelTask := w.createTaskContext(baseCtx, task.TaskId)
 	defer cancelTask()
+	w.taskLog(task.TaskId, LevelInfo, "Step 2: Context created")
 
 	// 更新任务状态
+	w.taskLog(task.TaskId, LevelInfo, "Step 3: Updating task status to STARTED")
 	w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusStarted, "")
+	w.taskLog(task.TaskId, LevelInfo, "Step 4: Task status updated")
 
 	// 解析任务配置
+	w.taskLog(task.TaskId, LevelInfo, "Step 5: Parsing task config, length=%d", len(task.Config))
 	var taskConfig map[string]interface{}
 	if err := json.Unmarshal([]byte(task.Config), &taskConfig); err != nil {
+		w.taskLog(task.TaskId, LevelError, "Step 5 FAILED: Config parse error: %v", err)
 		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "配置解析失败: "+err.Error())
 		return
 	}
+	w.taskLog(task.TaskId, LevelInfo, "Step 6: Config parsed successfully, keys=%d", len(taskConfig))
 
 	// 检查任务类型，处理POC验证任务
 	taskType, _ := taskConfig["taskType"].(string)
+	w.taskLog(task.TaskId, LevelInfo, "Step 7: Task type: '%s'", taskType)
 	if taskType == "poc_validate" {
+		w.taskLog(task.TaskId, LevelInfo, "Step 7a: Executing POC validate task")
 		w.executePocValidateTask(ctx, task, taskConfig, startTime)
 		return
 	}
 	if taskType == "poc_batch_validate" {
+		w.taskLog(task.TaskId, LevelInfo, "Step 7b: Executing POC batch validate task")
 		w.executePocBatchValidateTask(ctx, task, taskConfig, startTime)
 		return
 	}
 
 	// 获取目标
 	target, _ := taskConfig["target"].(string)
+	w.taskLog(task.TaskId, LevelInfo, "Step 8: Target extracted: '%s'", target)
 	if target == "" {
+		w.taskLog(task.TaskId, LevelError, "Step 8 FAILED: Target is empty")
 		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "Target is empty")
 		return
 	}
 
 	// 获取组织ID
 	orgId, _ := taskConfig["orgId"].(string)
-	w.taskLog(task.TaskId, LevelInfo, "OrgId from config: %s", orgId)
+	w.taskLog(task.TaskId, LevelInfo, "Task started - Target: %s, OrgId: %s", target, orgId)
+	w.taskLog(task.TaskId, LevelDebug, "Full task config: %s", task.Config)
 
 	var allAssets []*scanner.Asset
 	var allVuls []*scanner.Vulnerability
 
 	// 解析扫描配置
-	config, _ := scheduler.ParseTaskConfig(task.Config)
+	config, err := scheduler.ParseTaskConfig(task.Config)
+	if err != nil {
+		w.taskLog(task.TaskId, LevelError, "Failed to parse task config: %v", err)
+		w.taskLog(task.TaskId, LevelDebug, "Raw config string: %s", task.Config)
+		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "配置解析失败: "+err.Error())
+		return
+	}
 	if config == nil {
-		config = &scheduler.TaskConfig{
-			PortScan: &scheduler.PortScanConfig{Enable: true, Ports: "80,443,8080"},
-		}
+		w.taskLog(task.TaskId, LevelError, "Task config is nil after parsing")
+		w.taskLog(task.TaskId, LevelDebug, "Raw config string: %s", task.Config)
+		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "任务配置为空")
+		return
 	}
 
 	// 输出任务开始日志（包含关键配置信息）
 	var enabledPhases []string
-	if config.DomainScan != nil && config.DomainScan.Enable {
-		enabledPhases = append(enabledPhases, "Domain Scan")
+	var configDetails []string
+	
+	if config.DomainScan != nil {
+		configDetails = append(configDetails, fmt.Sprintf("DomainScan.Enable=%v", config.DomainScan.Enable))
+		if config.DomainScan.Enable {
+			enabledPhases = append(enabledPhases, "Domain Scan")
+		}
+	} else {
+		configDetails = append(configDetails, "DomainScan=nil")
 	}
-	if config.PortScan != nil && config.PortScan.Enable {
-		enabledPhases = append(enabledPhases, "Port Scan")
+	
+	if config.PortScan != nil {
+		configDetails = append(configDetails, fmt.Sprintf("PortScan.Enable=%v", config.PortScan.Enable))
+		if config.PortScan.Enable {
+			enabledPhases = append(enabledPhases, "Port Scan")
+		}
+	} else {
+		configDetails = append(configDetails, "PortScan=nil")
 	}
-	if config.PortIdentify != nil && config.PortIdentify.Enable {
-		enabledPhases = append(enabledPhases, "Port Identify")
+	
+	if config.PortIdentify != nil {
+		configDetails = append(configDetails, fmt.Sprintf("PortIdentify.Enable=%v", config.PortIdentify.Enable))
+		if config.PortIdentify.Enable {
+			enabledPhases = append(enabledPhases, "Port Identify")
+		}
+	} else {
+		configDetails = append(configDetails, "PortIdentify=nil")
 	}
-	if config.Fingerprint != nil && config.Fingerprint.Enable {
-		enabledPhases = append(enabledPhases, "Fingerprint")
+	
+	if config.Fingerprint != nil {
+		configDetails = append(configDetails, fmt.Sprintf("Fingerprint.Enable=%v", config.Fingerprint.Enable))
+		if config.Fingerprint.Enable {
+			enabledPhases = append(enabledPhases, "Fingerprint")
+		}
+	} else {
+		configDetails = append(configDetails, "Fingerprint=nil")
 	}
-	if config.DirScan != nil && config.DirScan.Enable {
-		enabledPhases = append(enabledPhases, "Dir Scan")
+	
+	if config.DirScan != nil {
+		configDetails = append(configDetails, fmt.Sprintf("DirScan.Enable=%v", config.DirScan.Enable))
+		if config.DirScan.Enable {
+			enabledPhases = append(enabledPhases, "Dir Scan")
+		}
+	} else {
+		configDetails = append(configDetails, "DirScan=nil")
 	}
-	if config.PocScan != nil && config.PocScan.Enable {
-		enabledPhases = append(enabledPhases, "POC Scan")
+	
+	if config.PocScan != nil {
+		configDetails = append(configDetails, fmt.Sprintf("PocScan.Enable=%v", config.PocScan.Enable))
+		if config.PocScan.Enable {
+			enabledPhases = append(enabledPhases, "POC Scan")
+		}
+	} else {
+		configDetails = append(configDetails, "PocScan=nil")
+	}
+
+	w.taskLog(task.TaskId, LevelInfo, "Config parsed: %s", strings.Join(configDetails, ", "))
+
+	// 检查是否有启用的扫描阶段
+	if len(enabledPhases) == 0 {
+		w.taskLog(task.TaskId, LevelError, "No scan phases enabled in config")
+		w.taskLog(task.TaskId, LevelError, "Config details: %s", strings.Join(configDetails, ", "))
+		w.taskLog(task.TaskId, LevelDebug, "Full config JSON: %s", task.Config)
+		w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, "未启用任何扫描阶段")
+		return
 	}
 
 	// 解析目标列表
@@ -2010,6 +2097,13 @@ func (w *Worker) updateTaskProgressWithPhase(ctx context.Context, taskId string,
 // incrSubTaskDone 递增子任务完成数（模块级别）
 // 每完成一个扫描模块就调用此方法，通知主任务进度更新
 func (w *Worker) incrSubTaskDone(ctx context.Context, task *scheduler.TaskInfo, phase string) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Error("Increment subtask done panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	if w.httpClient == nil {
 		return
 	}
@@ -2035,6 +2129,13 @@ func (w *Worker) incrSubTaskDone(ctx context.Context, task *scheduler.TaskInfo, 
 
 // saveAssetResult 保存资产结果
 func (w *Worker) saveAssetResult(ctx context.Context, workspaceId, mainTaskId, orgId string, assets []*scanner.Asset) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Error("Save asset result panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	if len(assets) == 0 {
 		return
 	}
@@ -2125,6 +2226,13 @@ func (w *Worker) saveAssetResult(ctx context.Context, workspaceId, mainTaskId, o
 
 // saveVulResult 保存漏洞结果（支持去重与聚合）
 func (w *Worker) saveVulResult(ctx context.Context, workspaceId, mainTaskId string, vuls []*scanner.Vulnerability) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Error("Save vulnerability result panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	if len(vuls) == 0 {
 		return
 	}
@@ -2556,6 +2664,13 @@ type TagMatchInfo struct {
 // generateAutoTags 根据资产的应用信息生成Nuclei标签
 // 返回: 标签列表, 匹配信息列表
 func (w *Worker) generateAutoTags(assets []*scanner.Asset, pocConfig *scheduler.PocScanConfig) ([]string, []TagMatchInfo) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Error("Generate auto tags panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	tagSet := make(map[string]bool)
 	matchInfoMap := make(map[string]*TagMatchInfo) // 用于去重，key为 fingerprint+source
 
@@ -2704,6 +2819,13 @@ func parseAppName(app string) string {
 // loadCustomFingerprints 加载自定义指纹到指纹扫描器
 // activeScan: 是否启用主动扫描，如果启用则同时加载主动指纹
 func (w *Worker) loadCustomFingerprints(ctx context.Context, fpScanner *scanner.FingerprintScanner, activeScan bool) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Error("Load custom fingerprints panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	// 通过 HTTP 接口获取被动指纹配置
 	var passiveFingerprints []*model.Fingerprint
 	passiveFpMap := make(map[string]*model.Fingerprint)
@@ -2864,6 +2986,18 @@ func filterByPortThreshold(assets []*scanner.Asset, threshold int) ([]*scanner.A
 
 // executePocValidateTask 执行POC验证任务
 func (w *Worker) executePocValidateTask(ctx context.Context, task *scheduler.TaskInfo, taskConfig map[string]interface{}, startTime time.Time) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.taskLog(task.TaskId, LevelError, "POC validation task panic recovered: %v, stack: %s", r, string(getStackTrace()))
+			// 更新任务状态为失败
+			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, fmt.Sprintf("POC validation panic: %v", r))
+			// 保存失败结果
+			batchId, _ := taskConfig["batchId"].(string)
+			w.savePocValidationResult(ctx, task.TaskId, batchId, nil, fmt.Sprintf("POC validation panic: %v", r))
+		}
+	}()
+
 	// 解析配置
 	url, _ := taskConfig["url"].(string)
 	pocId, _ := taskConfig["pocId"].(string)
@@ -3064,6 +3198,15 @@ func (w *Worker) executePocValidateTask(ctx context.Context, task *scheduler.Tas
 
 // executePocBatchValidateTask 执行POC批量验证任务（使用单个Nuclei引擎扫描所有目标）
 func (w *Worker) executePocBatchValidateTask(ctx context.Context, task *scheduler.TaskInfo, taskConfig map[string]interface{}, startTime time.Time) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.taskLog(task.TaskId, LevelError, "POC batch validation task panic recovered: %v, stack: %s", r, string(getStackTrace()))
+			// 更新任务状态为失败
+			w.updateTaskStatus(ctx, task.TaskId, scheduler.TaskStatusFailure, fmt.Sprintf("POC batch validation panic: %v", r))
+		}
+	}()
+
 	// 解析配置
 	pocId, _ := taskConfig["pocId"].(string)
 	pocType, _ := taskConfig["pocType"].(string)
@@ -3353,6 +3496,17 @@ func (c *WorkerHttpServiceChecker) SetNonHttpPorts(ports []int) {
 
 // executePortIdentify 执行端口识别阶段（Nmap/Fingerprintx 服务识别）
 func (w *Worker) executePortIdentify(ctx context.Context, task *scheduler.TaskInfo, assets []*scanner.Asset, config *scheduler.PortIdentifyConfig) []*scanner.Asset {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.taskLog(task.TaskId, LevelError, "Port identify panic recovered: %v, stack: %s", r, string(getStackTrace()))
+			// panic 时返回原始资产，确保任务能继续执行
+			for _, asset := range assets {
+				asset.IsHTTP = scanner.IsHTTPService(asset.Service, asset.Port)
+			}
+		}
+	}()
+
 	// 确定使用的工具
 	tool := config.Tool
 	if tool == "" {
@@ -3424,8 +3578,17 @@ func (w *Worker) executePortIdentifyWithNmap(ctx context.Context, task *schedule
 
 		// 构建 Nmap 选项
 		nmapOpts := &scanner.NmapOptions{
-			Ports:   portsStr,
-			Timeout: timeout,
+			Ports:      portsStr,
+			Timeout:    timeout,
+			Concurrent: 1, // 默认串行扫描，避免过度并发
+		}
+		// 如果配置中指定了并发数，使用配置值（但限制最大值）
+		if config.Concurrency > 0 {
+			nmapOpts.Concurrent = config.Concurrency
+			if nmapOpts.Concurrent > 5 {
+				w.taskLog(task.TaskId, LevelWarn, "Port identify concurrency %d exceeds maximum 5, limiting to 5", nmapOpts.Concurrent)
+				nmapOpts.Concurrent = 5
+			}
 		}
 		if config.Args != "" {
 			nmapOpts.Args = config.Args
@@ -3526,6 +3689,14 @@ func (w *Worker) executePortIdentifyWithFingerprintx(ctx context.Context, task *
 
 // executeDirScan 执行目录扫描阶段
 func (w *Worker) executeDirScan(ctx context.Context, task *scheduler.TaskInfo, assets []*scanner.Asset, config *scheduler.DirScanConfig, orgId string) []*scanner.Asset {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.taskLog(task.TaskId, LevelError, "Directory scan panic recovered: %v, stack: %s", r, string(getStackTrace()))
+			// panic 时返回 nil，让任务继续执行后续阶段
+		}
+	}()
+
 	// 过滤出HTTP资产（必须同时满足 IsHTTP=true 且端口是常见HTTP端口或已确认为HTTP服务）
 	var httpAssets []*scanner.Asset
 	for _, asset := range assets {
@@ -3681,6 +3852,13 @@ func (w *Worker) executeDirScan(ctx context.Context, task *scheduler.TaskInfo, a
 
 // saveDirScanResults 保存目录扫描结果到数据库
 func (w *Worker) saveDirScanResults(ctx context.Context, task *scheduler.TaskInfo, assets []*scanner.Asset) {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.taskLog(task.TaskId, LevelError, "Save directory scan results panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	if len(assets) == 0 {
 		w.taskLog(task.TaskId, LevelDebug, "Dir scan: no assets to save")
 		return
@@ -3990,6 +4168,13 @@ func parsePortList(portsStr string) []int {
 
 // loadHttpServiceMappings 从 HTTP 接口加载HTTP服务设置（端口配置+服务映射）
 func (w *Worker) loadHttpServiceMappings() {
+	// 添加 panic 恢复机制
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Error("Load HTTP service mappings panic recovered: %v, stack: %s", r, string(getStackTrace()))
+		}
+	}()
+
 	ctx := context.Background()
 
 	// 通过 HTTP 接口获取 HTTP 服务设置

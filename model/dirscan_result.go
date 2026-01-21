@@ -26,6 +26,8 @@ type DirScanResult struct {
 	Title         string             `bson:"title" json:"title"`
 	RedirectURL   string             `bson:"redirect_url" json:"redirectUrl"`
 	CreateTime    time.Time          `bson:"create_time" json:"createTime"`
+	ScanTime      time.Time          `bson:"scan_time,omitempty" json:"scanTime,omitempty"`       // New field for versioning
+	Version       int64              `bson:"version,omitempty" json:"version,omitempty"`          // New field for versioning
 }
 
 // DirScanResultModel 目录扫描结果模型
@@ -47,6 +49,18 @@ func (m *DirScanResultModel) EnsureIndexes(ctx context.Context) error {
 		{Keys: bson.D{{Key: "authority", Value: 1}}},
 		{Keys: bson.D{{Key: "url", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "create_time", Value: -1}}},
+		// New composite index for efficient scan result queries
+		{Keys: bson.D{
+			{Key: "workspace_id", Value: 1},
+			{Key: "authority", Value: 1},
+			{Key: "host", Value: 1},
+			{Key: "port", Value: 1},
+			{Key: "scan_time", Value: -1},
+		}},
+		// Index for scan_time to support versioning queries
+		{Keys: bson.D{{Key: "scan_time", Value: -1}}},
+		// Index for version to support versioning queries
+		{Keys: bson.D{{Key: "version", Value: 1}}},
 	}
 	_, err := m.coll.Indexes().CreateMany(ctx, indexes)
 	return err
@@ -57,8 +71,17 @@ func (m *DirScanResultModel) Insert(ctx context.Context, doc *DirScanResult) err
 	if doc.Id.IsZero() {
 		doc.Id = primitive.NewObjectID()
 	}
+	now := time.Now()
 	if doc.CreateTime.IsZero() {
-		doc.CreateTime = time.Now()
+		doc.CreateTime = now
+	}
+	// Set scan_time if not already set
+	if doc.ScanTime.IsZero() {
+		doc.ScanTime = now
+	}
+	// Set version to 1 if not already set (for new records)
+	if doc.Version == 0 {
+		doc.Version = 1
 	}
 	_, err := m.coll.InsertOne(ctx, doc)
 	return err
@@ -78,6 +101,14 @@ func (m *DirScanResultModel) InsertMany(ctx context.Context, docs []*DirScanResu
 		if doc.CreateTime.IsZero() {
 			doc.CreateTime = now
 		}
+		// Set scan_time if not already set
+		if doc.ScanTime.IsZero() {
+			doc.ScanTime = now
+		}
+		// Set version to 1 if not already set (for new records)
+		if doc.Version == 0 {
+			doc.Version = 1
+		}
 		documents = append(documents, doc)
 	}
 	_, err := m.coll.InsertMany(ctx, documents)
@@ -92,6 +123,14 @@ func (m *DirScanResultModel) Upsert(ctx context.Context, doc *DirScanResult) err
 	now := time.Now()
 	if doc.CreateTime.IsZero() {
 		doc.CreateTime = now
+	}
+	// Set scan_time if not already set
+	if doc.ScanTime.IsZero() {
+		doc.ScanTime = now
+	}
+	// Set version to 1 if not already set (for new records)
+	if doc.Version == 0 {
+		doc.Version = 1
 	}
 
 	filter := bson.M{"url": doc.URL}
@@ -108,6 +147,8 @@ func (m *DirScanResultModel) Upsert(ctx context.Context, doc *DirScanResult) err
 			"content_type":   doc.ContentType,
 			"title":          doc.Title,
 			"redirect_url":   doc.RedirectURL,
+			"scan_time":      doc.ScanTime,
+			"version":        doc.Version,
 		},
 		"$setOnInsert": bson.M{
 			"_id":         doc.Id,
@@ -224,6 +265,15 @@ func (m *DirScanResultModel) DeleteByWorkspace(ctx context.Context, workspaceId 
 	if workspaceId != "" && workspaceId != "all" {
 		filter["workspace_id"] = workspaceId
 	}
+	result, err := m.coll.DeleteMany(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
+}
+
+// DeleteByFilter 根据条件删除
+func (m *DirScanResultModel) DeleteByFilter(ctx context.Context, filter bson.M) (int64, error) {
 	result, err := m.coll.DeleteMany(ctx, filter)
 	if err != nil {
 		return 0, err

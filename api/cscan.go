@@ -28,8 +28,25 @@ func main() {
 	flag.Parse()
 
 	var c config.Config
+
+	
 	conf.MustLoad(*configFile, &c)
 
+	logx.MustSetup(c.Log)
+	logx.DisableStat()
+
+	fmt.Println(`
+   ______ _____  ______          _   _ 
+  / ____/ ____|/ __ \ \        / / | \ | |
+ | |   | (___ | |  | \ \  /\  / /|  \| |
+ | |    \___ \| |  | |\ \/  \/ / | .  |
+ | |________) | |__| | \  /\  /  | |\  |
+  \_____|_____/ \____/   \/  \/   |_| \_| 
+                                         `)
+	fmt.Println("---------------------------------------------------------")
+	logx.Infof("🚀 Initializing CScan API Service...")
+	logx.Infof("⚙️  Config loaded from: %s", *configFile)
+	fmt.Println("---------------------------------------------------------")
 	// 创建服务上下文
 	svcCtx := svc.NewServiceContext(c)
 
@@ -53,7 +70,12 @@ func main() {
 	// 启动孤儿任务恢复后台任务（每 5 分钟检查一次）
 	go startOrphanedTaskRecovery(svcCtx)
 
-	logx.Infof("Starting API server at %s:%d...", c.Host, c.Port)
+	// logx.Infof("Starting API server at %s:%d...", c.Host, c.Port)
+	fmt.Println("---------------------------------------------------------")
+	logx.Infof("✅ CScan API is running at: %s:%d", c.Host, c.Port)
+	logx.Infof("gn  Environment: %s | LogLevel: %s", c.Mode, c.Log.Level)
+	logx.Infof("📡 Ready to handle requests...")
+	fmt.Println("---------------------------------------------------------")
 	server.Start()
 }
 

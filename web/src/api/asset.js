@@ -86,7 +86,16 @@ export function clearAssets() {
 // 获取资产历史
 export function getAssetHistory(data) {
   return request({
-    url: '/asset/history',
+    url: '/assets/history',
+    method: 'post',
+    data
+  })
+}
+
+// 比较两个历史版本
+export function compareVersions(data) {
+  return request({
+    url: '/assets/compareVersions',
     method: 'post',
     data
   })
@@ -151,6 +160,24 @@ export function getAssetFilterOptions(data) {
 export function getAssetExposures(data) {
   return request({
     url: '/asset/exposures',
+    method: 'post',
+    data
+  })
+}
+
+// 获取资产目录扫描结果（支持分页）
+export function getAssetDirScans(data) {
+  return request({
+    url: '/assets/dirscans',
+    method: 'post',
+    data
+  })
+}
+
+// 获取资产漏洞扫描结果（支持分页）
+export function getAssetVulnScans(data) {
+  return request({
+    url: '/assets/vulnscans',
     method: 'post',
     data
   })

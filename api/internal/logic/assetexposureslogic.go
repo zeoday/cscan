@@ -2,8 +2,8 @@ package logic
 
 import (
 	"context"
-	"fmt"
 
+	"cscan/api/internal/logic/common"
 	"cscan/api/internal/svc"
 	"cscan/api/internal/types"
 	"cscan/model"
@@ -27,26 +27,49 @@ func NewAssetExposuresLogic(ctx context.Context, svcCtx *svc.ServiceContext) *As
 }
 
 func (l *AssetExposuresLogic) AssetExposures(req *types.AssetExposuresReq, workspaceId string) (resp *types.AssetExposuresResp, err error) {
-	// 获取资产信息
-	assetModel := l.svcCtx.GetAssetModel(workspaceId)
-	asset, err := assetModel.FindById(l.ctx, req.AssetId)
-	if err != nil {
+	// 获取资产信息 - 当 workspaceId 为 "all" 时，需要遍历所有工作空间查找资产
+	var asset *model.Asset
+	var actualWorkspaceId string
+
+	workspaceIds := common.GetWorkspaceIds(l.ctx, l.svcCtx, workspaceId)
+	for _, wsId := range workspaceIds {
+		assetModel := l.svcCtx.GetAssetModel(wsId)
+		found, err := assetModel.FindById(l.ctx, req.AssetId)
+		if err == nil && found != nil {
+			asset = found
+			actualWorkspaceId = wsId
+			break
+		}
+	}
+
+	if asset == nil {
+		l.Logger.Errorf("资产不存在: assetId=%s, workspaceId=%s, 搜索的工作空间=%v", req.AssetId, workspaceId, workspaceIds)
 		return &types.AssetExposuresResp{Code: 404, Msg: "资产不存在"}, nil
 	}
 
-	// 构建查询条件：根据 host 和 port 查询
-	authority := fmt.Sprintf("%s:%d", asset.Host, asset.Port)
-
 	// 查询目录扫描结果
 	dirScanModel := model.NewDirScanResultModel(l.svcCtx.MongoDB)
-	dirScanFilter := bson.M{
-		"authority": authority,
+
+	// 构建查询条件：优先使用资产的 authority，同时支持 host+port 回退匹配
+	var dirScanFilter bson.M
+	if actualWorkspaceId != "" && actualWorkspaceId != "all" {
+		// 使用 $or 条件同时匹配 authority 或 host+port
+		dirScanFilter = bson.M{
+			"workspace_id": actualWorkspaceId,
+			"$or": []bson.M{
+				{"authority": asset.Authority},
+				{"host": asset.Host, "port": asset.Port},
+			},
+		}
+	} else {
+		dirScanFilter = bson.M{
+			"$or": []bson.M{
+				{"authority": asset.Authority},
+				{"host": asset.Host, "port": asset.Port},
+			},
+		}
 	}
-	// 如果有工作空间ID，也加上工作空间过滤
-	if workspaceId != "" && workspaceId != "all" {
-		dirScanFilter["workspace_id"] = workspaceId
-	}
-	
+
 	dirScans, err := dirScanModel.FindByFilter(l.ctx, dirScanFilter, 0, 100) // 最多返回100条
 	if err != nil {
 		l.Logger.Errorf("查询目录扫描结果失败: %v", err)
@@ -54,12 +77,12 @@ func (l *AssetExposuresLogic) AssetExposures(req *types.AssetExposuresReq, works
 	}
 
 	// 查询漏洞扫描结果
-	vulModel := l.svcCtx.GetVulModel(workspaceId)
+	vulModel := l.svcCtx.GetVulModel(actualWorkspaceId)
 	vulFilter := bson.M{
 		"host": asset.Host,
 		"port": asset.Port,
 	}
-	
+
 	vuls, err := vulModel.Find(l.ctx, vulFilter, 0, 100) // 最多返回100条
 	if err != nil {
 		l.Logger.Errorf("查询漏洞扫描结果失败: %v", err)
@@ -84,17 +107,19 @@ func (l *AssetExposuresLogic) AssetExposures(req *types.AssetExposuresReq, works
 	vulnResults := make([]types.VulnResultItem, 0, len(vuls))
 	for _, v := range vuls {
 		vulnResults = append(vulnResults, types.VulnResultItem{
-			ID:          v.Id.Hex(),
-			Name:        v.PocFile,
-			Severity:    v.Severity,
-			URL:         v.Url,
-			Description: v.Extra,
-			CVE:         v.CveId,
-			CVSS:        v.CvssScore,
-			MatchedURL:  v.Url,
+			ID:           v.Id.Hex(),
+			Name:         v.PocFile,
+			Severity:     v.Severity,
+			URL:          v.Url,
+			Description:  v.Extra,
+			CVE:          v.CveId,
+			CVSS:         v.CvssScore,
+			MatchedURL:   v.Url,
 			DiscoveredAt: v.CreateTime.Format("2006-01-02 15:04:05"),
 		})
 	}
+
+	l.Logger.Infof("资产 %s 暴露面数据: 目录扫描=%d, 漏洞扫描=%d", req.AssetId, len(dirScanResults), len(vulnResults))
 
 	return &types.AssetExposuresResp{
 		Code:           0,

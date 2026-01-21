@@ -7,6 +7,7 @@ import (
 
 	"cscan/model"
 	"cscan/rpc/task/internal/config"
+	"cscan/scheduler"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -26,6 +27,7 @@ type ServiceContext struct {
 	WorkspaceModel          *model.WorkspaceModel
 	SubfinderProviderModel  *model.SubfinderProviderModel
 	NotifyConfigModel       *model.NotifyConfigModel
+	TaskRecoveryManager     *scheduler.TaskRecoveryManager // 任务恢复管理器
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -60,6 +62,11 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 	logx.Info("Redis connected successfully")
 
+	// 创建任务恢复管理器
+	recoveryManager := scheduler.NewTaskRecoveryManager(rdb, context.Background())
+	recoveryManager.Start()
+	logx.Info("Task recovery manager started")
+
 	return &ServiceContext{
 		Config:                  c,
 		MongoClient:             mongoClient,
@@ -72,6 +79,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		WorkspaceModel:          model.NewWorkspaceModel(mongoDB),
 		SubfinderProviderModel:  model.NewSubfinderProviderModel(mongoDB),
 		NotifyConfigModel:       model.NewNotifyConfigModel(mongoDB),
+		TaskRecoveryManager:     recoveryManager,
 	}
 }
 

@@ -38,6 +38,20 @@
             <el-option v-for="w in workers" :key="w.name" :label="`${w.name} (${w.ip})`" :value="w.name" />
           </el-select>
         </el-form-item>
+        <el-form-item :label="$t('task.tags')">
+          <el-select 
+            v-model="form.tags" 
+            multiple 
+            filterable 
+            allow-create 
+            default-first-option 
+            :placeholder="$t('task.tagsPlaceholder')" 
+            style="width: 100%"
+          >
+            <el-option v-for="tag in commonTags" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+          <span class="form-hint">{{ $t('task.tagsHint') }}</span>
+        </el-form-item>
         <!-- 可折叠配置区域 -->
         <el-collapse v-model="activeCollapse" class="config-collapse">
           <!-- 子域名扫描 -->
@@ -782,6 +796,7 @@ const submitting = ref(false)
 const workspaces = ref([])
 const organizations = ref([])
 const workers = ref([])
+const commonTags = ref([]) // 常用标签列表
 const activeCollapse = ref(['portscan', 'fingerprint'])
 const isEdit = ref(false)
 const selectedTemplate = ref(null)
@@ -873,6 +888,7 @@ const form = reactive({
   target: '',
   workspaceId: '',
   orgId: '',
+  tags: [], // 任务标签
   workers: [],
   batchSize: 50,
   // 子域名扫描
@@ -959,6 +975,7 @@ onMounted(async () => {
   await loadWorkspaces()
   await loadOrganizations()
   await loadWorkers()
+  await loadCommonTags()
   
   // 检查是否是编辑模式
   if (route.query.id) {
@@ -1025,6 +1042,22 @@ async function loadWorkers() {
     const data = res.data || res
     if (data.code === 0) workers.value = (data.list || []).filter(w => w.status === 'running')
   } catch (e) { console.error(e) }
+}
+
+async function loadCommonTags() {
+  try {
+    // 从任务列表中获取常用标签
+    const res = await request.post('/task/list', { page: 1, pageSize: 100 })
+    if (res.code === 0 && res.list) {
+      const tagSet = new Set()
+      res.list.forEach(task => {
+        if (task.tags && Array.isArray(task.tags)) {
+          task.tags.forEach(tag => tagSet.add(tag))
+        }
+      })
+      commonTags.value = Array.from(tagSet)
+    }
+  } catch (e) { console.error('Load common tags failed:', e) }
 }
 
 async function loadTaskDetail(taskId) {

@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -67,6 +68,11 @@ func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.I
 	// 计算进度百分比，确保不超过100
 	progress := calculateProgress(task.SubTaskDone, task.SubTaskCount)
 
+	// 更新任务进度到恢复管理器
+	if err := l.svcCtx.TaskRecoveryManager.UpdateTaskProgress(in.TaskId, in.Phase, progress); err != nil {
+		l.Logger.Errorf("IncrSubTaskDone: failed to update recovery progress: %v", err)
+	}
+
 	// 更新进度和当前阶段
 	update := bson.M{
 		"progress":      progress,
@@ -76,6 +82,9 @@ func (l *IncrSubTaskDoneLogic) IncrSubTaskDone(in *pb.IncrSubTaskDoneReq) (*pb.I
 	if err := taskModel.Update(l.ctx, in.MainTaskId, update); err != nil {
 		l.Logger.Errorf("IncrSubTaskDone: failed to update progress, mainTaskId=%s, error=%v", in.MainTaskId, err)
 	}
+
+	// 更新分片状态（如果是分片任务）
+	l.updateChunkStatus(in.TaskId, in.MainTaskId, in.Phase, allDone)
 
 	// 如果全部完成，使用原子操作更新状态
 	if allDone {
@@ -316,4 +325,130 @@ func (l *IncrSubTaskDoneLogic) collectHighRiskInfo(workspaceId, mainTaskId strin
 	}
 
 	return info
+}
+
+// updateChunkStatus 更新分片状态
+func (l *IncrSubTaskDoneLogic) updateChunkStatus(taskId, mainTaskId, phase string, allDone bool) {
+	// 检查是否是分片任务（taskId包含"-"且后面是数字）
+	if !l.isChunkTask(taskId) {
+		return
+	}
+
+	// 从Redis获取主任务信息，检查是否启用了分片
+	taskInfoKey := fmt.Sprintf("cscan:task:info:%s", l.getMainTaskId(taskId))
+	taskInfoData, err := l.svcCtx.RedisClient.Get(l.ctx, taskInfoKey).Result()
+	if err != nil {
+		// 如果获取不到任务信息，可能不是分片任务，直接返回
+		return
+	}
+
+	var taskInfo map[string]interface{}
+	if err := json.Unmarshal([]byte(taskInfoData), &taskInfo); err != nil {
+		l.Logger.Errorf("updateChunkStatus: failed to unmarshal task info, taskId=%s, error=%v", taskId, err)
+		return
+	}
+
+	// 检查是否启用了分片
+	chunkingEnabled, ok := taskInfo["chunkingEnabled"].(bool)
+	if !ok || !chunkingEnabled {
+		return
+	}
+
+	// 确定分片状态
+	var status string
+	if allDone {
+		status = "SUCCESS"
+	} else {
+		status = "STARTED"
+	}
+
+	// 更新分片状态到Redis
+	chunkStatusKey := fmt.Sprintf("cscan:chunk:status:%s", taskId)
+	statusData := map[string]interface{}{
+		"chunkId":  taskId,
+		"status":   status,
+		"phase":    phase,
+		"updateTime": time.Now(),
+	}
+
+	// 如果是开始状态，设置开始时间
+	if status == "STARTED" {
+		// 检查是否已经有开始时间
+		existingData, err := l.svcCtx.RedisClient.Get(l.ctx, chunkStatusKey).Result()
+		if err == nil {
+			var existing map[string]interface{}
+			if json.Unmarshal([]byte(existingData), &existing) == nil {
+				if startTime, ok := existing["startTime"]; ok {
+					statusData["startTime"] = startTime
+				}
+			}
+		}
+		if _, ok := statusData["startTime"]; !ok {
+			statusData["startTime"] = time.Now()
+		}
+	}
+
+	// 如果是完成状态，设置结束时间和计算执行时长
+	if status == "SUCCESS" {
+		statusData["endTime"] = time.Now()
+		
+		// 获取开始时间计算执行时长
+		existingData, err := l.svcCtx.RedisClient.Get(l.ctx, chunkStatusKey).Result()
+		if err == nil {
+			var existing map[string]interface{}
+			if json.Unmarshal([]byte(existingData), &existing) == nil {
+				if startTimeStr, ok := existing["startTime"].(string); ok {
+					if startTime, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
+						duration := time.Since(startTime)
+						statusData["duration"] = int64(duration.Seconds())
+					}
+				}
+			}
+		}
+	}
+
+	statusBytes, _ := json.Marshal(statusData)
+	if err := l.svcCtx.RedisClient.Set(l.ctx, chunkStatusKey, statusBytes, 24*time.Hour).Err(); err != nil {
+		l.Logger.Errorf("updateChunkStatus: failed to update chunk status, taskId=%s, error=%v", taskId, err)
+	} else {
+		l.Logger.Infof("updateChunkStatus: updated chunk status, taskId=%s, status=%s, phase=%s", taskId, status, phase)
+	}
+}
+
+// isChunkTask 判断是否是分片任务
+func (l *IncrSubTaskDoneLogic) isChunkTask(taskId string) bool {
+	// 查找最后一个 "-" 后面是否是数字
+	lastDash := strings.LastIndex(taskId, "-")
+	if lastDash <= 0 || lastDash >= len(taskId)-1 {
+		return false
+	}
+	
+	suffix := taskId[lastDash+1:]
+	// 检查后缀是否全是数字
+	for _, c := range suffix {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// getMainTaskId 从分片任务ID获取主任务ID
+func (l *IncrSubTaskDoneLogic) getMainTaskId(taskId string) string {
+	lastDash := strings.LastIndex(taskId, "-")
+	if lastDash > 0 {
+		suffix := taskId[lastDash+1:]
+		// 检查后缀是否全是数字
+		isNumber := true
+		for _, c := range suffix {
+			if c < '0' || c > '9' {
+				isNumber = false
+				break
+			}
+		}
+		if isNumber {
+			return taskId[:lastDash]
+		}
+	}
+	return taskId
 }

@@ -24,7 +24,7 @@ RUN go install -v github.com/boy-hack/ksubdomain/v2/cmd/ksubdomain@latest
 # ============ 运行阶段 ============
 FROM alpine:3.19
 
-# 安装运行时依赖
+# 安装运行时依赖 (包含 util-linux 用于 prlimit)
 RUN apk add --no-cache \
     ca-certificates \
     tzdata \
@@ -35,7 +35,9 @@ RUN apk add --no-cache \
     bind-tools \
     libpcap \
     chromium \
-    font-noto-cjk
+    font-noto-cjk \
+    util-linux
+
 # 设置时区
 ENV TZ=Asia/Shanghai
 
@@ -43,8 +45,15 @@ ENV TZ=Asia/Shanghai
 COPY --from=builder /cscan-worker /cscan-worker
 COPY --from=builder /go/bin/ksubdomain /usr/local/bin/ksubdomain
 
+# 创建监控启动脚本
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# 设置资源限制并启动进程' >> /start.sh && \
+    echo 'exec prlimit --nofile=65535:65535 /cscan-worker "$@"' >> /start.sh && \
+    chmod +x /start.sh
+
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD pgrep cscan-worker || exit 1
 
-ENTRYPOINT ["/cscan-worker"]
+ENTRYPOINT ["/start.sh"]

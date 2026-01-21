@@ -115,10 +115,11 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 		Tool:          "httpx", // 默认使用httpx
 		IconHash:      true,
 		Wappalyzer:    true,
-		CustomEngine:  true, // 默认启用自定义指纹引擎
+		CustomEngine:  true,  // 默认启用自定义指纹引擎
 		Screenshot:    false,
-		Timeout:       300, // 总超时默认5分钟
-		TargetTimeout: 30,  // 单目标超时默认30秒
+		Timeout:       300,   // 总超时默认5分钟
+		TargetTimeout: 30,    // 单目标超时默认30秒
+		Concurrency:   1,     // 默认串行扫描，由 Worker 并发控制
 	}
 	if config.Options != nil {
 		switch v := config.Options.(type) {
@@ -149,6 +150,12 @@ func (s *FingerprintScanner) Scan(ctx context.Context, config *ScanConfig) (*Sca
 	// 设置默认值
 	if opts.TargetTimeout <= 0 {
 		opts.TargetTimeout = 30
+	}
+	
+	// 限制最大并发数，避免过度并发
+	if opts.Concurrency > 5 {
+		logx.Infof("Fingerprint concurrency %d exceeds maximum 5, limiting to 5", opts.Concurrency)
+		opts.Concurrency = 5
 	}
 
 	// 日志辅助函数

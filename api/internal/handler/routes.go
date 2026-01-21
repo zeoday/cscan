@@ -159,6 +159,13 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/asset/history", Handler: asset.AssetHistoryHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/asset/import", Handler: asset.AssetImportHandler(svcCtx)},
 
+		// 扫描结果集成 API
+		{Method: http.MethodPost, Path: "/api/v1/assets/withScans", Handler: asset.AssetsWithScansHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/assets/dirscans", Handler: asset.AssetDirScansHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/assets/vulnscans", Handler: asset.AssetVulnScansHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/assets/history", Handler: asset.AssetHistoryV2Handler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/assets/compareVersions", Handler: asset.CompareVersionsHandler(svcCtx)},
+
 		// 站点管理
 		{Method: http.MethodPost, Path: "/api/v1/asset/site/list", Handler: asset.SiteListHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/asset/site/stat", Handler: asset.SiteStatHandler(svcCtx)},
@@ -194,6 +201,9 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodPost, Path: "/api/v1/task/profile/delete", Handler: task.TaskProfileDeleteHandler(svcCtx)},
 		{Method: http.MethodPost, Path: "/api/v1/task/logs", Handler: task.GetTaskLogsHandler(svcCtx)},
 		{Method: http.MethodGet, Path: "/api/v1/task/logs/stream", Handler: task.TaskLogsStreamHandler(svcCtx)},
+		// 任务分片管理
+		{Method: http.MethodPost, Path: "/api/v1/task/chunk/progress", Handler: task.ChunkProgressHandler(svcCtx)},
+		{Method: http.MethodPost, Path: "/api/v1/task/chunk/preview", Handler: task.ChunkPreviewHandler(svcCtx)},
 
 		// 扫描配置模板管理
 		{Method: http.MethodPost, Path: "/api/v1/task/template/list", Handler: task.ScanTemplateListHandler(svcCtx)},

@@ -23,10 +23,10 @@ type ResourceManagerConfig struct {
 func DefaultResourceManagerConfig(maxConcurrency int) ResourceManagerConfig {
 	return ResourceManagerConfig{
 		MaxConcurrency:       maxConcurrency,
-		CPUThreshold:         50.0,
-		MemThreshold:         55.0,
-		CPURecoveryThreshold: 50.0,
-		CheckInterval:        2 * time.Second,
+		CPUThreshold:         65.0,
+		MemThreshold:         60.0,
+		CPURecoveryThreshold: 55.0,
+		CheckInterval:        5 * time.Second,
 		ThrottleDuration:     60 * time.Second,
 		OverloadThreshold:    2,
 	}

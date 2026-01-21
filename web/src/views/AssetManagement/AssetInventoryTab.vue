@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <div class="asset-inventory-tab">
-    <!-- 搜索和过滤栏 -->
+    <!-- 鎼滅储鍜岃繃婊ゆ爮 -->
     <div class="toolbar">
       <el-input
         v-model="searchQuery"
@@ -23,7 +23,6 @@
       </el-button>
     </div>
 
-    <!-- 高级过滤器 -->
     <div v-if="showFilters" class="filters-panel">
       <el-form :inline="true">
         <el-form-item :label="t('asset.assetInventoryTab.technologies')">
@@ -63,148 +62,149 @@
       </el-form>
     </div>
 
-    <!-- 资产卡片列表 -->
+    <!-- 璧勪骇鍗＄墖鍒楄〃 -->
     <div v-loading="loading" class="assets-grid">
       <div 
         v-for="asset in assets" 
         :key="asset.id" 
-        class="asset-card"
-        @click="handleCardClick(asset)"
+        class="asset-card-wrapper"
       >
-        <!-- 左侧：主机信息 -->
-        <div class="asset-left">
-          <!-- 主机名和端口 -->
-          <div class="host-info">
-            <a :href="asset.url" target="_blank" class="host-link">
-              {{ asset.host }}<template v-if="asset.port && asset.port !== 0">:{{ asset.port }}</template>
-            </a>
-            <div v-if="asset.ip" class="host-ip">{{ asset.ip }}</div>
-            <div v-if="asset.iconHash" class="host-icon-info">
-              <img 
-                v-if="asset.iconHashBytes"
-                :src="'data:image/x-icon;base64,' + asset.iconHashBytes"
-                class="favicon"
-                @error="(e) => e.target.style.display = 'none'"
-              />
-              <span class="icon-hash">{{ asset.iconHash }}</span>
+        <div 
+          class="asset-card"
+          @click="handleCardClick(asset)"
+        >
+          <!-- 宸︿晶锛氫富鏈轰俊锟?-->
+          <div class="asset-left">
+            <!-- 涓绘満鍚嶅拰绔彛 -->
+            <div class="host-info">
+              <a :href="asset.url" target="_blank" class="host-link">
+                {{ asset.host }}<template v-if="asset.port && asset.port !== 0">:{{ asset.port }}</template>
+              </a>
+              <div v-if="asset.ip" class="host-ip">{{ asset.ip }}</div>
+              <div v-if="asset.iconHash" class="host-icon-info">
+                <img 
+                  v-if="asset.iconHashBytes"
+                  :src="'data:image/x-icon;base64,' + asset.iconHashBytes"
+                  class="favicon"
+                  @error="(e) => e.target.style.display = 'none'"
+                />
+                <span class="icon-hash">{{ asset.iconHash }}</span>
+              </div>
+            </div>
+            
+            <div class="tags-row">
+              <el-tag v-if="asset.status && asset.status !== '0'" :type="getStatusType(asset.status)" size="small" class="status-tag">
+                {{ asset.status }}
+              </el-tag>
+              
+              <!-- AS缂栧彿 -->
+              <el-tag v-if="asset.asn" size="small" effect="plain" class="info-tag">
+                {{ asset.asn }}
+              </el-tag>
+              
+              <el-tag
+                v-for="(label, index) in (asset.labels || [])"
+                :key="index"
+                size="small"
+                closable
+                class="custom-label"
+                @close.stop="handleRemoveLabel(asset, index)"
+              >
+                {{ label }}
+              </el-tag>
+              
+              <el-button 
+                text 
+                size="small" 
+                class="add-label-btn"
+                @click.stop="handleAddLabel(asset)"
+              >
+                <el-icon><Plus /></el-icon>
+                {{ t('asset.assetInventoryTab.addLabels') }}
+              </el-button>
+            </div>
+            
+            <!-- CNAME 淇℃伅 -->
+            <div v-if="asset.cname" class="cname-info">
+              <span class="label-text">CNAME:</span>
+              <span class="cname-value">{{ asset.cname }}</span>
             </div>
           </div>
           
-          <!-- 标签行 -->
-          <div class="tags-row">
-            <!-- 状态码 (只在有HTTP状态码时显示) -->
-            <el-tag v-if="asset.status && asset.status !== '0'" :type="getStatusType(asset.status)" size="small" class="status-tag">
-              {{ asset.status }}
-            </el-tag>
-            
-            <!-- AS编号 -->
-            <el-tag v-if="asset.asn" size="small" effect="plain" class="info-tag">
-              {{ asset.asn }}
-            </el-tag>
-            
-            <!-- 自定义标签 -->
-            <el-tag
-              v-for="(label, index) in (asset.labels || [])"
-              :key="index"
-              size="small"
-              closable
-              class="custom-label"
-              @close.stop="handleRemoveLabel(asset, index)"
+          <!-- 涓棿锛氭埅鍥惧拰鏍囬 -->
+          <div class="asset-center">
+            <div 
+              v-if="asset.screenshot" 
+              class="screenshot-wrapper"
+              @mouseenter="showPreview(asset, $event)"
+              @mouseleave="hidePreview"
             >
-              {{ label }}
-            </el-tag>
-            
-            <el-button 
-              text 
-              size="small" 
-              class="add-label-btn"
-              @click.stop="handleAddLabel(asset)"
-            >
-              <el-icon><Plus /></el-icon>
-              {{ t('asset.assetInventoryTab.addLabels') }}
-            </el-button>
+              <img 
+                :src="formatScreenshotUrl(asset.screenshot)"
+                :alt="asset.title"
+                class="screenshot-img"
+                loading="lazy"
+                @error="handleScreenshotError"
+              />
+            </div>
+            <div v-else class="screenshot-placeholder-text">
+              {{ t('asset.noScreenshot') }}
+            </div>
+            <div class="title-text">{{ asset.title || '-' }}</div>
           </div>
           
-          <!-- CNAME 信息 -->
-          <div v-if="asset.cname" class="cname-info">
-            <span class="label-text">CNAME:</span>
-            <span class="cname-value">{{ asset.cname }}</span>
+          <!-- 鍙充晶锛氭妧鏈爤 -->
+          <div class="asset-right">
+            <div v-if="asset.technologies && asset.technologies.length > 0" class="tech-list">
+              <el-tag
+                v-for="(tech, index) in asset.technologies.slice(0, 5)"
+                :key="index"
+                size="small"
+                class="tech-tag"
+              >
+                {{ tech }}
+              </el-tag>
+              <el-button
+                v-if="asset.technologies.length > 5"
+                text
+                size="small"
+                class="more-btn"
+                @click.stop="showAllTechnologies(asset)"
+              >
+                +{{ asset.technologies.length - 5 }} {{ t('common.more') }}
+              </el-button>
+            </div>
+            <div v-else class="no-tech">
+              {{ t('asset.assetInventoryTab.noTechnologies') }}
+            </div>
           </div>
-        </div>
-        
-        <!-- 中间：截图和标题 -->
-        <div class="asset-center">
-          <div 
-            v-if="asset.screenshot" 
-            class="screenshot-wrapper"
-            @mouseenter="showPreview(asset, $event)"
-            @mouseleave="hidePreview"
-          >
-            <img 
-              :src="formatScreenshotUrl(asset.screenshot)"
-              :alt="asset.title"
-              class="screenshot-img"
-              loading="lazy"
-              @error="handleScreenshotError"
-            />
-          </div>
-          <div v-else class="screenshot-placeholder-text">
-            {{ t('asset.noScreenshot') }}
-          </div>
-          <div class="title-text">{{ asset.title || '-' }}</div>
-        </div>
-        
-        <!-- 右侧：技术栈 -->
-        <div class="asset-right">
-          <div v-if="asset.technologies && asset.technologies.length > 0" class="tech-list">
-            <el-tag
-              v-for="(tech, index) in asset.technologies.slice(0, 5)"
-              :key="index"
-              size="small"
-              class="tech-tag"
-            >
-              {{ tech }}
-            </el-tag>
-            <el-button
-              v-if="asset.technologies.length > 5"
-              text
-              size="small"
-              class="more-btn"
-              @click.stop="showAllTechnologies(asset)"
-            >
-              +{{ asset.technologies.length - 5 }} {{ t('common.more') }}
-            </el-button>
-          </div>
-          <div v-else class="no-tech">
-            {{ t('asset.assetInventoryTab.noTechnologies') }}
-          </div>
-        </div>
-        
-        <!-- 右上角：时间和操作 -->
-        <div class="asset-meta">
-          <el-tooltip placement="left" effect="dark">
-            <template #content>
-              <div class="time-tooltip">
-                <div class="tooltip-row">
-                  <span class="tooltip-label">{{ t('asset.firstSeen') }}</span>
-                  <span class="tooltip-value">{{ asset.firstSeen }}</span>
+          
+          <!-- 鍙充笂瑙掞細鏃堕棿鍜屾搷锟?-->
+          <div class="asset-meta">
+            <el-tooltip placement="left" effect="dark">
+              <template #content>
+                <div class="time-tooltip">
+                  <div class="tooltip-row">
+                    <span class="tooltip-label">{{ t('asset.firstSeen') }}</span>
+                    <span class="tooltip-value">{{ asset.firstSeen }}</span>
+                  </div>
+                  <div class="tooltip-row">
+                    <span class="tooltip-label">{{ t('asset.lastUpdated') }}</span>
+                    <span class="tooltip-value">{{ asset.lastUpdatedFull }}</span>
+                  </div>
                 </div>
-                <div class="tooltip-row">
-                  <span class="tooltip-label">{{ t('asset.lastUpdated') }}</span>
-                  <span class="tooltip-value">{{ asset.lastUpdatedFull }}</span>
-                </div>
-              </div>
-            </template>
-            <span class="time-text">{{ asset.lastUpdated }}</span>
-          </el-tooltip>
-          <el-icon class="delete-icon" @click.stop="handleDelete(asset)">
-            <Delete />
-          </el-icon>
+              </template>
+              <span class="time-text">{{ asset.lastUpdated }}</span>
+            </el-tooltip>
+            <el-icon class="delete-icon" @click.stop="handleDelete(asset)">
+              <Delete />
+            </el-icon>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 分页 -->
+    <!-- 鍒嗛〉 -->
     <el-pagination
       v-model:current-page="currentPage"
       v-model:page-size="pageSize"
@@ -216,7 +216,7 @@
       @current-change="loadData"
     />
     
-    <!-- 技术栈详情对话框 -->
+    <!-- 鎶€鏈爤璇︽儏瀵硅瘽锟?-->
     <el-dialog
       v-model="techDialogVisible"
       :title="t('asset.assetInventoryTab.allTechnologies')"
@@ -246,7 +246,7 @@
       </div>
     </el-dialog>
     
-    <!-- 添加标签对话框 -->
+    <!-- 娣诲姞鏍囩瀵硅瘽锟?-->
     <el-dialog
       v-model="labelDialogVisible"
       :title="t('asset.assetInventoryTab.addLabelsTitle')"
@@ -278,288 +278,15 @@
       </div>
     </el-dialog>
     
-    <!-- 资产详情抽屉 -->
-    <el-drawer
-      v-model="detailDrawerVisible"
-      :title="detailAsset?.host + (detailAsset?.port && detailAsset?.port !== 0 ? ':' + detailAsset?.port : '')"
-      size="60%"
-      direction="rtl"
-    >
-      <div v-if="detailAsset" class="asset-detail">
-        <!-- 顶部截图和基本信息 -->
-        <div class="detail-header">
-          <div 
-            class="detail-screenshot"
-            @mouseenter="showPreview(detailAsset, $event)"
-            @mouseleave="hidePreview"
-          >
-            <img 
-              v-if="detailAsset.screenshot"
-              :src="formatScreenshotUrl(detailAsset.screenshot)"
-              :alt="detailAsset.title"
-              class="detail-screenshot-img"
-            />
-            <div v-else class="detail-screenshot-placeholder">
-              {{ t('asset.noScreenshot') }}
-            </div>
-          </div>
-          <div class="detail-basic-info">
-            <div class="info-row">
-              <span class="info-label">URL:</span>
-              <a :href="detailAsset.url" target="_blank" class="info-value link">
-                {{ detailAsset.url }}
-              </a>
-            </div>
-            <div class="info-row">
-              <span class="info-label">{{ t('asset.ip') }}:</span>
-              <span class="info-value">{{ detailAsset.ip || '-' }}</span>
-            </div>
-            <div v-if="detailAsset.status && detailAsset.status !== '0'" class="info-row">
-              <span class="info-label">{{ t('asset.statusCode') }}:</span>
-              <el-tag :type="getStatusType(detailAsset.status)" size="small">
-                {{ detailAsset.status }}
-              </el-tag>
-            </div>
-            <div v-if="detailAsset.asn" class="info-row">
-              <span class="info-label">ASN:</span>
-              <span class="info-value">{{ detailAsset.asn }}</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 标签页 -->
-        <el-tabs v-model="activeDetailTab" class="detail-tabs">
-          <!-- Overview 标签页 -->
-          <el-tab-pane :label="t('asset.assetDetail.overview')" name="overview">
-            <div class="tab-content">
-              <div class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.networkInfo') }}</h4>
-                <div class="info-grid">
-                  <div class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.host') }}:</span>
-                    <span class="item-value">{{ detailAsset.host }}</span>
-                  </div>
-                  <div v-if="detailAsset.port && detailAsset.port !== 0" class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.port') }}:</span>
-                    <span class="item-value">{{ detailAsset.port }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.service') }}:</span>
-                    <span class="item-value">{{ detailAsset.service || '-' }}</span>
-                  </div>
-                  <div v-if="detailAsset.cname" class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.cname') }}:</span>
-                    <span class="item-value">{{ detailAsset.cname }}</span>
-                  </div>
-                  <div v-if="detailAsset.iconHash" class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.iconHash') }}:</span>
-                    <div class="icon-hash-display">
-                      <img 
-                        v-if="detailAsset.iconHashBytes"
-                        :src="'data:image/x-icon;base64,' + detailAsset.iconHashBytes"
-                        class="favicon-large"
-                        @error="(e) => e.target.style.display = 'none'"
-                      />
-                      <span class="item-value">{{ detailAsset.iconHash }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.httpResponse') }}</h4>
-                <div class="code-block">
-                  <pre>{{ detailAsset.httpHeader || t('asset.assetDetail.noHttpData') }}</pre>
-                </div>
-              </div>
-              
-              <div v-if="detailAsset.httpBody" class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.httpBody') }}</h4>
-                <div class="code-block">
-                  <pre>{{ detailAsset.httpBody.substring(0, 1000) }}{{ detailAsset.httpBody.length > 1000 ? '...' : '' }}</pre>
-                </div>
-              </div>
-            </div>
-          </el-tab-pane>
-          
-          <!-- Exposures 标签页 (暴露面：目录扫描、漏洞扫描) -->
-          <el-tab-pane name="exposures">
-            <template #label>
-              <span>{{ t('asset.assetDetail.exposures') }} <el-badge :value="getExposuresCount(detailAsset)" class="tab-badge" /></span>
-            </template>
-            <div class="tab-content">
-              <!-- 端口服务 -->
-              <div class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.portServices') }}</h4>
-                <div class="exposure-item">
-                  <div class="exposure-header">
-                    <el-tag size="small">{{ detailAsset.port }}</el-tag>
-                    <span class="exposure-service">{{ detailAsset.service || t('asset.assetDetail.unknown') }}</span>
-                  </div>
-                  <div class="exposure-details">
-                    <div class="detail-item">
-                      <span class="detail-label">{{ t('asset.assetDetail.protocol') }}:</span>
-                      <span class="detail-value">{{ detailAsset.port === 443 ? 'HTTPS' : 'HTTP' }}</span>
-                    </div>
-                    <div v-if="detailAsset.banner" class="detail-item">
-                      <span class="detail-label">{{ t('asset.assetDetail.banner') }}:</span>
-                      <div class="code-block small">
-                        <pre>{{ detailAsset.banner }}</pre>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- 目录扫描结果 -->
-              <div class="section">
-                <h4 class="section-title">
-                  {{ t('asset.assetDetail.dirScanResults') }}
-                  <el-badge :value="detailAsset.dirScanResults?.length || 0" class="count-badge" />
-                </h4>
-                <div v-if="detailAsset.dirScanResults && detailAsset.dirScanResults.length > 0" class="dir-scan-list">
-                  <div v-for="(dir, index) in detailAsset.dirScanResults" :key="index" class="dir-scan-item">
-                    <div class="dir-scan-header">
-                      <a :href="dir.url" target="_blank" class="dir-url">{{ dir.path }}</a>
-                      <el-tag :type="getStatusType(dir.status)" size="small">{{ dir.status }}</el-tag>
-                    </div>
-                    <div class="dir-scan-meta">
-                      <span class="meta-item">
-                        <el-icon><Document /></el-icon>
-                        {{ dir.contentLength || 0 }} bytes
-                      </span>
-                      <span class="meta-item">
-                        <el-icon><Clock /></el-icon>
-                        {{ dir.responseTime || 0 }}ms
-                      </span>
-                      <span v-if="dir.title" class="meta-item">
-                        <el-icon><Document /></el-icon>
-                        {{ dir.title }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div v-else class="empty-state">
-                  {{ t('asset.assetDetail.noDirScanResults') }}
-                </div>
-              </div>
-              
-              <!-- 漏洞扫描结果 -->
-              <div class="section">
-                <h4 class="section-title">
-                  {{ t('asset.assetDetail.vulnScanResults') }}
-                  <el-badge :value="detailAsset.vulnScanResults?.length || 0" class="count-badge" />
-                </h4>
-                <div v-if="detailAsset.vulnScanResults && detailAsset.vulnScanResults.length > 0" class="vuln-scan-list">
-                  <div v-for="(vuln, index) in detailAsset.vulnScanResults" :key="index" class="vuln-scan-item">
-                    <div class="vuln-scan-header">
-                      <div class="vuln-title-row">
-                        <el-tag :type="getVulnSeverityType(vuln.severity)" size="small" class="severity-tag">
-                          {{ vuln.severity }}
-                        </el-tag>
-                        <span class="vuln-name">{{ vuln.name }}</span>
-                      </div>
-                      <span class="vuln-id">{{ vuln.id }}</span>
-                    </div>
-                    <div v-if="vuln.description" class="vuln-description">
-                      {{ vuln.description }}
-                    </div>
-                    <div class="vuln-meta">
-                      <span v-if="vuln.cvss" class="meta-item">
-                        <el-icon><Warning /></el-icon>
-                        CVSS: {{ vuln.cvss }}
-                      </span>
-                      <span v-if="vuln.cve" class="meta-item">
-                        <el-icon><Document /></el-icon>
-                        {{ vuln.cve }}
-                      </span>
-                      <span class="meta-item">
-                        <el-icon><Clock /></el-icon>
-                        {{ vuln.discoveredAt }}
-                      </span>
-                    </div>
-                    <div v-if="vuln.matchedUrl" class="vuln-matched-url">
-                      <span class="matched-label">{{ t('asset.assetDetail.matchedUrl') }}:</span>
-                      <a :href="vuln.matchedUrl" target="_blank" class="matched-url">{{ vuln.matchedUrl }}</a>
-                    </div>
-                  </div>
-                </div>
-                <div v-else class="empty-state">
-                  {{ t('asset.assetDetail.noVulnScanResults') }}
-                </div>
-              </div>
-            </div>
-          </el-tab-pane>
-          
-          <!-- Technologies 标签页 (Web指纹) -->
-          <el-tab-pane name="technologies">
-            <template #label>
-              <span>{{ t('asset.assetDetail.technologies') }} <el-badge :value="detailAsset.technologies?.length || 0" class="tab-badge" /></span>
-            </template>
-            <div class="tab-content">
-              <div v-if="detailAsset.technologies && detailAsset.technologies.length > 0" class="tech-list-detail">
-                <div v-for="(tech, index) in detailAsset.technologies" :key="index" class="tech-item-detail">
-                  <div class="tech-icon">
-                    <el-icon><Box /></el-icon>
-                  </div>
-                  <div class="tech-info">
-                    <div class="tech-name">{{ tech }}</div>
-                    <div class="tech-category">{{ t('asset.assetDetail.techCategory') }}</div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="empty-state">
-                {{ t('asset.assetDetail.noTechDetected') }}
-              </div>
-            </div>
-          </el-tab-pane>
-          
-          <!-- Changelogs 标签页 (变更记录) -->
-          <el-tab-pane name="changelogs">
-            <template #label>
-              <span>{{ t('asset.assetDetail.changelogs') }} <el-badge :value="detailAsset.changelogs?.length || 0" class="tab-badge" /></span>
-            </template>
-            <div class="tab-content">
-              <div v-if="detailAsset.changelogs && detailAsset.changelogs.length > 0" class="changelog-list">
-                <div v-for="(log, index) in detailAsset.changelogs" :key="index" class="changelog-item">
-                  <div class="changelog-header">
-                    <div class="changelog-time-info">
-                      <el-icon class="time-icon"><Clock /></el-icon>
-                      <span class="changelog-time">{{ log.time }}</span>
-                    </div>
-                    <el-tag size="small" type="info">{{ log.taskId }}</el-tag>
-                  </div>
-                  <div class="changelog-changes">
-                    <div v-for="(change, idx) in log.changes" :key="idx" class="change-item">
-                      <div class="change-field-name">
-                        <el-icon class="field-icon"><Edit /></el-icon>
-                        <span class="field-label">{{ translateFieldName(change.field) }}</span>
-                      </div>
-                      <div class="change-values">
-                        <div class="change-value-box old-value">
-                          <div class="value-label">{{ t('asset.assetDetail.oldValue') }}</div>
-                          <div class="value-content">{{ change.oldValue || '-' }}</div>
-                        </div>
-                        <el-icon class="change-arrow"><Right /></el-icon>
-                        <div class="change-value-box new-value">
-                          <div class="value-label">{{ t('asset.assetDetail.newValue') }}</div>
-                          <div class="value-content">{{ change.newValue || '-' }}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="empty-state">
-                {{ t('asset.assetDetail.noChangeHistory') }}
-              </div>
-            </div>
-          </el-tab-pane>
-        </el-tabs>
-      </div>
-    </el-drawer>
+    <!-- 璧勪骇璇︽儏鎶藉眽 -->
+    <AssetDetailDrawer
+      v-model:visible="detailDrawerVisible"
+      :asset="detailAsset"
+      @preview-show="showPreview"
+      @preview-hide="hidePreview"
+    />
     
-    <!-- 图片预览浮层 -->
+    <!-- 鍥剧墖棰勮娴眰 -->
     <Teleport to="body">
       <Transition name="preview-fade">
         <div
@@ -608,6 +335,7 @@ import {
 } from '@element-plus/icons-vue'
 import { getAssetInventory, updateAssetLabels, getAssetFilterOptions, deleteAsset, getAssetHistory, getAssetExposures } from '@/api/asset'
 import { formatScreenshotUrl, handleScreenshotError } from '@/utils/screenshot'
+import AssetDetailDrawer from '@/components/asset/AssetDetailDrawer.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -625,29 +353,28 @@ const filters = ref({
   statusCodes: []
 })
 
-// 过滤器选项（从后端动态加载）
+// 杩囨护鍣ㄩ€夐」锛堜粠鍚庣鍔ㄦ€佸姞杞斤級
 const filterOptions = ref({
   technologies: [],
   ports: [],
   statusCodes: []
 })
 
-// 技术栈对话框
-const techDialogVisible = ref(false)
+// 鎶€鏈爤瀵硅瘽
+  const techDialogVisible = ref(false)
 const techSearchQuery = ref('')
 const currentAsset = ref(null)
 
-// 标签对话框
-const labelDialogVisible = ref(false)
+// 鏍囩瀵硅瘽
+  const labelDialogVisible = ref(false)
 const newLabelInput = ref('')
 
-// 详情抽屉
+// 璇︽儏鎶藉眽
 const detailDrawerVisible = ref(false)
 const detailAsset = ref(null)
 const activeDetailTab = ref('overview')
-const loadedTabs = ref(new Set()) // 追踪已加载的标签页
 
-// 图片预览
+// 鍥剧墖棰勮
 const previewVisible = ref(false)
 const previewImage = ref('')
 const previewPosition = ref({ x: 0, y: 0 })
@@ -659,10 +386,10 @@ const showPreview = (asset, event) => {
   previewImage.value = formatScreenshotUrl(asset.screenshot)
   previewVisible.value = true
   
-  // 计算预览位置
+  // 璁＄畻棰勮浣嶇疆
   const rect = event.currentTarget.getBoundingClientRect()
   
-  // 检查是否在抽屉或对话框中（通过检查父元素类名）
+  // 妫€鏌ユ槸鍚﹀湪鎶藉眽鎴栧璇濇涓紙閫氳繃妫€鏌ョ埗鍏冪礌绫诲悕
   const isInDrawer = event.currentTarget.closest('.el-drawer__body') !== null
   const isInDialog = event.currentTarget.closest('.el-dialog__body') !== null
   const isInDetailView = isInDrawer || isInDialog
@@ -670,12 +397,12 @@ const showPreview = (asset, event) => {
   let previewWidth, previewHeight, padding
   
   if (isInDetailView) {
-    // 在详情视图中，使用更大的预览尺寸
-    previewWidth = Math.min(800, window.innerWidth * 0.5) // 最大800px或屏幕宽度的50%
-    previewHeight = Math.min(900, window.innerHeight * 0.8) // 最大900px或屏幕高度的80%
+    // 鍦ㄨ鎯呰鍥句腑锛屼娇鐢ㄦ洿澶х殑棰勮灏哄
+    previewWidth = Math.min(800, window.innerWidth * 0.5) // 鏈€锟?00px鎴栧睆骞曞搴︾殑50%
+    previewHeight = Math.min(900, window.innerHeight * 0.8) // 鏈€锟?00px鎴栧睆骞曢珮搴︾殑80%
     padding = 30
   } else {
-    // 在列表视图中，使用较小的预览尺寸
+    // 鍦ㄥ垪琛ㄨ鍥句腑锛屼娇鐢ㄨ緝灏忕殑棰勮灏哄
     previewWidth = 400
     previewHeight = 300
     padding = 20
@@ -683,26 +410,26 @@ const showPreview = (asset, event) => {
   
   previewSize.value = { width: previewWidth, height: previewHeight }
   
-  // 默认显示在右侧
+  // 榛樿鏄剧ず鍦ㄥ彸
   let x = rect.right + padding
   let y = rect.top
   
-  // 如果右侧空间不够，显示在左侧
+  // 濡傛灉鍙充晶绌洪棿涓嶅锛屾樉绀哄湪宸︿晶
   if (x + previewWidth > window.innerWidth) {
     x = rect.left - previewWidth - padding
   }
   
-  // 如果下方空间不够，向上调整
+  // 濡傛灉涓嬫柟绌洪棿涓嶅锛屽悜涓婅皟
   if (y + previewHeight > window.innerHeight) {
     y = window.innerHeight - previewHeight - padding
   }
   
-  // 确保不超出顶部
+  // 纭繚涓嶈秴鍑洪《
   if (y < padding) {
     y = padding
   }
   
-  // 确保不超出左侧
+  // 纭繚涓嶈秴鍑哄乏
   if (x < padding) {
     x = padding
   }
@@ -725,7 +452,7 @@ const filteredTechnologies = computed(() => {
   )
 })
 
-// 模拟数据（用于开发测试）
+// 妯℃嫙鏁版嵁锛堢敤浜庡紑鍙戞祴璇曪級
 const useMockData = false
 
 const mockAssets = [
@@ -752,11 +479,11 @@ const mockAssets = [
     host: 'cscan.txf7.cn',
     port: 80,
     status: '200',
-    asn: '', // 没有 ASN 数据
+    asn: '', // 娌℃湁 ASN 鏁版嵁
     ip: '124.221.31.220',
     url: 'http://cscan.txf7.cn',
     screenshot: null,
-    title: 'CSCAN - 完整安全三合一',
+    title: 'CSCAN - 瀹屾暣瀹夊叏涓夊悎涓€',
     technologies: ['Nginx 1.18.0'],
     lastUpdated: '1 day ago',
     firstSeen: 'Jan 15, 2026, 10:30 UTC',
@@ -768,11 +495,11 @@ const loadData = async () => {
   loading.value = true
   try {
     if (useMockData) {
-      // 使用模拟数据
+      // 浣跨敤妯℃嫙鏁版嵁
       assets.value = mockAssets
       total.value = mockAssets.length
     } else {
-      // 调用真实 API
+      // 璋冪敤鐪熷疄 API
       const params = {
         page: currentPage.value,
         pageSize: pageSize.value,
@@ -788,27 +515,27 @@ const loadData = async () => {
       const res = await getAssetInventory(params)
       
       if (res.code === 0) {
-        // 转换后端数据格式为前端格式
-        assets.value = (res.list || []).map(item => ({
+        // 杞崲鍚庣鏁版嵁鏍煎紡涓哄墠绔牸
+  assets.value = (res.list || []).map(item => ({
           id: item.id,
-          workspaceId: item.workspaceId, // 保存工作空间ID，用于删除
-          host: item.host,
+          workspaceId: item.workspaceId, // 淇濆瓨宸ヤ綔绌洪棿ID锛岀敤浜庡垹
+  host: item.host,
           port: item.port,
           status: String(item.status || '200'),
-          asn: item.asn || '', // 空字符串，不显示默认值
-          ip: item.ip || '',
+          asn: item.asn || '', // 绌哄瓧绗︿覆锛屼笉鏄剧ず榛樿
+  ip: item.ip || '',
           url: item.port && item.port !== 0 ? `${item.port === 443 ? 'https' : 'http'}://${item.host}:${item.port}` : `http://${item.host}`,
           screenshot: item.screenshot || '',
           title: item.title || item.host,
           cname: item.cname || '',
           technologies: item.technologies || [],
-          labels: item.labels || [], // 自定义标签
-          iconHash: item.iconHash || '',
+          labels: item.labels || [], // 鑷畾涔夋爣
+  iconHash: item.iconHash || '',
           iconHashBytes: item.iconHashBytes || '',
           httpHeader: item.httpHeader || '',
           httpBody: item.httpBody || '',
           banner: item.banner || '',
-          lastUpdated: item.lastUpdated || '未知',
+          lastUpdated: item.lastUpdated || '鏈煡',
           firstSeen: item.firstSeen || '',
           lastUpdatedFull: item.lastUpdatedFull || ''
         }))
@@ -818,7 +545,7 @@ const loadData = async () => {
       }
     }
   } catch (error) {
-    console.error('加载失败:', error)
+    console.error('鍔犺浇澶辫触:', error)
     ElMessage.error(t('asset.assetInventoryTab.loadFailed'))
   } finally {
     loading.value = false
@@ -858,8 +585,8 @@ const getStatusType = (status) => {
   return 'info'
 }
 
-// 获取漏洞严重程度的标签类型
-const getVulnSeverityType = (severity) => {
+// 鑾峰彇婕忔礊涓ラ噸绋嬪害鐨勬爣绛剧被
+  const getVulnSeverityType = (severity) => {
   const severityLower = severity?.toLowerCase()
   if (severityLower === 'critical') return 'danger'
   if (severityLower === 'high') return 'danger'
@@ -884,7 +611,7 @@ const handleAddNewLabel = async () => {
     currentAsset.value.labels = []
   }
   
-  // 检查是否已存在
+  // 妫€鏌ユ槸鍚﹀凡瀛樺湪
   if (currentAsset.value.labels.includes(newLabelInput.value.trim())) {
     ElMessage.warning(t('asset.assetInventoryTab.labelExists'))
     return
@@ -894,7 +621,7 @@ const handleAddNewLabel = async () => {
   const newLabel = newLabelInput.value.trim()
   newLabelInput.value = ''
   
-  // 调用 API 保存标签
+  // 璋冪敤 API 淇濆瓨鏍囩
   try {
     const res = await updateAssetLabels({
       id: currentAsset.value.id,
@@ -904,16 +631,16 @@ const handleAddNewLabel = async () => {
     if (res.code === 0) {
       ElMessage.success(t('asset.assetInventoryTab.labelAddSuccess'))
     } else {
-      // 失败时回滚
-      const index = currentAsset.value.labels.indexOf(newLabel)
+      // 澶辫触鏃跺洖
+  const index = currentAsset.value.labels.indexOf(newLabel)
       if (index > -1) {
         currentAsset.value.labels.splice(index, 1)
       }
       ElMessage.error(res.msg || t('asset.assetInventoryTab.labelAddFailed'))
     }
   } catch (error) {
-    // 失败时回滚
-    const index = currentAsset.value.labels.indexOf(newLabel)
+    // 澶辫触鏃跺洖
+  const index = currentAsset.value.labels.indexOf(newLabel)
     if (index > -1) {
       currentAsset.value.labels.splice(index, 1)
     }
@@ -926,7 +653,7 @@ const handleRemoveLabel = async (asset, index) => {
     const removedLabel = asset.labels[index]
     asset.labels.splice(index, 1)
     
-    // 调用 API 保存标签
+    // 璋冪敤 API 淇濆瓨鏍囩
     try {
       const res = await updateAssetLabels({
         id: asset.id,
@@ -936,13 +663,13 @@ const handleRemoveLabel = async (asset, index) => {
       if (res.code === 0) {
         ElMessage.success(t('asset.assetInventoryTab.labelDeleteSuccess'))
       } else {
-        // 失败时回滚
-        asset.labels.splice(index, 0, removedLabel)
+        // 澶辫触鏃跺洖
+  asset.labels.splice(index, 0, removedLabel)
         ElMessage.error(res.msg || t('asset.assetInventoryTab.labelDeleteFailed'))
       }
     } catch (error) {
-      // 失败时回滚
-      asset.labels.splice(index, 0, removedLabel)
+      // 澶辫触鏃跺洖
+  asset.labels.splice(index, 0, removedLabel)
       ElMessage.error(t('asset.assetInventoryTab.labelDeleteFailed'))
     }
   }
@@ -966,7 +693,7 @@ const handleDelete = async (asset) => {
       }
     )
     
-    // 调用删除 API，传递资产ID和工作空间ID
+    // 璋冪敤鍒犻櫎 API锛屼紶閫掕祫浜D鍜屽伐浣滅┖闂碔D
     const res = await deleteAsset({ 
       id: asset.id,
       workspaceId: asset.workspaceId
@@ -978,15 +705,15 @@ const handleDelete = async (asset) => {
       ElMessage.error(res.msg || t('asset.assetInventoryTab.deleteFailed'))
     }
   } catch (error) {
-    // 用户取消或删除失败
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
+    // 鐢ㄦ埛鍙栨秷鎴栧垹闄ゅけ
+  if (error !== 'cancel') {
+      console.error('鍒犻櫎澶辫触:', error)
       ElMessage.error(t('asset.assetInventoryTab.deleteFailed'))
     }
   }
 }
 
-const handleCardClick = (asset) => {
+const handleCardClick = async (asset) => {
   detailAsset.value = {
     ...asset,
     httpHeader: asset.httpHeader || '',
@@ -998,27 +725,17 @@ const handleCardClick = (asset) => {
   }
   activeDetailTab.value = 'overview'
   detailDrawerVisible.value = true
-  loadedTabs.value.clear() // 清空已加载标签
-  // 不立即加载数据，等待用户切换到对应标签页
+  
+  // 绔嬪嵆鍔犺浇鎵€鏈夋暟鎹紙涓庢埅鍥炬竻鍗曚繚鎸佷竴鑷达級
+  // 异步加载额外数据，忽略错误
+  if (asset.id) {
+    // 静默加载，不阻塞UI
+    loadAssetHistory(asset.id).catch(() => {})
+    loadAssetExposures(asset.id).catch(() => {})
+  }
 }
 
-// 监听详情标签页切换，按需加载数据
-watch(activeDetailTab, async (newTab) => {
-  if (!detailAsset.value) return
-  
-  const tabKey = `${detailAsset.value.id}-${newTab}`
-  if (loadedTabs.value.has(tabKey)) return // 已加载过
-  
-  if (newTab === 'changelogs') {
-    await loadAssetHistory(detailAsset.value.id)
-    loadedTabs.value.add(tabKey)
-  } else if (newTab === 'exposures') {
-    await loadAssetExposures(detailAsset.value.id)
-    loadedTabs.value.add(tabKey)
-  }
-})
-
-// 加载资产变更记录
+// 鍔犺浇璧勪骇鍙樻洿璁板綍
 const loadAssetHistory = async (assetId) => {
   try {
     const res = await getAssetHistory({
@@ -1027,37 +744,45 @@ const loadAssetHistory = async (assetId) => {
     })
     
     if (res.code === 0 && res.list) {
-      // 转换数据格式
+      // 杞崲鏁版嵁鏍煎紡
       detailAsset.value.changelogs = res.list.map(item => ({
         time: formatDateTime(item.createTime),
         taskId: item.taskId,
         changes: item.changes || []
       }))
+    } else {
+      // API返回非0代码，静默处理
+      if (detailAsset.value) {
+        detailAsset.value.changelogs = []
+      }
     }
   } catch (error) {
-    console.error('加载变更记录失败:', error)
+    console.debug('加载变更记录失败:', error.message)
+    if (detailAsset.value) {
+      detailAsset.value.changelogs = []
+    }
   }
 }
 
-// 加载资产暴露面数据
-const loadAssetExposures = async (assetId) => {
+// 鍔犺浇璧勪骇鏆撮湶闈㈡暟
+  const loadAssetExposures = async (assetId) => {
   try {
     const res = await getAssetExposures({
       assetId: assetId
     })
     
     if (res.code === 0) {
-      // 更新目录扫描结果
+      // 鏇存柊鐩綍鎵弿缁撴灉
       detailAsset.value.dirScanResults = (res.dirScanResults || []).map(item => ({
         url: item.url,
         path: item.path,
         status: String(item.status || ''),
         contentLength: item.contentLength,
-        responseTime: 0, // 后端暂未返回响应时间
+        responseTime: 0, // 鍚庣鏆傛湭杩斿洖鍝嶅簲鏃堕棿
         title: item.title || ''
       }))
       
-      // 更新漏洞扫描结果
+      // 鏇存柊婕忔礊鎵弿缁撴灉
       detailAsset.value.vulnScanResults = (res.vulnResults || []).map(item => ({
         id: item.id,
         name: item.name,
@@ -1068,14 +793,25 @@ const loadAssetExposures = async (assetId) => {
         matchedUrl: item.matchedUrl || item.url,
         discoveredAt: item.discoveredAt || ''
       }))
+
+    } else {
+      // API返回非0代码，静默处理
+      if (detailAsset.value) {
+        detailAsset.value.dirScanResults = []
+        detailAsset.value.vulnScanResults = []
+      }
     }
   } catch (error) {
-    console.error('加载暴露面数据失败:', error)
+    console.debug('加载暴露面数据失败:', error.message)
+    if (detailAsset.value) {
+      detailAsset.value.dirScanResults = []
+      detailAsset.value.vulnScanResults = []
+    }
   }
 }
 
-// 格式化日期时间
-const formatDateTime = (dateStr) => {
+// 鏍煎紡鍖栨棩鏈熸椂
+  const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleString('zh-CN', {
@@ -1088,7 +824,7 @@ const formatDateTime = (dateStr) => {
   })
 }
 
-// 翻译字段名称
+// 缈昏瘧瀛楁鍚嶇О
 const translateFieldName = (field) => {
   const fieldMap = {
     'title': t('asset.field.title'),
@@ -1102,16 +838,16 @@ const translateFieldName = (field) => {
   return fieldMap[field] || field
 }
 
-// 计算暴露面数量（端口服务 + 目录扫描 + 漏洞扫描）
-const getExposuresCount = (asset) => {
+// 璁＄畻鏆撮湶闈㈡暟閲忥紙绔彛鏈嶅姟 + 鐩綍鎵弿 + 婕忔礊鎵弿
+  const getExposuresCount = (asset) => {
   if (!asset) return 0
-  let count = 1 // 至少有一个端口服务
+  let count = 1 // 鑷冲皯鏈変竴涓鍙ｆ湇
   count += (asset.dirScanResults?.length || 0)
   count += (asset.vulnScanResults?.length || 0)
   return count
 }
 
-// 加载过滤器选项
+// 鍔犺浇杩囨护鍣ㄩ€夐」
 const loadFilterOptions = async () => {
   try {
     const res = await getAssetFilterOptions({
@@ -1126,11 +862,11 @@ const loadFilterOptions = async () => {
       }
     }
   } catch (error) {
-    console.error('加载过滤器选项失败:', error)
+    console.error('鍔犺浇杩囨护鍣ㄩ€夐」澶辫触:', error)
   }
 }
 
-// 监听路由参数变化
+// 鐩戝惉璺敱鍙傛暟鍙樺寲
 watch(() => route.query.domain, (newDomain) => {
   if (newDomain) {
     searchQuery.value = newDomain
@@ -1139,7 +875,7 @@ watch(() => route.query.domain, (newDomain) => {
 }, { immediate: true })
 
 onMounted(() => {
-  // 加载过滤器选项
+  // 鍔犺浇杩囨护鍣ㄩ€夐」
   loadFilterOptions()
   
   // 检查初始 URL 参数
@@ -1184,6 +920,12 @@ onMounted(() => {
     margin-bottom: 16px;
   }
   
+  .asset-card-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  
   .asset-card {
     position: relative;
     display: grid;
@@ -1193,7 +935,7 @@ onMounted(() => {
     padding-top: 40px;
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
-    border-radius: 8px;
+    border-radius: 8px 8px 0 0;
     transition: all 0.2s;
     align-items: start;
     cursor: pointer;
@@ -1201,6 +943,10 @@ onMounted(() => {
     &:hover {
       border-color: hsl(var(--primary) / 0.5);
       box-shadow: 0 2px 8px hsl(var(--primary) / 0.1);
+    }
+    
+    .asset-card-wrapper:not(:has(.dir-scan-details)) & {
+      border-radius: 8px;
     }
   }
   
@@ -1472,7 +1218,7 @@ onMounted(() => {
     }
   }
   
-  // 资产详情抽屉样式
+  // 璧勪骇璇︽儏鎶藉眽鏍峰紡
   .asset-detail {
     .detail-header {
       display: grid;
@@ -1854,7 +1600,7 @@ onMounted(() => {
         font-style: italic;
       }
       
-      // 目录扫描结果样式
+      // 鐩綍鎵弿缁撴灉鏍峰紡
       .dir-scan-list {
         display: flex;
         flex-direction: column;
@@ -1903,7 +1649,7 @@ onMounted(() => {
         }
       }
       
-      // 漏洞扫描结果样式
+      // 婕忔礊鎵弿缁撴灉鏍峰紡
       .vuln-scan-list {
         display: flex;
         flex-direction: column;
@@ -2004,7 +1750,7 @@ onMounted(() => {
   }
 }
 
-// 图片预览样式
+// 鍥剧墖棰勮鏍峰紡
 .screenshot-preview-overlay {
   position: fixed;
   z-index: 9999;
@@ -2029,7 +1775,7 @@ onMounted(() => {
   }
 }
 
-// 预览动画
+// 棰勮鍔ㄧ敾
 .preview-fade-enter-active,
 .preview-fade-leave-active {
   transition: opacity 0.2s ease;
@@ -2040,4 +1786,7 @@ onMounted(() => {
   opacity: 0;
 }
 </style>
-
+    if (detailAsset.value) {
+      detailAsset.value.dirScanResults = []
+      detailAsset.value.vulnScanResults = []
+    }

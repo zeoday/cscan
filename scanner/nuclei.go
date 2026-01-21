@@ -137,9 +137,9 @@ func (s *NucleiScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResu
 	opts := &NucleiOptions{
 		Severity:      "critical,high,medium",
 		RateLimit:     150,
-		Concurrency:   25,
-		Timeout:       600,  // 总超时默认10分钟
-		TargetTimeout: 600,  // 单目标超时默认600秒
+		Concurrency:   5,   // 模板并发数（不是目标并发数），默认5
+		Timeout:       600, // 总超时默认10分钟
+		TargetTimeout: 600, // 单目标超时默认600秒
 		Retries:       1,
 	}
 	if config.Options != nil {
@@ -151,6 +151,14 @@ func (s *NucleiScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResu
 	// 设置默认值
 	if opts.TargetTimeout <= 0 {
 		opts.TargetTimeout = 600
+	}
+	
+	// 限制模板并发数最大值，避免过度并发
+	// 注意：这是模板并发数，不是目标并发数
+	// 目标是串行扫描的（for循环），并发由 Worker 控制
+	if opts.Concurrency > 25 {
+		logx.Infof("Nuclei template concurrency %d exceeds maximum 25, limiting to 25", opts.Concurrency)
+		opts.Concurrency = 25
 	}
 
 	// 自动扫描模式1: 基于自定义标签映射

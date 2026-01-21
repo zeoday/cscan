@@ -139,6 +139,7 @@ func (l *ScreenshotsLogic) Screenshots(req *types.ScreenshotsReq, workspaceId st
 
 			item := types.ScreenshotItem{
 				Id:           asset.Id.Hex(),
+				WorkspaceId:  wsId, // 添加工作空间ID
 				Name:         asset.Host,
 				Port:         asset.Port,
 				IP:           ip,

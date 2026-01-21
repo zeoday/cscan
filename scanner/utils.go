@@ -94,6 +94,7 @@ func getCategory(target string) string {
 	return "ipv6"
 }
 
+const MaxTargetCount = 2048
 // expandCIDR 展开CIDR
 func expandCIDR(cidr string) []string {
 	var ips []string
@@ -101,10 +102,14 @@ func expandCIDR(cidr string) []string {
 	if err != nil {
 		return ips
 	}
-
-	for ip := ipnet.IP.Mask(ipnet.Mask); ipnet.Contains(ip); incIP(ip) {
-		ips = append(ips, ip.String())
-	}
+	count := 0
+    for ip := ipnet.IP.Mask(ipnet.Mask); ipnet.Contains(ip); incIP(ip) {
+        count++
+        if count > MaxTargetCount {
+            break 
+        }
+        ips = append(ips, ip.String())
+    }
 
 	// 移除网络地址和广播地址
 	if len(ips) > 2 {

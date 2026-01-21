@@ -25,6 +25,9 @@ func NewSaveVulResultLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Sav
 }
 
 // 保存漏洞结果
+// Note: This currently saves to the {workspace}_vul collection using the legacy Vul model.
+// The vulnerability scanner produces Vul objects, not ScanResult objects.
+// For now, we keep this behavior and add scan_timestamp tracking for history purposes.
 func (l *SaveVulResultLogic) SaveVulResult(in *pb.SaveVulResultReq) (*pb.SaveVulResultResp, error) {
 	if len(in.Vuls) == 0 {
 		return &pb.SaveVulResultResp{
@@ -94,6 +97,8 @@ func (l *SaveVulResultLogic) SaveVulResult(in *pb.SaveVulResultReq) (*pb.SaveVul
 		}
 
 		// 使用Upsert避免重复
+		// Note: The Upsert method in VulModel already handles scan_count and timestamps
+		// which provides basic history tracking through first_seen_time and last_seen_time
 		if err := vulModel.Upsert(l.ctx, vul); err != nil {
 			l.Logger.Errorf("SaveVulResult: failed to upsert vul: %v", err)
 			continue

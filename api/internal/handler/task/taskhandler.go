@@ -366,3 +366,41 @@ func TaskLogsStreamHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 		}
 	}
 }
+
+// ChunkProgressHandler 获取任务分片进度
+func ChunkProgressHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ChunkProgressReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewChunkProgressLogic(r.Context(), svcCtx)
+		resp, err := l.ChunkProgress(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}
+
+// ChunkPreviewHandler 获取任务分片预览
+func ChunkPreviewHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.ChunkPreviewReq
+		if err := httpx.Parse(r, &req); err != nil {
+			response.ParamError(w, err.Error())
+			return
+		}
+
+		l := logic.NewChunkPreviewLogic(r.Context(), svcCtx)
+		resp, err := l.ChunkPreview(&req)
+		if err != nil {
+			response.Error(w, err)
+			return
+		}
+		httpx.OkJson(w, resp)
+	}
+}

@@ -50,7 +50,7 @@ func (s *FingerprintxScanner) Scan(ctx context.Context, config *ScanConfig) (*Sc
 	// 解析配置
 	opts := &FingerprintxOptions{
 		Timeout:     10,
-		Concurrency: 10,
+		Concurrency: 1, // 默认串行扫描，由 Worker 并发控制
 		UDP:         false,
 		FastMode:    false,
 	}
@@ -69,6 +69,12 @@ func (s *FingerprintxScanner) Scan(ctx context.Context, config *ScanConfig) (*Sc
 	// 验证配置
 	if err := opts.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid options: %w", err)
+	}
+
+	// 限制最大并发数，避免过度并发
+	if opts.Concurrency > 5 {
+		logx.Infof("Fingerprintx concurrency %d exceeds maximum 5, limiting to 5", opts.Concurrency)
+		opts.Concurrency = 5
 	}
 
 	// 日志辅助函数

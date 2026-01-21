@@ -30,6 +30,7 @@ type MainTask struct {
 	ProfileId   string             `bson:"profile_id" json:"profileId"`
 	ProfileName string             `bson:"profile_name" json:"profileName"`
 	OrgId       string             `bson:"org_id,omitempty" json:"orgId"`
+	Tags        []string           `bson:"tags,omitempty" json:"tags"`        // 任务标签
 	Status      string             `bson:"status" json:"status"`
 	Progress    int                `bson:"progress" json:"progress"`
 	Result      string             `bson:"result" json:"result"`
@@ -87,6 +88,7 @@ func NewMainTaskModel(db *mongo.Database, workspaceId string) *MainTaskModel {
 		{Keys: bson.D{{Key: "task_id", Value: 1}}, Options: options.Index().SetUnique(true)},
 		{Keys: bson.D{{Key: "status", Value: 1}}},
 		{Keys: bson.D{{Key: "create_time", Value: -1}}},
+		{Keys: bson.D{{Key: "tags", Value: 1}}},
 	}
 	coll.Indexes().CreateMany(ctx, indexes)
 

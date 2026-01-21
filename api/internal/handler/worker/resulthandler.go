@@ -3,6 +3,7 @@ package worker
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"cscan/api/internal/svc"
 	"cscan/model"
@@ -348,13 +349,34 @@ func WorkerDirScanResultHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
-		// 直接保存到 MongoDB
 		ctx := r.Context()
-		resultModel := model.NewDirScanResultModel(svcCtx.MongoDB)
 
-		var savedCount int64
+		// Group results by target (authority/host/port combination)
+		// This allows us to call SaveScanResultsWithHistory once per target
+		targetGroups := make(map[string][]model.DirScanResult)
+		targetKeys := make(map[string]struct {
+			Authority string
+			Host      string
+			Port      int
+		})
+
 		for _, result := range req.Results {
-			doc := &model.DirScanResult{
+			// Create a unique key for this target
+			key := result.Authority + ":" + result.Host + ":" + string(rune(result.Port))
+			if _, exists := targetKeys[key]; !exists {
+				targetKeys[key] = struct {
+					Authority string
+					Host      string
+					Port      int
+				}{
+					Authority: result.Authority,
+					Host:      result.Host,
+					Port:      result.Port,
+				}
+			}
+
+			// Convert to model.DirScanResult
+			doc := model.DirScanResult{
 				WorkspaceId:   req.WorkspaceId,
 				MainTaskId:    req.MainTaskId,
 				Authority:     result.Authority,
@@ -369,21 +391,43 @@ func WorkerDirScanResultHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 				RedirectURL:   result.RedirectURL,
 			}
 
-			// 使用 Upsert 避免重复
-			if err := resultModel.Upsert(ctx, doc); err != nil {
-				logx.Errorf("[WorkerDirScanResult] Upsert error: %v", err)
-				continue
-			}
-			savedCount++
+			targetGroups[key] = append(targetGroups[key], doc)
 		}
 
-		logx.Infof("[WorkerDirScanResult] Saved %d dir scan results for task %s", savedCount, req.MainTaskId)
+		// Use ScanResultService to save results with history preservation
+		scanResultService := svc.NewScanResultService(svcCtx.MongoDB)
+		var totalSaved int64
+
+		for key, dirResults := range targetGroups {
+			target := targetKeys[key]
+
+			// Call SaveScanResultsWithHistory for this target
+			saveReq := &svc.SaveScanResultsReq{
+				WorkspaceId:   req.WorkspaceId,
+				TargetId:      req.MainTaskId, // Use MainTaskId as TargetId
+				Authority:     target.Authority,
+				Host:          target.Host,
+				Port:          target.Port,
+				DirResults:    dirResults,
+				VulnResults:   []model.ScanResult{}, // No vuln results in this call
+				ScanTimestamp: time.Now(),
+			}
+
+			if err := scanResultService.SaveScanResultsWithHistory(ctx, saveReq); err != nil {
+				logx.Errorf("[WorkerDirScanResult] SaveScanResultsWithHistory error for %s: %v", key, err)
+				continue
+			}
+
+			totalSaved += int64(len(dirResults))
+		}
+
+		logx.Infof("[WorkerDirScanResult] Saved %d dir scan results for task %s with history preservation", totalSaved, req.MainTaskId)
 
 		httpx.OkJson(w, &WorkerDirScanResultResp{
 			Code:    0,
 			Msg:     "success",
 			Success: true,
-			Total:   savedCount,
+			Total:   totalSaved,
 		})
 	}
 }

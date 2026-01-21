@@ -139,186 +139,13 @@
       @current-change="loadData"
     />
 
-    <!-- 详情抽屉 -->
-    <el-drawer
-      v-model="showDetailsDialog"
-      :title="selectedItem?.name + ':' + selectedItem?.port"
-      size="60%"
-      direction="rtl"
-    >
-      <div v-if="selectedItem" class="asset-detail">
-        <!-- 顶部截图和基本信息 -->
-        <div class="detail-header">
-          <div 
-            class="detail-screenshot"
-            @mouseenter="showPreview(selectedItem, $event)"
-            @mouseleave="hidePreview"
-          >
-            <img 
-              v-if="selectedItem.screenshot"
-              :src="formatScreenshotUrl(selectedItem.screenshot)"
-              :alt="selectedItem.title"
-              class="detail-screenshot-img"
-            />
-            <div v-else class="detail-screenshot-placeholder">
-              {{ t('asset.screenshotsTab.noScreenshot') }}
-            </div>
-          </div>
-          <div class="detail-basic-info">
-            <div class="info-row">
-              <span class="info-label">URL:</span>
-              <a :href="`${selectedItem.port === 443 ? 'https' : 'http'}://${selectedItem.name}:${selectedItem.port}`" target="_blank" class="info-value link">
-                {{ `${selectedItem.port === 443 ? 'https' : 'http'}://${selectedItem.name}:${selectedItem.port}` }}
-              </a>
-            </div>
-            <div class="info-row">
-              <span class="info-label">{{ t('asset.ip') }}:</span>
-              <span class="info-value">{{ selectedItem.ip || '-' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">{{ t('asset.statusCode') }}:</span>
-              <el-tag :type="getStatusType(selectedItem.status)" size="small">
-                {{ selectedItem.status }}
-              </el-tag>
-            </div>
-            <div v-if="selectedItem.title" class="info-row">
-              <span class="info-label">{{ t('asset.title') }}:</span>
-              <span class="info-value">{{ selectedItem.title }}</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 标签页 -->
-        <el-tabs v-model="activeDetailTab" class="detail-tabs">
-          <!-- Overview 标签页 -->
-          <el-tab-pane :label="t('asset.assetDetail.overview')" name="overview">
-            <div class="tab-content">
-              <div class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.networkInfo') }}</h4>
-                <div class="info-grid">
-                  <div class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.host') }}:</span>
-                    <span class="item-value">{{ selectedItem.name }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="item-label">{{ t('asset.assetDetail.port') }}:</span>
-                    <span class="item-value">{{ selectedItem.port }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="item-label">{{ t('asset.ip') }}:</span>
-                    <span class="item-value">{{ selectedItem.ip || '-' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="item-label">{{ t('asset.statusCode') }}:</span>
-                    <span class="item-value">{{ selectedItem.status }} {{ selectedItem.statusText || '' }}</span>
-                  </div>
-                  <div v-if="selectedItem.title" class="info-item">
-                    <span class="item-label">{{ t('asset.title') }}:</span>
-                    <span class="item-value">{{ selectedItem.title }}</span>
-                  </div>
-                  <div v-if="selectedItem.lastUpdated" class="info-item">
-                    <span class="item-label">{{ t('asset.lastUpdated') }}:</span>
-                    <span class="item-value">{{ selectedItem.lastUpdated }}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-if="selectedItem.httpHeader" class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.httpResponse') }}</h4>
-                <div class="code-block">
-                  <pre>{{ selectedItem.httpHeader }}</pre>
-                </div>
-              </div>
-              
-              <div v-if="selectedItem.httpBody" class="section">
-                <h4 class="section-title">{{ t('asset.assetDetail.httpBody') }}</h4>
-                <div class="code-block">
-                  <pre>{{ selectedItem.httpBody.substring(0, 1000) }}{{ selectedItem.httpBody.length > 1000 ? '...' : '' }}</pre>
-                </div>
-              </div>
-            </div>
-          </el-tab-pane>
-          
-          <!-- Exposures 标签页 -->
-          <el-tab-pane name="exposures">
-            <template #label>
-              <span>{{ t('asset.assetDetail.exposures') }} <el-badge :value="getExposuresCount()" class="tab-badge" /></span>
-            </template>
-            <div class="tab-content">
-              <div class="exposure-item">
-                <div class="exposure-header">
-                  <el-tag size="small">{{ selectedItem.port }}</el-tag>
-                  <span class="exposure-service">{{ selectedItem.service || t('asset.assetDetail.unknown') }}</span>
-                </div>
-                <div class="exposure-details">
-                  <div class="detail-item">
-                    <span class="detail-label">{{ t('asset.assetDetail.protocol') }}:</span>
-                    <span class="detail-value">{{ selectedItem.port === 443 ? 'HTTPS' : 'HTTP' }}</span>
-                  </div>
-                  <div v-if="selectedItem.banner" class="detail-item">
-                    <span class="detail-label">{{ t('asset.assetDetail.banner') }}:</span>
-                    <div class="code-block small">
-                      <pre>{{ selectedItem.banner }}</pre>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </el-tab-pane>
-          
-          <!-- Technologies 标签页 -->
-          <el-tab-pane name="technologies">
-            <template #label>
-              <span>{{ t('asset.assetDetail.technologies') }} <el-badge :value="selectedItem.technologies?.length || 0" class="tab-badge" /></span>
-            </template>
-            <div class="tab-content">
-              <div v-if="selectedItem.technologies && selectedItem.technologies.length > 0" class="tech-list-detail">
-                <div v-for="(tech, index) in selectedItem.technologies" :key="index" class="tech-item-detail">
-                  <div class="tech-icon">
-                    <el-icon><Box /></el-icon>
-                  </div>
-                  <div class="tech-info">
-                    <div class="tech-name">{{ typeof tech === 'string' ? tech : tech.name }}</div>
-                    <div class="tech-category">{{ t('asset.assetDetail.techCategory') }}</div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="empty-state">
-                {{ t('asset.assetDetail.noTechDetected') }}
-              </div>
-            </div>
-          </el-tab-pane>
-          
-          <!-- Changelogs 标签页 -->
-          <el-tab-pane name="changelogs">
-            <template #label>
-              <span>{{ t('asset.assetDetail.changelogs') }} <el-badge :value="selectedItem.changelogs?.length || 0" class="tab-badge" /></span>
-            </template>
-            <div class="tab-content">
-              <div v-if="selectedItem.changelogs && selectedItem.changelogs.length > 0" class="changelog-list">
-                <div v-for="(log, index) in selectedItem.changelogs" :key="index" class="changelog-item">
-                  <div class="changelog-header">
-                    <span class="changelog-time">{{ log.time }}</span>
-                    <el-tag size="small" type="info">{{ log.taskId }}</el-tag>
-                  </div>
-                  <div class="changelog-changes">
-                    <div v-for="(change, idx) in log.changes" :key="idx" class="change-item">
-                      <span class="change-field">{{ translateFieldName(change.field) }}:</span>
-                      <span class="change-old">{{ change.oldValue || '-' }}</span>
-                      <el-icon class="change-arrow"><Right /></el-icon>
-                      <span class="change-new">{{ change.newValue || '-' }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="empty-state">
-                {{ t('asset.assetDetail.noChangeHistory') }}
-              </div>
-            </div>
-          </el-tab-pane>
-        </el-tabs>
-      </div>
-    </el-drawer>
+    <!-- 截图详情抽屉 - 使用共享组件 -->
+    <AssetDetailDrawer
+      v-model:visible="showDetailsDialog"
+      :asset="selectedItem"
+      @preview-show="showPreview"
+      @preview-hide="hidePreview"
+    />
     
     <!-- 图片预览浮层 -->
     <Teleport to="body">
@@ -362,8 +189,10 @@ import {
   Box,
   Right
 } from '@element-plus/icons-vue'
-import { getScreenshots, getAssetFilterOptions, getAssetHistory, getAssetExposures } from '@/api/asset'
+import { getScreenshots, getAssetFilterOptions, getAssetHistory, getAssetExposures, getAssetDirScans, getAssetVulnScans } from '@/api/asset'
 import { formatScreenshotUrl, handleScreenshotError } from '@/utils/screenshot'
+import AssetDetailDrawer from '@/components/asset/AssetDetailDrawer.vue'
+import ScanResultHistory from '@/components/ScanResultHistory.vue'
 
 const { t } = useI18n()
 
@@ -381,6 +210,24 @@ const filters = ref({
   statusCodes: [],
   timeRange: 'all'
 })
+
+// Directory scans state
+const dirScansLoading = ref(false)
+const dirScans = ref([])
+const dirScansTotal = ref(0)
+const dirScansPage = ref(1)
+const dirScansPageSize = ref(100)
+
+// Vulnerability scans state
+const vulnScansLoading = ref(false)
+const vulnScans = ref([])
+const vulnScansTotal = ref(0)
+const vulnScansPage = ref(1)
+const vulnScansPageSize = ref(50)
+const vulnScansError = ref(false)
+
+// Directory scans error state
+const dirScansError = ref(false)
 
 // 过滤器选项（从后端动态加载）
 const filterOptions = ref({
@@ -512,12 +359,24 @@ const viewDetails = async (item) => {
   showDetailsDialog.value = true
   activeDetailTab.value = 'overview'
   
+  // Reset directory scans pagination
+  dirScansPage.value = 1
+  dirScans.value = []
+  dirScansTotal.value = 0
+  
+  // Reset vulnerability scans pagination
+  vulnScansPage.value = 1
+  vulnScans.value = []
+  vulnScansTotal.value = 0
+  
   // 异步加载变更记录和暴露面数据
+  // 异步加载额外数据，忽略错误
   if (item.id) {
-    await Promise.all([
-      loadAssetHistory(item.id),
-      loadAssetExposures(item.id)
-    ])
+    // 静默加载，不阻塞UI
+    loadAssetHistory(item.id).catch(() => {})
+    loadAssetExposures(item.id).catch(() => {})
+    loadDirScans(item.id).catch(() => {})
+    loadVulnScans(item.id).catch(() => {})
   }
 }
 
@@ -535,9 +394,18 @@ const loadAssetHistory = async (assetId) => {
         taskId: item.taskId,
         changes: item.changes || []
       }))
+    } else {
+      // API返回非0代码，静默处理
+      if (selectedItem.value) {
+        selectedItem.value.changelogs = []
+      }
     }
   } catch (error) {
-    console.error('加载变更记录失败:', error)
+    // 静默失败，不影响用户体验
+    console.debug('加载变更记录失败:', error.message)
+    if (selectedItem.value) {
+      selectedItem.value.changelogs = []
+    }
   }
 }
 
@@ -568,9 +436,162 @@ const loadAssetExposures = async (assetId) => {
         matchedUrl: item.matchedUrl || item.url,
         discoveredAt: item.discoveredAt || ''
       }))
+    } else {
+      // API返回非0代码，静默处理
+      if (selectedItem.value) {
+        selectedItem.value.dirScanResults = []
+        selectedItem.value.vulnScanResults = []
+      }
     }
   } catch (error) {
-    console.error('加载暴露面数据失败:', error)
+    // 静默失败，不影响用户体验
+    console.debug('加载暴露面数据失败:', error.message)
+    if (selectedItem.value) {
+      selectedItem.value.dirScanResults = []
+      selectedItem.value.vulnScanResults = []
+    }
+  }
+}
+
+// 加载目录扫描结果（支持分页）
+const loadDirScans = async (assetId) => {
+  if (!assetId) return
+  
+  dirScansLoading.value = true
+  dirScansError.value = false
+  try {
+    const res = await getAssetDirScans({
+      assetId: assetId,
+      limit: dirScansPageSize.value,
+      offset: (dirScansPage.value - 1) * dirScansPageSize.value
+    })
+    
+    if (res.code === 0) {
+      dirScans.value = res.results || []
+      dirScansTotal.value = res.total || 0
+      
+      // 同时更新selectedItem中的数据，供共享组件使用
+      if (selectedItem.value) {
+        selectedItem.value.dirScanResults = res.results || []
+      }
+    } else {
+      dirScansError.value = true
+    }
+  } catch (error) {
+    dirScansError.value = true
+    console.debug('加载目录扫描结果失败:', error.message)
+    // 静默失败，不显示错误消息
+    if (selectedItem.value) {
+      selectedItem.value.dirScanResults = []
+    }
+  } finally {
+    dirScansLoading.value = false
+  }
+}
+
+// 处理目录扫描分页变化
+const handleDirScansPageChange = (page) => {
+  dirScansPage.value = page
+  if (selectedItem.value?.id) {
+    loadDirScans(selectedItem.value.id)
+  }
+}
+
+// 处理目录扫描每页大小变化
+const handleDirScansSizeChange = (size) => {
+  dirScansPageSize.value = size
+  dirScansPage.value = 1
+  if (selectedItem.value?.id) {
+    loadDirScans(selectedItem.value.id)
+  }
+}
+
+// 加载漏洞扫描结果（支持分页）
+const loadVulnScans = async (assetId) => {
+  if (!assetId) return
+  
+  vulnScansLoading.value = true
+  vulnScansError.value = false
+  try {
+    const res = await getAssetVulnScans({
+      assetId: assetId,
+      limit: vulnScansPageSize.value,
+      offset: (vulnScansPage.value - 1) * vulnScansPageSize.value
+    })
+    
+    if (res.code === 0) {
+      vulnScans.value = res.results || []
+      vulnScansTotal.value = res.total || 0
+      
+      // 同时更新selectedItem中的数据，供共享组件使用
+      if (selectedItem.value) {
+        selectedItem.value.vulnScanResults = res.results || []
+      }
+    } else {
+      vulnScansError.value = true
+    }
+  } catch (error) {
+    vulnScansError.value = true
+    console.debug('加载漏洞扫描结果失败:', error.message)
+    // 静默失败，不显示错误消息
+    if (selectedItem.value) {
+      selectedItem.value.vulnScanResults = []
+    }
+  } finally {
+    vulnScansLoading.value = false
+  }
+}
+
+// 处理漏洞扫描分页变化
+const handleVulnScansPageChange = (page) => {
+  vulnScansPage.value = page
+  if (selectedItem.value?.id) {
+    loadVulnScans(selectedItem.value.id)
+  }
+}
+
+// 处理漏洞扫描每页大小变化
+const handleVulnScansSizeChange = (size) => {
+  vulnScansPageSize.value = size
+  vulnScansPage.value = 1
+  if (selectedItem.value?.id) {
+    loadVulnScans(selectedItem.value.id)
+  }
+}
+
+// 获取风险等级类型
+const getRiskLevelType = (riskLevel) => {
+  const level = String(riskLevel || '').toLowerCase()
+  if (level === 'high' || level === 'critical') return 'danger'
+  if (level === 'medium') return 'warning'
+  if (level === 'low') return 'info'
+  return 'info'
+}
+
+// 获取风险等级显示文本
+const getRiskLevelText = (riskLevel) => {
+  const level = String(riskLevel || '').toLowerCase()
+  const levelMap = {
+    'critical': t('asset.assetDetail.riskCritical'),
+    'high': t('asset.assetDetail.riskHigh'),
+    'medium': t('asset.assetDetail.riskMedium'),
+    'low': t('asset.assetDetail.riskLow'),
+    'info': t('asset.assetDetail.riskInfo')
+  }
+  return levelMap[level] || riskLevel
+}
+
+// 重试加载目录扫描
+const retryLoadDirScans = () => {
+  if (selectedItem.value?.id) {
+    loadDirScans(selectedItem.value.id)
+  }
+}
+
+// 重试加载漏洞扫描
+const retryLoadVulnScans = () => {
+  if (selectedItem.value?.id) {
+    loadVulnScans(selectedItem.value.id)
   }
 }
 
@@ -586,6 +607,15 @@ const formatDateTime = (dateStr) => {
     minute: '2-digit',
     second: '2-digit'
   })
+}
+
+// 格式化字节大小
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
 }
 
 // 翻译字段名称
@@ -1084,6 +1114,24 @@ onMounted(() => {
         padding: 48px 0;
         color: hsl(var(--muted-foreground));
         font-style: italic;
+      }
+      
+      // Directory scans table styles
+      .path-link {
+        color: hsl(var(--primary));
+        text-decoration: none;
+        word-break: break-all;
+        
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+      
+      .dir-scans-pagination,
+      .vuln-scans-pagination {
+        margin-top: 16px;
+        display: flex;
+        justify-content: center;
       }
     }
   }

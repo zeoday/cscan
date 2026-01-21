@@ -19,15 +19,38 @@
 
     <!-- 数据表格 -->
     <el-card class="table-card">
-      <div style="margin-bottom: 15px">
-        <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
-          <el-icon><Delete /></el-icon>{{ $t('task.batchDelete') }} ({{ selectedRows.length }})
-        </el-button>
+      <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <el-button type="danger" :disabled="selectedRows.length === 0" @click="handleBatchDelete">
+            <el-icon><Delete /></el-icon>{{ $t('task.batchDelete') }} ({{ selectedRows.length }})
+          </el-button>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <el-select 
+            v-model="filterTags" 
+            multiple 
+            filterable 
+            :placeholder="$t('task.filterByTags')" 
+            clearable 
+            style="width: 250px"
+            @change="loadData"
+          >
+            <el-option v-for="tag in allTags" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+        </div>
       </div>
       <el-table :data="tableData" v-loading="loading" stripe max-height="500" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="name" :label="$t('task.taskName')" min-width="150" />
         <el-table-column prop="target" :label="$t('task.scanTarget')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="tags" :label="$t('task.tags')" width="200">
+          <template #default="{ row }">
+            <div v-if="row.tags && row.tags.length" style="display: flex; flex-wrap: wrap; gap: 4px;">
+              <el-tag v-for="tag in row.tags" :key="tag" size="small" type="info">{{ tag }}</el-tag>
+            </div>
+            <span v-else style="color: #999;">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" :label="$t('task.status')" width="120">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status, row)">{{ getStatusText(row) }}</el-tag>
@@ -918,6 +941,8 @@ const logDialogVisible = ref(false)
 const tableData = ref([])
 const organizations = ref([])
 const workers = ref([])
+const allTags = ref([]) // 所有标签列表
+const filterTags = ref([]) // 过滤标签
 const formRef = ref()
 const logContainerRef = ref()
 const currentTask = ref({})
@@ -1075,8 +1100,27 @@ function stopAutoRefresh() { if (refreshTimer) { clearInterval(refreshTimer); re
 async function loadData() {
   loading.value = true
   try {
-    const res = await getTaskList({ page: pagination.page, pageSize: pagination.pageSize, workspaceId: workspaceStore.currentWorkspaceId || '' })
-    if (res.code === 0) { tableData.value = res.list || []; pagination.total = res.total }
+    const params = { 
+      page: pagination.page, 
+      pageSize: pagination.pageSize, 
+      workspaceId: workspaceStore.currentWorkspaceId || '' 
+    }
+    if (filterTags.value && filterTags.value.length > 0) {
+      params.tags = filterTags.value
+    }
+    const res = await getTaskList(params)
+    if (res.code === 0) { 
+      tableData.value = res.list || []
+      pagination.total = res.total 
+      // 收集所有标签
+      const tagSet = new Set()
+      res.list.forEach(task => {
+        if (task.tags && Array.isArray(task.tags)) {
+          task.tags.forEach(tag => tagSet.add(tag))
+        }
+      })
+      allTags.value = Array.from(tagSet)
+    }
   } finally { loading.value = false }
 }
 

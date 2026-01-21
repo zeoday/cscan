@@ -47,6 +47,10 @@ type ServiceContext struct {
 	// 同步服务
 	SyncMethods *sync.SyncMethods
 
+	// 扫描结果服务
+	ScanResultService *ScanResultService
+	HistoryService    *HistoryService
+
 	// 缓存的模板元数据
 	TemplateCategories []string
 	TemplateTags       []string
@@ -135,6 +139,8 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		NotifyConfigModel:        model.NewNotifyConfigModel(mongoDB),
 		ScanTemplateModel:        model.NewScanTemplateModel(mongoDB),
 		Scheduler:               scheduler.NewScheduler(rdb),
+		ScanResultService:       NewScanResultService(mongoDB),
+		HistoryService:          NewHistoryService(mongoDB),
 		TemplateCategories:      []string{},
 		TemplateTags:            []string{},
 		TemplateStats:           map[string]int{},

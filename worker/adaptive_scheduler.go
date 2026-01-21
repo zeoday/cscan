@@ -100,8 +100,8 @@ func DefaultAdaptiveSchedulerConfig(baseConcurrency int) *AdaptiveSchedulerConfi
 		SmoothingFactor:      0.3,
 		ScaleUpCooldown:      30 * time.Second,
 		ScaleDownCooldown:    10 * time.Second,
-		MinPullInterval:      100 * time.Millisecond,
-		MaxPullInterval:      5 * time.Second,
+		MinPullInterval:      3 * time.Second,
+		MaxPullInterval:      10 * time.Second,
 		IdleMultiplier:       2.0,
 	}
 }

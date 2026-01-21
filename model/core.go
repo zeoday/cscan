@@ -16,6 +16,7 @@ type ScanJob struct {
 	Name     string             `bson:"name" json:"name"`
 	Target   string             `bson:"target" json:"target"`
 	Profile  Profile            `bson:"profile" json:"profile"`
+	Tags     []string           `bson:"tags,omitempty" json:"tags,omitempty"` // 任务标签
 	Status   Status             `bson:"status" json:"status"`
 	Progress int                `bson:"progress" json:"progress"`
 	State    TaskState          `bson:"state" json:"state"`
@@ -45,6 +46,9 @@ type ScanResult struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	JobID     string             `bson:"job_id" json:"jobId"`
 	TargetID  string             `bson:"target_id" json:"targetId"`
+	Authority string             `bson:"authority,omitempty" json:"authority,omitempty"`  // New field for consistent association
+	Host      string             `bson:"host,omitempty" json:"host,omitempty"`            // New field for consistent association
+	Port      int                `bson:"port,omitempty" json:"port,omitempty"`            // New field for consistent association
 	Findings  []Finding          `bson:"findings" json:"findings"`
 	Assets    []Asset            `bson:"assets" json:"assets"`
 	RiskScore float64            `bson:"risk_score" json:"riskScore"`
@@ -52,6 +56,8 @@ type ScanResult struct {
 	Completed time.Time          `bson:"completed" json:"completed"`
 	Created   time.Time          `bson:"create_time" json:"created"`
 	Updated   time.Time          `bson:"update_time" json:"updated"`
+	ScanTime  time.Time          `bson:"scan_time,omitempty" json:"scanTime,omitempty"`   // New field for versioning
+	Version   int64              `bson:"version,omitempty" json:"version,omitempty"`      // New field for versioning
 }
 
 // ==================== Supporting Types ====================

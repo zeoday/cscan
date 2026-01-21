@@ -43,7 +43,7 @@ type NaabuOptions struct {
 	ExcludeHosts      string `json:"excludeHosts"`      // 排除的目标，逗号分隔 (-eh)
 	Retries           int    `json:"retries"`           // 重试次数，默认3，建议1-2
 	WarmUpTime        int    `json:"warmUpTime"`        // 扫描阶段间等待时间(秒)，默认2，建议0-1
-	Workers           int    `json:"workers"`           // Naabu内部工作线程，默认25，建议50-100
+	Workers           int    `json:"workers"`           // Naabu SDK 内部工作线程，默认25（内部参数，不受 Worker 并发限制）
 	Verify            bool   `json:"verify"`            // TCP验证，默认false（禁用以提速）
 }
 

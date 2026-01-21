@@ -131,6 +131,17 @@ func (s *NmapScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResult
 			if v.Concurrent > 0 {
 				opts.Concurrent = v.Concurrent
 			}
+		case map[string]interface{}:
+			// 处理从 scheduler.PortIdentifyConfig 传递的配置
+			if ports, ok := v["ports"].(string); ok && ports != "" {
+				opts.Ports = ports
+			}
+			if timeout, ok := v["timeout"].(int); ok && timeout > 0 {
+				opts.Timeout = timeout
+			}
+			if concurrent, ok := v["concurrency"].(int); ok && concurrent > 0 {
+				opts.Concurrent = concurrent
+			}
 		default:
 			// 尝试通过JSON转换
 			if data, err := json.Marshal(config.Options); err == nil {
@@ -139,9 +150,13 @@ func (s *NmapScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResult
 		}
 	}
 
-	// 确保并发数至少为1
+	// 确保并发数至少为1，最大不超过5（避免过度并发）
 	if opts.Concurrent <= 0 {
 		opts.Concurrent = 1
+	}
+	if opts.Concurrent > 5 {
+		logx.Infof("Nmap concurrent %d exceeds maximum 5, limiting to 5", opts.Concurrent)
+		opts.Concurrent = 5
 	}
 
 	// 检查nmap是否安装

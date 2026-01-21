@@ -79,6 +79,16 @@ func (l *CheckTaskLogic) popTaskFromQueue(queueKey, processingKey, workerName st
 	// 添加到处理中集合
 	l.svcCtx.RedisClient.SAdd(l.ctx, processingKey, task.TaskId)
 
+	// 记录任务开始执行（用于恢复机制）
+	if err := l.svcCtx.TaskRecoveryManager.RecordTaskStart(task.TaskId, workerName); err != nil {
+		l.Logger.Errorf("CheckTask: failed to record task start: %v", err)
+	}
+
+	// 保存任务信息到 Redis（用于恢复时重新入队）
+	taskInfoKey := "cscan:task:info:" + task.TaskId
+	taskInfoData, _ := json.Marshal(task)
+	l.svcCtx.RedisClient.Set(l.ctx, taskInfoKey, taskInfoData, 24*time.Hour)
+
 	l.Logger.Infof("CheckTask: assigned task %s to worker %s from queue %s", task.TaskId, workerName, queueKey)
 
 	// 立即更新主任务状态为 STARTED

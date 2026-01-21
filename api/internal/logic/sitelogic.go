@@ -105,10 +105,13 @@ func (l *SiteLogic) SiteList(req *types.SiteListReq, workspaceId string) (*types
 				Service:    asset.Service,
 				HttpStatus: asset.HttpStatus,
 				App:        asset.App,
+				Labels:     asset.Labels,
 				Screenshot: asset.Screenshot,
 				OrgId:      asset.OrgId,
 				HttpHeader: asset.HttpHeader,
 				IconHash:   asset.IconHash,
+				ColorTag:   asset.ColorTag,
+				Memo:       asset.Memo,
 			}
 
 			// 构建站点URL

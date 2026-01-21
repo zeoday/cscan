@@ -34,7 +34,7 @@ func NewSubfinderScanner() *SubfinderScanner {
 type SubfinderOptions struct {
 	Timeout            int                 `json:"timeout"`            // 超时时间(秒)
 	MaxEnumerationTime int                 `json:"maxEnumerationTime"` // 最大枚举时间(分钟)
-	Threads            int                 `json:"threads"`            // 并发线程数
+	Threads            int                 `json:"threads"`            // Subfinder SDK 内部线程数，默认10
 	RateLimit          int                 `json:"rateLimit"`          // 速率限制
 	Sources            []string            `json:"sources"`            // 指定数据源
 	ExcludeSources     []string            `json:"excludeSources"`     // 排除数据源
@@ -43,7 +43,7 @@ type SubfinderOptions struct {
 	RemoveWildcard     bool                `json:"removeWildcard"`     // 移除泛解析域名
 	ProviderConfig     map[string][]string `json:"providerConfig"`     // API配置 (从数据库加载)
 	ResolveDNS         bool                `json:"resolveDNS"`         // 是否解析DNS
-	Concurrent         int                 `json:"concurrent"`         // DNS解析并发数
+	Concurrent         int                 `json:"concurrent"`         // DNS解析并发数，默认50（内部参数，不受 Worker 并发限制）
 }
 
 // Validate 验证 SubfinderOptions 配置是否有效

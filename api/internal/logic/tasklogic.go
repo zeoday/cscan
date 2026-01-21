@@ -366,7 +366,7 @@ func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, works
 	}
 	l.Logger.Infof("MainTaskCreate: config length=%d, config=%s", len(configStr), configStr[:logLen])
 
-	// 创建主任务（状态为CREATED，不立即执行）
+	// 创建主任务
 	taskId := uuid.New().String()
 	task := &model.MainTask{
 		TaskId:      taskId,
@@ -376,7 +376,7 @@ func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, works
 		ProfileName: profileName,
 		OrgId:       req.OrgId,
 		Config:      string(configBytes),
-		Status:      model.TaskStatusCreated, // 设置初始状态
+		Status:      model.TaskStatusCreated,
 	}
 
 	if err := taskModel.Insert(l.ctx, task); err != nil {
@@ -384,7 +384,135 @@ func (l *MainTaskCreateLogic) MainTaskCreate(req *types.MainTaskCreateReq, works
 		return &types.BaseRespWithId{Code: 500, Msg: "创建任务失败: " + err.Error()}, nil
 	}
 
-	l.Logger.Infof("Task created (not started): taskId=%s, workspaceId=%s", taskId, wsId)
+	l.Logger.Infof("Task created: taskId=%s, workspaceId=%s", taskId, wsId)
+
+	// ========== 直接启动任务（使用与重试相同的逻辑）==========
+	
+	// 从配置中获取批次大小，默认50
+	batchSize := 50
+	if bs, ok := taskConfig["batchSize"].(float64); ok {
+		if bs == 0 {
+			batchSize = 1000000 // 不拆分
+		} else if bs > 0 {
+			batchSize = int(bs)
+		}
+	}
+
+	// 使用目标拆分器判断是否需要拆分
+	splitter := scheduler.NewTargetSplitter(batchSize)
+	batches := splitter.SplitTargets(req.Target)
+
+	// 解析任务配置，计算启用的扫描模块数量
+	config, _ := scheduler.ParseTaskConfig(string(configBytes))
+	enabledModules := 0
+	if config != nil {
+		if config.DomainScan != nil && config.DomainScan.Enable {
+			enabledModules++
+		}
+		if config.PortScan == nil || config.PortScan.Enable {
+			enabledModules++
+		}
+		if config.PortIdentify != nil && config.PortIdentify.Enable {
+			enabledModules++
+		}
+		if config.Fingerprint != nil && config.Fingerprint.Enable {
+			enabledModules++
+		}
+		if config.DirScan != nil && config.DirScan.Enable {
+			enabledModules++
+		}
+		if config.PocScan != nil && config.PocScan.Enable {
+			enabledModules++
+		}
+	}
+	if enabledModules == 0 {
+		enabledModules = 1
+	}
+
+	// 子任务总数 = 目标批次数 × 启用的扫描模块数
+	subTaskCount := len(batches) * enabledModules
+
+	l.Logger.Infof("Create task %s: split into %d batches (batchSize=%d), enabledModules=%d, subTaskCount=%d",
+		taskId, len(batches), batchSize, enabledModules, subTaskCount)
+
+	// 更新任务状态为STARTED
+	now := time.Now()
+	taskModel.Update(l.ctx, task.Id.Hex(), bson.M{
+		"status":         model.TaskStatusStarted,
+		"sub_task_count": subTaskCount,
+		"sub_task_done":  0,
+		"start_time":     now,
+	})
+
+	// 保存主任务信息到 Redis
+	taskInfoKey := "cscan:task:info:" + taskId
+	taskInfoData, _ := json.Marshal(map[string]interface{}{
+		"workspaceId":    wsId,
+		"mainTaskId":     task.Id.Hex(),
+		"subTaskCount":   subTaskCount,
+		"batchCount":     len(batches),
+		"enabledModules": enabledModules,
+	})
+	l.svcCtx.RedisClient.Set(l.ctx, taskInfoKey, taskInfoData, 24*time.Hour)
+
+	// 从配置中获取指定的 Worker 列表
+	var workers []string
+	if w, ok := taskConfig["workers"].([]interface{}); ok {
+		for _, v := range w {
+			if s, ok := v.(string); ok {
+				workers = append(workers, s)
+			}
+		}
+	}
+
+	// 为每个批次创建子任务并推送到队列
+	for i, batch := range batches {
+		// 复制配置并替换目标
+		subConfig := make(map[string]interface{})
+		for k, v := range taskConfig {
+			subConfig[k] = v
+		}
+		subConfig["target"] = batch
+		subConfig["subTaskIndex"] = i
+		subConfig["subTaskTotal"] = len(batches)
+		subConfigBytes, _ := json.Marshal(subConfig)
+
+		// 生成子任务ID
+		subTaskId := taskId
+		if len(batches) > 1 {
+			subTaskId = taskId + "-" + strconv.Itoa(i)
+		}
+
+		schedTask := &scheduler.TaskInfo{
+			TaskId:      subTaskId,
+			MainTaskId:  task.Id.Hex(),
+			WorkspaceId: wsId,
+			TaskName:    task.Name,
+			Config:      string(subConfigBytes),
+			Priority:    1,
+			Workers:     workers,
+		}
+
+		l.Logger.Infof("Pushing sub-task %d/%d: taskId=%s, targets=%d", i+1, len(batches), subTaskId, len(strings.Split(batch, "\n")))
+
+		if err := l.svcCtx.Scheduler.PushTask(l.ctx, schedTask); err != nil {
+			l.Logger.Errorf("push task to queue failed: %v", err)
+			continue
+		}
+
+		// 保存子任务信息到 Redis（多批次时）
+		if len(batches) > 1 {
+			subTaskInfoKey := "cscan:task:info:" + subTaskId
+			subTaskInfoData, _ := json.Marshal(map[string]interface{}{
+				"workspaceId":  wsId,
+				"mainTaskId":   task.Id.Hex(),
+				"subTaskCount": subTaskCount,
+			})
+			l.svcCtx.RedisClient.Set(l.ctx, subTaskInfoKey, subTaskInfoData, 24*time.Hour)
+		}
+	}
+
+	l.Logger.Infof("Task created and started: taskId=%s, workspaceId=%s, batches=%d", taskId, wsId, len(batches))
 
 	return &types.BaseRespWithId{Code: 0, Msg: "任务创建成功", Id: task.Id.Hex()}, nil
 }
@@ -914,20 +1042,56 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 		l.Logger.Infof("MainTaskStart: orgId not found in config")
 	}
 
-	// 从配置中获取批次大小，默认50
-	// batchSize = 0 表示不拆分，使用一个很大的值
-	batchSize := 50
-	if bs, ok := taskConfig["batchSize"].(float64); ok {
-		if bs == 0 {
-			batchSize = 1000000 // 不拆分，使用一个很大的值
-		} else if bs > 0 {
-			batchSize = int(bs)
+	// 创建分片管理器
+	chunkConfig := &scheduler.ChunkConfig{
+		MaxTargetsPerChunk: 30,  // 默认每个分片30个目标
+		EnableChunking:     true,
+		MinChunkSize:       10,
+		MaxChunkSize:       100,
+	}
+
+	// 从配置中获取分片设置
+	if chunkSettings, ok := taskConfig["chunking"].(map[string]interface{}); ok {
+		if maxTargets, ok := chunkSettings["maxTargetsPerChunk"].(float64); ok && maxTargets > 0 {
+			chunkConfig.MaxTargetsPerChunk = int(maxTargets)
+		}
+		if enable, ok := chunkSettings["enable"].(bool); ok {
+			chunkConfig.EnableChunking = enable
+		}
+		if minSize, ok := chunkSettings["minChunkSize"].(float64); ok && minSize > 0 {
+			chunkConfig.MinChunkSize = int(minSize)
+		}
+		if maxSize, ok := chunkSettings["maxChunkSize"].(float64); ok && maxSize > 0 {
+			chunkConfig.MaxChunkSize = int(maxSize)
 		}
 	}
 
-	// 使用目标拆分器判断是否需要拆分
-	splitter := scheduler.NewTargetSplitter(batchSize)
-	batches := splitter.SplitTargets(target)
+	// 兼容旧的batchSize配置
+	if batchSize, ok := taskConfig["batchSize"].(float64); ok {
+		if batchSize == 0 {
+			chunkConfig.EnableChunking = false
+		} else if batchSize > 0 {
+			chunkConfig.MaxTargetsPerChunk = int(batchSize)
+		}
+	}
+
+	// 验证分片配置
+	if err := scheduler.ValidateChunkConfig(chunkConfig); err != nil {
+		l.Logger.Errorf("MainTaskStart: invalid chunk config: %v", err)
+		chunkConfig = scheduler.DefaultChunkConfig()
+	}
+
+	chunkManager := scheduler.NewChunkManager(l.svcCtx.RedisClient, chunkConfig)
+
+	// 获取拆分预览
+	preview, err := chunkManager.GetSplitPreview(target, taskConfig)
+	if err != nil {
+		l.Logger.Errorf("MainTaskStart: failed to get split preview: %v", err)
+		return &types.BaseResp{Code: 500, Msg: "任务拆分预览失败"}, nil
+	}
+
+	l.Logger.Infof("MainTaskStart: split preview - totalTargets=%d, chunkCount=%d, needSplit=%v, estimatedTime=%ds", 
+		preview.TotalTargets, preview.ChunkCount, preview.NeedSplit, preview.EstimatedTime)
 
 	// 解析任务配置，计算启用的扫描模块数量
 	config, _ := scheduler.ParseTaskConfig(task.Config)
@@ -956,13 +1120,13 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 		enabledModules = 1 // 至少有一个模块
 	}
 
-	// 子任务总数 = 目标批次数 × 启用的扫描模块数
-	subTaskCount := len(batches) * enabledModules
+	// 子任务总数 = 分片数 × 启用的扫描模块数
+	subTaskCount := preview.ChunkCount * enabledModules
 
-	l.Logger.Infof("Task %s target split into %d batches (batchSize=%d), enabledModules=%d, subTaskCount=%d", 
-		task.TaskId, len(batches), batchSize, enabledModules, subTaskCount)
+	l.Logger.Infof("MainTaskStart: task %s will be split into %d chunks, enabledModules=%d, subTaskCount=%d", 
+		task.TaskId, preview.ChunkCount, enabledModules, subTaskCount)
 
-	// 更新主任务状态为STARTED（直接设置为执行中，因为任务即将被推送到队列）
+	// 更新主任务状态为STARTED
 	now := time.Now()
 	update := bson.M{
 		"status":         model.TaskStatusStarted,
@@ -987,8 +1151,11 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 		"workspaceId":    wsId,
 		"mainTaskId":     task.Id.Hex(),
 		"subTaskCount":   subTaskCount,
-		"batchCount":     len(batches),
+		"chunkCount":     preview.ChunkCount,
 		"enabledModules": enabledModules,
+		"totalTargets":   preview.TotalTargets,
+		"estimatedTime":  preview.EstimatedTime,
+		"chunkingEnabled": chunkConfig.EnableChunking,
 	})
 	l.svcCtx.RedisClient.Set(l.ctx, taskInfoKey, taskInfoData, 24*time.Hour)
 
@@ -1002,57 +1169,48 @@ func (l *MainTaskStartLogic) MainTaskStart(req *types.MainTaskControlReq, worksp
 		}
 	}
 
-	// 批量创建子任务
-	var schedTasks []*scheduler.TaskInfo
-	for i, batch := range batches {
-		// 复制配置并替换目标
-		subConfig := make(map[string]interface{})
-		for k, v := range taskConfig {
-			subConfig[k] = v
-		}
-		subConfig["target"] = batch
-		subConfig["subTaskIndex"] = i
-		subConfig["subTaskTotal"] = len(batches)
-		subConfigBytes, _ := json.Marshal(subConfig)
+	// 创建分片任务请求
+	chunkReq := &scheduler.ChunkTaskRequest{
+		TaskId:      task.TaskId,
+		TaskName:    task.Name,
+		Target:      target,
+		Config:      taskConfig,
+		WorkspaceId: wsId,
+		MainTaskId:  task.Id.Hex(),
+		Priority:    1,
+		Workers:     workers,
+	}
 
-		// 生成子任务ID
-		subTaskId := task.TaskId
-		if len(batches) > 1 {
-			subTaskId = task.TaskId + "-" + strconv.Itoa(i)
-		}
+	// 使用分片管理器创建并推送任务
+	chunkResp, err := chunkManager.PushChunkedTasks(l.ctx, l.svcCtx.Scheduler, chunkReq)
+	if err != nil {
+		l.Logger.Errorf("MainTaskStart: failed to create chunked tasks: %v", err)
+		return &types.BaseResp{Code: 500, Msg: fmt.Sprintf("创建分片任务失败: %v", err)}, nil
+	}
 
-		schedTask := &scheduler.TaskInfo{
-			TaskId:      subTaskId,
-			MainTaskId:  task.Id.Hex(),
-			WorkspaceId: wsId,
-			TaskName:    task.Name,
-			Config:      string(subConfigBytes),
-			Priority:    1,
-			Workers:     workers,
-		}
-		schedTasks = append(schedTasks, schedTask)
+	if !chunkResp.Success {
+		l.Logger.Errorf("MainTaskStart: chunked task creation failed: %s", chunkResp.Message)
+		return &types.BaseResp{Code: 500, Msg: chunkResp.Message}, nil
+	}
 
-		// 只有多批次时才保存子任务信息到 Redis（单批次时使用主任务信息）
-		if len(batches) > 1 {
-			subTaskInfoKey := "cscan:task:info:" + subTaskId
-			subTaskInfoData, _ := json.Marshal(map[string]interface{}{
-				"workspaceId":  wsId,
-				"mainTaskId":   task.Id.Hex(),
-				"parentTaskId": task.TaskId,
-				"subTaskCount": subTaskCount,
-			})
-			l.svcCtx.RedisClient.Set(l.ctx, subTaskInfoKey, subTaskInfoData, 24*time.Hour)
+	l.Logger.Infof("MainTaskStart: successfully created and pushed %d chunk tasks for task %s", 
+		chunkResp.ChunkCount, task.TaskId)
+
+	// 构建响应消息
+	message := fmt.Sprintf("任务已启动，共拆分为 %d 个分片，包含 %d 个目标", 
+		chunkResp.ChunkCount, chunkResp.TotalTargets)
+	
+	if preview.EstimatedTime > 0 {
+		estimatedHours := preview.EstimatedTime / 3600
+		estimatedMinutes := (preview.EstimatedTime % 3600) / 60
+		if estimatedHours > 0 {
+			message += fmt.Sprintf("，预计执行时间 %d 小时 %d 分钟", estimatedHours, estimatedMinutes)
+		} else {
+			message += fmt.Sprintf("，预计执行时间 %d 分钟", estimatedMinutes)
 		}
 	}
 
-	// 使用批量推送提高性能
-	l.Logger.Infof("Pushing %d sub-tasks to queue (batch mode)", len(schedTasks))
-	if err := l.svcCtx.Scheduler.PushTaskBatch(l.ctx, schedTasks); err != nil {
-		l.Logger.Errorf("push sub-tasks to queue failed: %v", err)
-		return &types.BaseResp{Code: 500, Msg: "任务入队失败"}, nil
-	}
-
-	return &types.BaseResp{Code: 0, Msg: "任务已启动"}, nil
+	return &types.BaseResp{Code: 0, Msg: message}, nil
 }
 
 // MainTaskPauseLogic 暂停任务

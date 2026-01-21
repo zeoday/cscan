@@ -168,6 +168,8 @@ func applyPortIdentifyDefaults(c *PortIdentifyConfig) {
 	if c.Timeout <= 0 {
 		c.Timeout = 30
 	}
+	// 注意：Concurrency 默认为 0，表示使用扫描器的默认值
+	// Nmap 默认为 1（串行），Fingerprintx 默认为 10（并发）
 }
 
 func applyDomainScanDefaults(c *DomainScanConfig) {

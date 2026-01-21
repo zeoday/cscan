@@ -37,9 +37,27 @@ func (l *UpdateTaskLogic) UpdateTask(in *pb.UpdateTaskReq) (*pb.UpdateTaskResp, 
 
 	l.Logger.Infof("UpdateTask: taskId=%s, state=%s, phase=%s", taskId, state, in.Phase)
 
+	// 更新任务进度（用于恢复机制）
+	if in.Phase != "" {
+		progress := 0 // 可以从 result 中解析进度
+		if err := l.svcCtx.TaskRecoveryManager.UpdateTaskProgress(taskId, in.Phase, progress); err != nil {
+			l.Logger.Errorf("UpdateTask: failed to update task progress: %v", err)
+		}
+	}
+
 	// 从处理中集合移除
 	processingKey := "cscan:task:processing"
 	l.svcCtx.RedisClient.SRem(l.ctx, processingKey, taskId)
+
+	// 如果任务完成或失败，清理执行记录
+	if state == "SUCCESS" || state == "FAILURE" || state == "COMPLETED" {
+		if err := l.svcCtx.TaskRecoveryManager.RemoveTaskExecution(taskId); err != nil {
+			l.Logger.Errorf("UpdateTask: failed to remove task execution: %v", err)
+		}
+		// 清理任务信息
+		taskInfoKey := "cscan:task:info:" + taskId
+		l.svcCtx.RedisClient.Del(l.ctx, taskInfoKey)
+	}
 
 	// 更新任务状态到Redis（包含当前阶段）
 	statusKey := "cscan:task:status:" + taskId

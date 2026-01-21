@@ -25,6 +25,18 @@ func NewScanResultModel(db *mongo.Database, workspaceId string) *ScanResultModel
 		{Keys: bson.D{{Key: "risk_level", Value: 1}}},
 		{Keys: bson.D{{Key: "completed", Value: -1}}},
 		{Keys: bson.D{{Key: "create_time", Value: -1}}},
+		// New composite index for efficient scan result queries
+		{Keys: bson.D{
+			{Key: "workspace_id", Value: 1},
+			{Key: "authority", Value: 1},
+			{Key: "host", Value: 1},
+			{Key: "port", Value: 1},
+			{Key: "scan_time", Value: -1},
+		}},
+		// Index for scan_time to support versioning queries
+		{Keys: bson.D{{Key: "scan_time", Value: -1}}},
+		// Index for version to support versioning queries
+		{Keys: bson.D{{Key: "version", Value: 1}}},
 	}
 	coll.Indexes().CreateMany(ctx, indexes)
 	

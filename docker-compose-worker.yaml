@@ -2,10 +2,27 @@ services:
   cscan-worker:
     image: registry.cn-hangzhou.aliyuncs.com/txf7/cscan-worker:latest
     container_name: cscan-worker
-    restart: unless-stopped
+    restart: always  # 改为 always 确保总是重启
     network_mode: host
     environment:
       - CSCAN_SERVER=${CSCAN_SERVER}
       - CSCAN_KEY=${CSCAN_KEY}
       - CSCAN_NAME=${CSCAN_NAME:-}
       - CSCAN_CONCURRENCY=${CSCAN_CONCURRENCY:-5}
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+      nproc:
+        soft: 65535
+        hard: 65535
+    privileged: false
+    cap_add:
+      - SYS_RESOURCE
+      - SYS_ADMIN
+    healthcheck:
+      test: ["CMD", "pgrep", "cscan-worker"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

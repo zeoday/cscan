@@ -5,11 +5,11 @@ MaxBytes: 104857600  # 100MB
 Timeout: 300000      # 5分钟超时 (毫秒)
 
 Log:
-  Level: error
+  Level: info
   Stat: false
   Mode: console
   Encoding: plain
-  TimeFormat: 2006-01-02 15:04:05
+  TimeFormat: "15:04:05"
   
 Auth:
   AccessSecret: "aKgPnXruwjMTjhDkSfNIP4LRZZkepj7vK4unzai68mJXTgdj"

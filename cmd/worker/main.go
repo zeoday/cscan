@@ -62,12 +62,10 @@ func validateInstallKey(apiServer, key, name string) error {
 	url := fmt.Sprintf("%s/api/v1/worker/validate", apiServer)
 
 	// 发送验证请求，带重试
-	var lastErr error
 	for i := 0; i < 3; i++ {
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 		if err != nil {
-			lastErr = err
-			logx.Infof("[Worker] Validation attempt %d failed: %v, retrying...", i+1, err)
+			logx.Infof("⚠️  Validation attempt %d failed: %v, retrying...", i+1, err)
 			time.Sleep(time.Duration(i+1) * time.Second)
 			continue
 		}
@@ -79,28 +77,35 @@ func validateInstallKey(apiServer, key, name string) error {
 			Msg   string `json:"msg"`
 			Valid bool   `json:"valid"`
 		}
-		if err := json.Unmarshal(body, &result); err != nil {
-			lastErr = fmt.Errorf("parse response failed: %v", err)
-			continue
-		}
-
-		if result.Code != 0 || !result.Valid {
-			return fmt.Errorf("validation failed: %s", result.Msg)
-		}
-
-		logx.Info("[Worker] Install key validated successfully")
+		json.Unmarshal(body, &result)
+		if result.Code != 0 || !result.Valid { return fmt.Errorf("validation failed: %s", result.Msg) }
 		return nil
 	}
-
-	return fmt.Errorf("validation failed after 3 attempts: %v", lastErr)
+	return fmt.Errorf("validation failed after 3 attempts")
 }
 
 func main() {
 	flag.Parse()
-
-	// 禁用统计日志
+	logx.MustSetup(logx.LogConf{
+			ServiceName: "cscan-worker",
+			Mode:        "console",            // 开启控制台颜色
+			Encoding:    "plain",              // 纯文本格式
+			TimeFormat:  "15:04:05",           // 简洁时间格式
+			Level:       "info",               // 日志级别
+			Stat:        false,                // 关闭资源统计
+	})
+	// 禁用额外的统计输出
 	stat.DisableLog()
-	logx.DisableStat()
+	fmt.Println(`
+	______ _____  ______          _   _ 
+	/ ____/ ____|/ __ \ \        / / | \ | |
+	| |   | (___ | |  | \ \  /\  / /|  \| |
+	| |    \___ \| |  | |\ \/  \/ / | .  |
+	| |________) | |__| | \  /\  /  | |\  |
+	\_____|_____/ \____/   \/  \/   |_| \_| 
+					WORKER NODE            `)
+	fmt.Println("---------------------------------------------------------")
+	logx.Info("🚀 Initializing CScan Worker Node...")
 
 	// 生成Worker名称
 	name := *workerName
@@ -110,8 +115,8 @@ func main() {
 
 	// 强制要求安装密钥
 	if *installKey == "" {
-		logx.Error("[Worker] Error: install key is required (-k flag)")
-		logx.Error("[Worker] Please get the install key from the admin panel")
+		logx.Error("❌ Error: install key is required (-k flag)")
+		logx.Error("   Please get the install key from the admin panel")
 		os.Exit(1)
 	}
 
@@ -122,22 +127,23 @@ func main() {
 		apiServer = "http://" + apiServer
 	}
 
-	logx.Infof("[Worker] Using API server: %s", apiServer)
-	logx.Info("[Worker] Validating install key...")
+	fmt.Println("---------------------------------------------------------")
+	logx.Infof("🔗 Connecting to API Server: %s", apiServer)
+	logx.Infof("🔑 Validating Identity for: %s", name)
 
 	// 验证安装密钥
 	if err := validateInstallKey(apiServer, *installKey, name); err != nil {
-		logx.Errorf("[Worker] Authentication failed: %v", err)
+	logx.Errorf("❌ Authentication failed: %v", err)
 		os.Exit(1)
 	}
-
+	logx.Info("✅ Identity verified successfully")
 	// 获取本机IP
 	ip := worker.GetLocalIP()
 
 	config := worker.WorkerConfig{
 		Name:        name,
 		IP:          ip,
-		ServerAddr:  apiServer, // 现在是 API 服务地址
+		ServerAddr:  apiServer,
 		InstallKey:  *installKey,
 		Concurrency: *concurrency,
 		Timeout:     3600,
@@ -145,24 +151,28 @@ func main() {
 
 	w, err := worker.NewWorker(config)
 	if err != nil {
-		logx.Errorf("create worker failed: %v", err)
+		logx.Errorf("❌ Create worker failed: %v", err)
 		os.Exit(1)
 	}
 
 	// 启动Worker
 	w.Start()
 
-	logx.Info("Worker started:")
-	logx.Infof("  Name: %s", name)
-	logx.Infof("  IP: %s", ip)
-	logx.Infof("  API Server: %s", apiServer)
-	logx.Infof("  Concurrency: %d", *concurrency)
+	fmt.Println("---------------------------------------------------------")
+	logx.Infof("✅ Worker is running successfully")
+	logx.Infof("   Name:        %s", name)
+	logx.Infof("   IP:          %s", ip)
+	logx.Infof("   Concurrency: %d threads", *concurrency)
+	logx.Infof("📡 Waiting for tasks from dispatch center...")
+	fmt.Println("---------------------------------------------------------")
 
 	// 等待退出信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logx.Info("Shutting down worker...")
+	fmt.Println("\n---------------------------------------------------------")
+	logx.Info("🛑 Shutting down worker...")
 	w.Stop()
+	logx.Info("👋 Bye!")
 }

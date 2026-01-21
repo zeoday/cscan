@@ -37,6 +37,8 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 
 	// 用于存储所有分组数据
 	domainGroups := make(map[string]*types.AssetGroup)
+	// 用于存储每个域名的最近任务执行时长
+	domainDuration := make(map[string]time.Duration)
 
 	// 遍历所有工作空间
 	for _, wsId := range wsIds {
@@ -48,10 +50,10 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 		} else {
 			// 用于记录每个域名对应的任务状态
 			domainTaskStatus := make(map[string]string)
-			
+
 			for _, task := range tasks {
 				l.Logger.Infof("处理任务: taskId=%s, status=%s, target=%s", task.TaskId, task.Status, task.Target)
-				
+
 				// 从任务目标中提取域名
 				targets := strings.Split(task.Target, "\n")
 				for _, target := range targets {
@@ -59,23 +61,23 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 					if target == "" {
 						continue
 					}
-					
+
 					// 提取主域名
 					domain := extractMainDomainFromTarget(target)
 					if domain == "" {
 						continue
 					}
-					
+
 					l.Logger.Infof("提取域名: target=%s, domain=%s", target, domain)
-					
+
 					// 记录该域名的任务状态（如果有多个任务，优先显示运行中的状态）
 					currentStatus := domainTaskStatus[domain]
 					taskStatus := getTaskStatusForGroup(task.Status)
-					
+
 					l.Logger.Infof("任务状态转换: taskStatus=%s -> groupStatus=%s, currentStatus=%s", task.Status, taskStatus, currentStatus)
-					
+
 					// 状态优先级：running > starting > failed > stopped > finished
-					if currentStatus == "" || 
+					if currentStatus == "" ||
 						(taskStatus == "running") ||
 						(taskStatus == "starting" && currentStatus != "running") ||
 						(taskStatus == "failed" && currentStatus != "running" && currentStatus != "starting") ||
@@ -83,7 +85,21 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 						domainTaskStatus[domain] = taskStatus
 						l.Logger.Infof("更新域名 %s 的状态为: %s", domain, taskStatus)
 					}
-					
+
+					// 计算任务的真实执行时长
+					if task.StartTime != nil && task.EndTime != nil {
+						taskDuration := task.EndTime.Sub(*task.StartTime)
+						// 保留最近一次任务的执行时长（更新时间最新的）
+						if existingDuration, exists := domainDuration[domain]; !exists || task.UpdateTime.After(task.CreateTime) {
+							if !exists || taskDuration > 0 {
+								domainDuration[domain] = existingDuration + taskDuration
+							}
+						}
+					} else if task.StartTime != nil && task.Status == "STARTED" {
+						// 正在运行的任务，计算从开始到现在的时长
+						domainDuration[domain] = time.Since(*task.StartTime)
+					}
+
 					// 如果分组不存在，创建新分组
 					if _, exists := domainGroups[domain]; !exists {
 						domainGroups[domain] = &types.AssetGroup{
@@ -105,7 +121,7 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 				}
 			}
 		}
-		
+
 		// 2. 从资产中统计实际数据
 		assetModel := l.svcCtx.GetAssetModel(wsId)
 
@@ -153,17 +169,13 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 	}
 
 	// 计算持续时间和格式化时间
-	for _, group := range domainGroups {
-		// 计算扫描持续时间
-		duration := group.LatestUpdate.Sub(group.FirstSeen)
-		if duration < time.Minute {
-			group.Duration = fmt.Sprintf("%ds", int(duration.Seconds()))
-		} else if duration < time.Hour {
-			group.Duration = fmt.Sprintf("%dm", int(duration.Minutes()))
-		} else if duration < 24*time.Hour {
-			group.Duration = fmt.Sprintf("%dh", int(duration.Hours()))
+	for domain, group := range domainGroups {
+		// 使用真实的任务执行时长
+		if duration, exists := domainDuration[domain]; exists && duration > 0 {
+			group.Duration = formatDuration(duration)
 		} else {
-			group.Duration = fmt.Sprintf("%dd", int(duration.Hours()/24))
+			// 如果没有任务记录，显示为 "-"
+			group.Duration = "-"
 		}
 
 		// 格式化最后更新时间
@@ -214,7 +226,7 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 		}
 		list = list[start:end]
 	}
-	
+
 	// 记录返回的数据
 	for _, group := range list {
 		l.Logger.Infof("返回分组: domain=%s, status=%s, services=%d", group.Domain, group.Status, group.TotalServices)
@@ -228,41 +240,71 @@ func (l *AssetGroupsLogic) AssetGroups(req *types.AssetGroupsReq, workspaceId st
 	}, nil
 }
 
+// formatDuration 格式化时间持续时长
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return "<1s"
+	} else if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	} else if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) % 60
+		if seconds > 0 {
+			return fmt.Sprintf("%dm%ds", minutes, seconds)
+		}
+		return fmt.Sprintf("%dm", minutes)
+	} else if d < 24*time.Hour {
+		hours := int(d.Hours())
+		minutes := int(d.Minutes()) % 60
+		if minutes > 0 {
+			return fmt.Sprintf("%dh%dm", hours, minutes)
+		}
+		return fmt.Sprintf("%dh", hours)
+	} else {
+		days := int(d.Hours() / 24)
+		hours := int(d.Hours()) % 24
+		if hours > 0 {
+			return fmt.Sprintf("%dd%dh", days, hours)
+		}
+		return fmt.Sprintf("%dd", days)
+	}
+}
+
 // extractMainDomainFromTarget 从任务目标中提取主域名
 func extractMainDomainFromTarget(target string) string {
 	// 移除协议前缀
 	target = strings.TrimPrefix(target, "http://")
 	target = strings.TrimPrefix(target, "https://")
-	
+
 	// 移除端口
 	if idx := strings.Index(target, ":"); idx > 0 {
 		target = target[:idx]
 	}
-	
+
 	// 移除路径
 	if idx := strings.Index(target, "/"); idx > 0 {
 		target = target[:idx]
 	}
-	
+
 	// 移除通配符
 	target = strings.TrimPrefix(target, "*.")
-	
+
 	// 移除CIDR
 	if strings.Contains(target, "/") {
 		return "" // CIDR不作为域名分组
 	}
-	
+
 	// 如果是IP地址，返回IP
 	if isIPAddress(target) {
 		return target
 	}
-	
+
 	// 提取主域名
 	parts := strings.Split(target, ".")
 	if len(parts) < 2 {
 		return target
 	}
-	
+
 	// 返回主域名（最后两部分）
 	return strings.Join(parts[len(parts)-2:], ".")
 }

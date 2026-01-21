@@ -10,8 +10,6 @@
 [![Version](https://img.shields.io/badge/Version-2.7-green)](VERSION)
 [![Demo](https://img.shields.io/badge/Demo-Live-orange)](http://cscan.txf7.cn)
 
-<img src="images/cscan.png" alt="CSCAN" width="250"/>
-
 ## Features
 
 | Module | Function | Tools |
