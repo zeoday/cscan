@@ -228,7 +228,7 @@ type TerminalCloseResponse struct {
 type TerminalInputRequest struct {
 	RequestId string `json:"requestId"`
 	SessionId string `json:"sessionId"`
-	Data      string `json:"data"`             // Base64编码的输入数据
+	Data      string `json:"data"`              // Base64编码的输入数据
 	Command   string `json:"command,omitempty"` // 可选：直接执行的命令
 }
 
@@ -261,7 +261,6 @@ type TerminalResizeResponse struct {
 	Success   bool   `json:"success"`
 	Error     string `json:"error,omitempty"`
 }
-
 
 // ==================== Worker Connection ====================
 
@@ -781,10 +780,10 @@ func NewWorkerWSHandler(svcCtx *svc.ServiceContext) *WorkerWSHandler {
 	h := &WorkerWSHandler{
 		svcCtx: svcCtx,
 	}
-	
+
 	// 启动 Worker 控制命令订阅
 	go h.subscribeWorkerControl()
-	
+
 	return h
 }
 
@@ -835,6 +834,10 @@ func (h *WorkerWSHandler) subscribeWorkerControl() {
 				"action":  "WORKER_RENAME",
 				"newName": cmd.NewName,
 			})
+			// 同时更新服务端的连接映射
+			if cmd.NewName != "" && cmd.NewName != cmd.WorkerName {
+				h.RenameConnection(cmd.WorkerName, cmd.NewName)
+			}
 		case "setConcurrency":
 			payload, _ = json.Marshal(map[string]interface{}{
 				"action":      "WORKER_SET_CONCURRENCY",
@@ -910,6 +913,33 @@ func (h *WorkerWSHandler) GetConnection(workerName string) (*WorkerConnection, b
 	return nil, false
 }
 
+// RenameConnection 重命名Worker连接映射
+// 当Worker被重命名时，需要同步更新WebSocket连接映射的key
+func (h *WorkerWSHandler) RenameConnection(oldName, newName string) {
+	if oldName == newName || newName == "" {
+		return
+	}
+
+	// 获取旧连接
+	if conn, ok := h.connections.Load(oldName); ok {
+		workerConn := conn.(*WorkerConnection)
+		// 更新连接的workerName
+		workerConn.workerName = newName
+		// 存储到新key
+		h.connections.Store(newName, workerConn)
+		// 删除旧key
+		h.connections.Delete(oldName)
+
+		// 同时迁移会话映射
+		if sessions, ok := h.workerSessions.Load(oldName); ok {
+			h.workerSessions.Store(newName, sessions)
+			h.workerSessions.Delete(oldName)
+		}
+
+		logx.Infof("[WorkerWS] Connection renamed: %s -> %s", oldName, newName)
+	}
+}
+
 // BroadcastControl 向指定Worker发送控制信号
 func (h *WorkerWSHandler) BroadcastControl(workerName, taskId, action string) error {
 	conn, ok := h.GetConnection(workerName)
@@ -959,7 +989,6 @@ func (h *WorkerWSHandler) GetConnectedWorkers() []string {
 	})
 	return workers
 }
-
 
 // ==================== HTTP Handler ====================
 
@@ -1108,7 +1137,6 @@ func sendAuthFail(conn io.Writer, reason string) {
 	data, _ := json.Marshal(msg)
 	wsutil.WriteServerMessage(conn, ws.OpText, data)
 }
-
 
 // ==================== Message Pumps ====================
 
@@ -1272,7 +1300,7 @@ func handleLog(ctx context.Context, wc *WorkerConnection, svcCtx *svc.ServiceCon
 		logPayload.Timestamp = time.Now().UnixMilli()
 	}
 
-	logx.Infof("[WorkerWS] Received log from %s: taskId=%s, level=%s, msg=%s", 
+	logx.Infof("[WorkerWS] Received log from %s: taskId=%s, level=%s, msg=%s",
 		wc.workerName, logPayload.TaskId, logPayload.Level, logPayload.Message)
 
 	// 写入Redis日志流
@@ -1342,7 +1370,6 @@ func writeLogToRedis(ctx context.Context, svcCtx *svc.ServiceContext, workerName
 	}
 }
 
-
 // ==================== Control Signal Subscription ====================
 
 // subscribeControlSignals 订阅Redis控制信号
@@ -1397,7 +1424,6 @@ func extractTaskIdFromChannel(channel string) string {
 	}
 	return ""
 }
-
 
 // ==================== Terminal Output Handling ====================
 
