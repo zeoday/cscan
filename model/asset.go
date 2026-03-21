@@ -608,14 +608,43 @@ func (m *AssetModel) Upsert(ctx context.Context, doc *Asset) error {
 	setFields := bson.M{
 		"host":                    doc.Host,
 		"port":                    doc.Port,
+		"category":                doc.Category,
 		"service":                 doc.Service,
+		"server":                  doc.Server,
+		"banner":                  doc.Banner,
 		"title":                   doc.Title,
 		"app":                     doc.App,
+		"status":                  doc.HttpStatus,
+		"header":                  doc.HttpHeader,
+		"body":                    doc.HttpBody,
 		"source":                  doc.Source,
 		"is_http":                 doc.IsHTTP,
 		"update_time":             now,
 		"update":                  true, // 标记为有更新
 		"last_status_change_time": now,  // 更新状态变更时间，确保排在前面
+	}
+
+	// 有值才更新的字段，避免用空值覆盖已有数据
+	if doc.Screenshot != "" {
+		setFields["screenshot"] = doc.Screenshot
+	}
+	if doc.IconHash != "" {
+		setFields["icon_hash"] = doc.IconHash
+	}
+	if len(doc.IconHashBytes) > 0 {
+		setFields["icon_hash_bytes"] = doc.IconHashBytes
+	}
+	if doc.CName != "" {
+		setFields["cname"] = doc.CName
+	}
+	if doc.Domain != "" {
+		setFields["domain"] = doc.Domain
+	}
+	if doc.Cert != "" {
+		setFields["cert"] = doc.Cert
+	}
+	if doc.Ip.IpV4 != nil || doc.Ip.IpV6 != nil {
+		setFields["ip"] = doc.Ip
 	}
 
 	// 如果有标签，使用 $addToSet 批量添加，避免覆盖原有标签

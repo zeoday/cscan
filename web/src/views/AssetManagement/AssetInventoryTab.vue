@@ -531,7 +531,7 @@ const loadData = async () => {
           workspaceId: item.workspaceId, // 淇濆瓨宸ヤ綔绌洪棿ID锛岀敤浜庡垹
   host: item.host,
           port: item.port,
-          status: String(item.status || '200'),
+          status: String(item.status || ''),
           asn: item.asn || '', // 绌哄瓧绗︿覆锛屼笉鏄剧ず榛樿
   ip: item.ip || '',
           url: item.port && item.port !== 0 ? `${item.port === 443 ? 'https' : 'http'}://${item.host}:${item.port}` : `http://${item.host}`,
