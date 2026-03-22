@@ -106,7 +106,7 @@ func (s *TaskSplitter) SplitTask(taskId, target string, taskConfig map[string]in
 	}
 
 	// 拆分为多个分片
-	chunks := s.createChunks(taskId, allTargets, taskConfig)
+	chunks := s.createChunks(taskId, allTargets)
 	result.Chunks = chunks
 	result.ChunkCount = len(chunks)
 	result.EstimatedTime = s.estimateExecutionTime(totalTargets, taskConfig)
@@ -142,7 +142,7 @@ func (s *TaskSplitter) calculateOptimalChunkSize(totalTargets int) int {
 }
 
 // createChunks 创建分片
-func (s *TaskSplitter) createChunks(taskId string, allTargets []string, taskConfig map[string]interface{}) []TaskChunk {
+func (s *TaskSplitter) createChunks(taskId string, allTargets []string) []TaskChunk {
 	var chunks []TaskChunk
 	chunkSize := s.calculateOptimalChunkSize(len(allTargets))
 

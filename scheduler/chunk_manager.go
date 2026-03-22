@@ -134,7 +134,7 @@ func (cm *ChunkManager) PushChunkedTasks(ctx context.Context, scheduler *Schedul
 	}
 
 	if !response.Success {
-		return response, fmt.Errorf(response.Message)
+		return response, fmt.Errorf("%s", response.Message)
 	}
 
 	// 获取分片任务列表

@@ -872,7 +872,7 @@ const form = reactive({
   portscanTool: 'naabu',
   portscanRate: 3000,
   ports: 'top100',
-  portThreshold: 100,
+  portThreshold: 50,
   scanType: 'c',
   portscanTimeout: 60,
   skipHostDiscovery: false,

@@ -1276,7 +1276,7 @@ function resetForm() {
     domainscanRemoveWildcard: true, domainscanResolveDNS: true, domainscanConcurrent: 50,
     // 端口扫描
     portscanEnable: true, portscanTool: 'naabu', portscanRate: 1000, ports: 'top100',
-    portThreshold: 100, scanType: 'c', portscanTimeout: 60, skipHostDiscovery: false, portidentifyEnable: false, portidentifyTimeout: 30,
+    portThreshold: 50, scanType: 'c', portscanTimeout: 60, skipHostDiscovery: false, portidentifyEnable: false, portidentifyTimeout: 30,
     portidentifyArgs: '', fingerprintEnable: true, fingerprintTool: 'httpx', fingerprintIconHash: true,
     fingerprintCustomEngine: false, fingerprintScreenshot: false,
     fingerprintTimeout: 30, pocscanEnable: false, pocscanAutoScan: true,
@@ -1343,7 +1343,7 @@ function applyConfig(config) {
     portscanTool: config.portscan?.tool || 'naabu',
     portscanRate: config.portscan?.rate || 1000,
     ports: config.portscan?.ports || 'top100',
-    portThreshold: config.portscan?.portThreshold || 100,
+    portThreshold: config.portscan?.portThreshold || 50,
     scanType: config.portscan?.scanType || 'c',
     portscanTimeout: config.portscan?.timeout || 60,
     skipHostDiscovery: config.portscan?.skipHostDiscovery ?? false,

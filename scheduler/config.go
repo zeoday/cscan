@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -19,7 +20,7 @@ func NewSimpleValidator() *SimpleValidator {
 }
 
 // Required 必填字段验证
-func (v *SimpleValidator) Required(field string, value interface{}) *SimpleValidator {
+func (v *SimpleValidator) Required(field string, value any) *SimpleValidator {
 	if value == nil {
 		v.errors = append(v.errors, fmt.Sprintf("%s is required", field))
 		return v
@@ -87,11 +88,14 @@ func (v *SimpleValidator) OneOf(field, value string, allowed ...string) *SimpleV
 	if value == "" {
 		return v // 空值不验证
 	}
+
+	// 使用 slices.Contains 简化循环
 	for _, a := range allowed {
 		if value == a {
 			return v
 		}
 	}
+
 	v.errors = append(v.errors, fmt.Sprintf("%s must be one of [%s], got %s", field, strings.Join(allowed, ", "), value))
 	return v
 }
@@ -160,7 +164,7 @@ func applyPortScanDefaults(c *PortScanConfig) {
 		c.Timeout = 5
 	}
 	if c.PortThreshold <= 0 {
-		c.PortThreshold = 100
+		c.PortThreshold = 50
 	}
 }
 

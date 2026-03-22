@@ -213,11 +213,12 @@ func (m *CronManager) executeTask(task *CronTask) {
 	task.LastRunTime = time.Now().Local().Format("2006-01-02 15:04:05")
 
 	// 计算下次执行时间
-	if task.ScheduleType == "cron" {
+	switch task.ScheduleType {
+	case "cron":
 		parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 		schedule, _ := parser.Parse(task.CronSpec)
 		task.NextRunTime = schedule.Next(time.Now()).Local().Format("2006-01-02 15:04:05")
-	} else if task.ScheduleType == "once" {
+	case "once":
 		// 一次性任务执行后禁用
 		task.Status = "disable"
 		task.NextRunTime = ""
