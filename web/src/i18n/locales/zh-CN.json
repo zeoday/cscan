@@ -72,7 +72,8 @@
     "defaultOrganization": "默认组织",
     "yes": "是",
     "no": "否",
-    "exportCsv": "导出CSV(全部字段)"
+    "exportCsv": "导出CSV(全部字段)",
+    "switchingWorkspace": "正在切换工作空间..."
   },
   "navigation": {
     "dashboard": "工作台",

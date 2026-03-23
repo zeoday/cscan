@@ -69,7 +69,8 @@
     "defaultOrganization": "Default Organization",
     "yes": "Yes",
     "no": "No",
-    "exportCsv": "Export CSV (All Fields)"
+    "exportCsv": "Export CSV (All Fields)",
+    "switchingWorkspace": "Switching workspace..."
   },
   "navigation": {
     "dashboard": "Dashboard",
