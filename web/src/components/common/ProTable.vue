@@ -53,54 +53,52 @@
         </template>
       </div>
       <div class="toolbar-right">
-        <!-- Advanced search -->
-        <el-popover
+        <!-- Advanced search toggle -->
+        <el-button
           v-if="searchItems && searchItems.length > 0"
-          placement="bottom-end"
-          :width="300"
-          trigger="click"
+          @click="showFilters = !showFilters"
         >
-          <template #reference>
-            <el-button>
-              <el-icon><Filter /></el-icon>
-              {{ t('asset.assetInventoryTab.filters') }}
-            </el-button>
-          </template>
-          <el-form :model="searchForm" label-position="top" size="small">
-            <el-form-item
-              v-for="item in searchItems"
-              :key="item.prop"
-              :label="item.label"
-            >
-              <el-input
-                v-if="item.type === 'input'"
-                v-model="searchForm[item.prop]"
-                :placeholder="`Enter ${item.label}`"
-                clearable
-              />
-              <el-select
-                v-else-if="item.type === 'select'"
-                v-model="searchForm[item.prop]"
-                :placeholder="`Select ${item.label}`"
-                clearable
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="opt in item.options"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </el-form-item>
-            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
-              <el-button @click="resetSearch">Reset</el-button>
-              <el-button type="primary" @click="handleSearch">Search</el-button>
-            </div>
-          </el-form>
-        </el-popover>
+          <el-icon><Filter /></el-icon>
+          {{ t('asset.assetInventoryTab.filters') }}
+        </el-button>
         <slot name="toolbar-right"></slot>
       </div>
+    </div>
+
+    <!-- Filters Panel -->
+    <div v-if="showFilters && searchItems && searchItems.length > 0" class="filters-panel">
+      <el-form :model="searchForm" :inline="true" size="small">
+        <el-form-item
+          v-for="item in searchItems"
+          :key="item.prop"
+          :label="item.label"
+        >
+          <el-input
+            v-if="item.type === 'input'"
+            v-model="searchForm[item.prop]"
+            :placeholder="`Enter ${item.label}`"
+            clearable
+          />
+          <el-select
+            v-else-if="item.type === 'select'"
+            v-model="searchForm[item.prop]"
+            :placeholder="`Select ${item.label}`"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in item.options"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="resetSearch">Reset</el-button>
+          <el-button type="primary" @click="handleSearch">Search</el-button>
+        </el-form-item>
+      </el-form>
     </div>
 
     <!-- Main Table -->
@@ -201,6 +199,7 @@ const router = useRouter()
 const route = useRoute()
 
 // State
+const showFilters = ref(false)
 const loading = ref(false)
 const tableData = ref([])
 const selectedRows = ref([])
@@ -519,6 +518,19 @@ defineExpose({
     padding: 16px;
     height: 100%;
     box-sizing: border-box;
+  }
+}
+
+
+.filters-panel {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+
+  :deep(.el-select) {
+    min-width: 200px;
   }
 }
 
