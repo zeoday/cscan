@@ -308,16 +308,16 @@ function resetFilters() {
 }
 
 function showExportMenu() {
-  if (tableData.value.length === 0) {
+  if (screenshots.value.length === 0) {
     ElMessage.warning('没有可导出的数据')
     return
   }
-  
+
   try {
     ElMessage.info('正在准备导出数据...')
-    
+
     // 准备导出数据
-    const exportList = tableData.value.map(item => ({
+    const exportList = screenshots.value.map(item => ({
       host: item.host,
       port: item.port,
       ip: item.ip || '',
@@ -338,10 +338,10 @@ function showExportMenu() {
         row.host,
         row.port,
         row.ip,
-        `"${(row.title || '').replace(/"/g, '""')}"`,
+        `"${String(row.title || '').replace(/"/g, '""')}"`,
         row.status,
-        row.service,
-        `"${(row.technologies || '').replace(/"/g, '""')}"`
+        `"${String(row.service || '').replace(/"/g, '""')}"`,
+        `"${String(row.technologies || '').replace(/"/g, '""')}"`
       ]
       csvContent += values.join(',') + '\n'
     })

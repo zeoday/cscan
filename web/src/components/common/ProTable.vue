@@ -180,6 +180,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  csvFormatter: {
+    type: Function,
+    default: null
+  },
   rowKey: {
     type: String,
     default: 'id'
@@ -372,13 +376,26 @@ async function handleExport(command) {
       return
     }
 
-    const headers = props.columns.map(c => c.label).filter(Boolean)
+    const exportColumns = props.columns.filter(c => c.label && c.prop)
+    const headers = exportColumns.map(c => c.label)
     const csvRows = [headers.join(',')]
 
     for (const row of data) {
-      const values = props.columns.filter(c => c.label).map(c => {
+      const values = exportColumns.map(c => {
         let val = row[c.prop]
-        if (typeof val === 'object') val = JSON.stringify(val)
+
+        if (props.csvFormatter) {
+          const formattedVal = props.csvFormatter(row, c)
+          if (formattedVal !== undefined) {
+             val = formattedVal
+          }
+        }
+
+        if (Array.isArray(val)) {
+          val = val.join('; ')
+        } else if (typeof val === 'object' && val !== null) {
+          val = JSON.stringify(val)
+        }
         return escapeCsvField(val)
       })
       csvRows.push(values.join(','))
