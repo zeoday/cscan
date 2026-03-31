@@ -102,6 +102,55 @@ func (m *VulModel) Count(ctx context.Context, filter bson.M) (int64, error) {
 	return m.coll.CountDocuments(ctx, filter)
 }
 
+type VulSeverityStats struct {
+	Total    int64
+	Critical int64
+	High     int64
+	Medium   int64
+	Low      int64
+	Info     int64
+	Week     int64
+	Month    int64
+}
+
+// AggregateStats 聚合统计漏洞总数、严重级别分布以及近7/30天数量
+func (m *VulModel) AggregateStats(ctx context.Context, now time.Time) (*VulSeverityStats, error) {
+	weekAgo := now.AddDate(0, 0, -7)
+	monthAgo := now.AddDate(0, 0, -30)
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: nil},
+			{Key: "total", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "critical", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$severity", "critical"}}}, 1, 0}}}}}},
+			{Key: "high", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$severity", "high"}}}, 1, 0}}}}}},
+			{Key: "medium", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$severity", "medium"}}}, 1, 0}}}}}},
+			{Key: "low", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$severity", "low"}}}, 1, 0}}}}}},
+			{Key: "info", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$eq", Value: bson.A{"$severity", "info"}}}, 1, 0}}}}}},
+			{Key: "week", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$gte", Value: bson.A{"$create_time", weekAgo}}}, 1, 0}}}}}},
+			{Key: "month", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{bson.D{{Key: "$gte", Value: bson.A{"$create_time", monthAgo}}}, 1, 0}}}}}},
+		}}},
+	}
+
+	cursor, err := m.coll.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	stats := &VulSeverityStats{}
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(stats); err != nil {
+			return nil, err
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
 // CountByTaskId 根据任务ID统计漏洞数量
 func (m *VulModel) CountByTaskId(ctx context.Context, taskId string) (int64, error) {
 	return m.coll.CountDocuments(ctx, bson.M{"task_id": taskId})

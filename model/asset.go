@@ -162,6 +162,7 @@ func (m *AssetModel) FindWithSort(ctx context.Context, filter bson.M, page, page
 		opts.SetSkip(int64((page - 1) * pageSize))
 		opts.SetLimit(int64(pageSize))
 	}
+	opts.SetProjection(AssetListProjection)
 	opts.SetSort(bson.D{{Key: sortField, Value: -1}})
 
 	cursor, err := m.coll.Find(ctx, filter, opts)
@@ -171,7 +172,74 @@ func (m *AssetModel) FindWithSort(ctx context.Context, filter bson.M, page, page
 	defer cursor.Close(ctx)
 
 	var docs []Asset
-	if err = cursor.All(ctx, &docs); err != nil {
+	for cursor.Next(ctx) {
+		var doc Asset
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
+// FindWithScreenshot 截图查询专用，包含 screenshot 字段
+func (m *AssetModel) FindWithScreenshot(ctx context.Context, filter bson.M, page, pageSize int) ([]Asset, error) {
+	opts := options.Find()
+	if page > 0 && pageSize > 0 {
+		opts.SetSkip(int64((page - 1) * pageSize))
+		opts.SetLimit(int64(pageSize))
+	}
+	opts.SetProjection(AssetScreenshotProjection)
+	opts.SetSort(bson.D{{Key: "update_time", Value: -1}})
+
+	cursor, err := m.coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var docs []Asset
+	for cursor.Next(ctx) {
+		var doc Asset
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	return docs, cursor.Err()
+}
+
+// FindWithOffset 支持自定义 skip 和 limit（用于多工作空间聚合分页）
+func (m *AssetModel) FindWithOffset(ctx context.Context, filter bson.M, skip, limit int64, sortField string) ([]Asset, error) {
+	opts := options.Find()
+	if skip > 0 {
+		opts.SetSkip(skip)
+	}
+	if limit > 0 {
+		opts.SetLimit(limit)
+	}
+	// 排除 body/header/cert 等超大字段，但保留 screenshot 供卡片视图展示
+	opts.SetProjection(AssetScreenshotProjection)
+	opts.SetSort(bson.D{{Key: sortField, Value: -1}})
+
+	cursor, err := m.coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var docs []Asset
+	for cursor.Next(ctx) {
+		var doc Asset
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return docs, nil
@@ -188,6 +256,7 @@ func (m *AssetModel) FindByRiskScore(ctx context.Context, filter bson.M, page, p
 	if ascending {
 		sortOrder = 1
 	}
+	opts.SetProjection(AssetListProjection)
 	opts.SetSort(bson.D{{Key: "risk_score", Value: sortOrder}})
 
 	cursor, err := m.coll.Find(ctx, filter, opts)
@@ -197,7 +266,14 @@ func (m *AssetModel) FindByRiskScore(ctx context.Context, filter bson.M, page, p
 	defer cursor.Close(ctx)
 
 	var docs []Asset
-	if err = cursor.All(ctx, &docs); err != nil {
+	for cursor.Next(ctx) {
+		var doc Asset
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return docs, nil
@@ -237,7 +313,17 @@ func (m *AssetModel) AggregateRiskLevel(ctx context.Context) (map[string]int, er
 		Level string `bson:"_id"`
 		Count int    `bson:"count"`
 	}
-	if err = cursor.All(ctx, &results); err != nil {
+	for cursor.Next(ctx) {
+		var res struct {
+			Level string `bson:"_id"`
+			Count int    `bson:"count"`
+		}
+		if err := cursor.Decode(&res); err != nil {
+			return nil, err
+		}
+		results = append(results, res)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 
@@ -384,7 +470,14 @@ func (m *AssetModel) Aggregate(ctx context.Context, field string, limit int) ([]
 	defer cursor.Close(ctx)
 
 	var results []StatResult
-	if err = cursor.All(ctx, &results); err != nil {
+	for cursor.Next(ctx) {
+		var res StatResult
+		if err := cursor.Decode(&res); err != nil {
+			return nil, err
+		}
+		results = append(results, res)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -413,7 +506,14 @@ func (m *AssetModel) AggregatePort(ctx context.Context, limit int) ([]PortStatRe
 	defer cursor.Close(ctx)
 
 	var results []PortStatResult
-	if err = cursor.All(ctx, &results); err != nil {
+	for cursor.Next(ctx) {
+		var res PortStatResult
+		if err := cursor.Decode(&res); err != nil {
+			return nil, err
+		}
+		results = append(results, res)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -422,6 +522,42 @@ func (m *AssetModel) AggregatePort(ctx context.Context, limit int) ([]PortStatRe
 type PortStatResult struct {
 	Port  int `bson:"_id"`
 	Count int `bson:"count"`
+}
+
+type AssetOverviewStats struct {
+	TotalAsset   int64 `bson:"totalAsset"`
+	NewCount     int64 `bson:"newCount"`
+	UpdatedCount int64 `bson:"updatedCount"`
+}
+
+// AggregateOverviewStats 聚合统计资产总数、新资产数、更新资产数
+func (m *AssetModel) AggregateOverviewStats(ctx context.Context) (*AssetOverviewStats, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: nil},
+			{Key: "totalAsset", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "newCount", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{"$new", 1, 0}}}}}},
+			{Key: "updatedCount", Value: bson.D{{Key: "$sum", Value: bson.D{{Key: "$cond", Value: bson.A{"$update", 1, 0}}}}}},
+		}}},
+	}
+
+	cursor, err := m.coll.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	stats := &AssetOverviewStats{}
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(stats); err != nil {
+			return nil, err
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
 }
 
 // AggregateApp 专门用于app字段统计（app是数组类型，需要先展开）
@@ -449,7 +585,14 @@ func (m *AssetModel) AggregateApp(ctx context.Context, limit int) ([]StatResult,
 	defer cursor.Close(ctx)
 
 	var results []StatResult
-	if err = cursor.All(ctx, &results); err != nil {
+	for cursor.Next(ctx) {
+		var res StatResult
+		if err := cursor.Decode(&res); err != nil {
+			return nil, err
+		}
+		results = append(results, res)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -469,10 +612,17 @@ func (m *AssetModel) AggregateIconHash(ctx context.Context, limit int) ([]IconHa
 		{{Key: "$match", Value: bson.D{
 			{Key: "icon_hash", Value: bson.D{{Key: "$exists", Value: true}, {Key: "$ne", Value: ""}}},
 		}}},
-		// 按 icon_hash 分组，统计数量
+		// 标记是否包含二进制图标数据，便于分组时优先保留有图标的记录
+		{{Key: "$addFields", Value: bson.D{
+			{Key: "has_icon_data", Value: bson.D{{Key: "$eq", Value: bson.A{bson.D{{Key: "$type", Value: "$icon_hash_bytes"}}, "binData"}}}},
+		}}},
+		// 同一 icon_hash 下优先让有 icon_hash_bytes 的文档排在前面
+		{{Key: "$sort", Value: bson.D{{Key: "icon_hash", Value: 1}, {Key: "has_icon_data", Value: -1}}}},
+		// 按 icon_hash 分组，统计数量并直接保留一份图标数据，避免 N+1 查询
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$icon_hash"},
 			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "iconData", Value: bson.D{{Key: "$first", Value: "$icon_hash_bytes"}}},
 		}}},
 		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
 		{{Key: "$limit", Value: limit}},
@@ -484,25 +634,16 @@ func (m *AssetModel) AggregateIconHash(ctx context.Context, limit int) ([]IconHa
 	}
 	defer cursor.Close(ctx)
 
-	// 第一阶段：获取统计结果（不含图片数据）
 	var stats []IconHashStatResult
-	if err = cursor.All(ctx, &stats); err != nil {
-		return nil, err
+	for cursor.Next(ctx) {
+		var stat IconHashStatResult
+		if err := cursor.Decode(&stat); err != nil {
+			return nil, err
+		}
+		stats = append(stats, stat)
 	}
-
-	// 第二阶段：为每个 icon_hash 查找一条有 icon_hash_bytes 的文档，补充图片数据
-	for i, s := range stats {
-		var asset struct {
-			IconHashBytes []byte `bson:"icon_hash_bytes"`
-		}
-		// 使用 $type 过滤确保字段存在且为 binData 类型（BSON type 5）
-		err := m.coll.FindOne(ctx, bson.M{
-			"icon_hash":       s.IconHash,
-			"icon_hash_bytes": bson.M{"$type": "binData"},
-		}, options.FindOne().SetProjection(bson.M{"icon_hash_bytes": 1})).Decode(&asset)
-		if err == nil && len(asset.IconHashBytes) > 0 {
-			stats[i].IconData = asset.IconHashBytes
-		}
+	if err := cursor.Err(); err != nil {
+		return nil, err
 	}
 
 	return stats, nil
@@ -571,7 +712,14 @@ func (m *AssetHistoryModel) FindByAssetId(ctx context.Context, assetId string, l
 	defer cursor.Close(ctx)
 
 	var docs []AssetHistory
-	if err = cursor.All(ctx, &docs); err != nil {
+	for cursor.Next(ctx) {
+		var doc AssetHistory
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return docs, nil
@@ -591,7 +739,14 @@ func (m *AssetHistoryModel) FindByAuthority(ctx context.Context, authority strin
 	defer cursor.Close(ctx)
 
 	var docs []AssetHistory
-	if err = cursor.All(ctx, &docs); err != nil {
+	for cursor.Next(ctx) {
+		var doc AssetHistory
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return docs, nil
@@ -626,13 +781,6 @@ func (m *AssetModel) Upsert(ctx context.Context, doc *Asset) error {
 		"port":                    doc.Port,
 		"category":                doc.Category,
 		"service":                 doc.Service,
-		"server":                  doc.Server,
-		"banner":                  doc.Banner,
-		"title":                   doc.Title,
-		"app":                     doc.App,
-		"status":                  doc.HttpStatus,
-		"header":                  doc.HttpHeader,
-		"body":                    doc.HttpBody,
 		"source":                  doc.Source,
 		"is_http":                 doc.IsHTTP,
 		"update_time":             now,
@@ -641,6 +789,27 @@ func (m *AssetModel) Upsert(ctx context.Context, doc *Asset) error {
 	}
 
 	// 有值才更新的字段，避免用空值覆盖已有数据
+	if doc.Server != "" {
+		setFields["server"] = doc.Server
+	}
+	if doc.Banner != "" {
+		setFields["banner"] = doc.Banner
+	}
+	if doc.Title != "" {
+		setFields["title"] = doc.Title
+	}
+	if len(doc.App) > 0 {
+		setFields["app"] = doc.App
+	}
+	if doc.HttpStatus != "" {
+		setFields["status"] = doc.HttpStatus
+	}
+	if doc.HttpHeader != "" {
+		setFields["header"] = doc.HttpHeader
+	}
+	if doc.HttpBody != "" {
+		setFields["body"] = doc.HttpBody
+	}
 	if doc.Screenshot != "" {
 		setFields["screenshot"] = doc.Screenshot
 	}

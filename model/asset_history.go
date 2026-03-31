@@ -147,7 +147,14 @@ func (m *ScanResultHistoryModel) findWithFilter(ctx context.Context, filter bson
 	defer cursor.Close(ctx)
 
 	var docs []ScanResultHistory
-	if err = cursor.All(ctx, &docs); err != nil {
+	for cursor.Next(ctx) {
+		var doc ScanResultHistory
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 	return docs, nil

@@ -135,6 +135,11 @@ func (m *IndexManager) ensureAssetIndexes(ctx context.Context, workspaceId strin
 			Keys:    bson.D{{Key: "new", Value: 1}},
 			Options: options.Index().SetBackground(true).SetName("idx_new"),
 		},
+		// 复合索引：new + update_time（新资产列表查询优化）
+		{
+			Keys:    bson.D{{Key: "new", Value: 1}, {Key: "update_time", Value: -1}},
+			Options: options.Index().SetBackground(true).SetName("idx_new_updateTime"),
+		},
 		// 复合索引：任务ID + 更新时间
 		{
 			Keys:    bson.D{{Key: "taskId", Value: 1}, {Key: "update_time", Value: -1}},
@@ -196,6 +201,11 @@ func (m *IndexManager) ensureVulIndexes(ctx context.Context, workspaceId string)
 			Keys:    bson.D{{Key: "host", Value: 1}, {Key: "port", Value: 1}},
 			Options: options.Index().SetBackground(true).SetName("idx_host_port"),
 		},
+		// 复合索引：severity + create_time（按严重程度排序查询优化）
+		{
+			Keys:    bson.D{{Key: "severity", Value: 1}, {Key: "create_time", Value: -1}},
+			Options: options.Index().SetBackground(true).SetName("idx_severity_createTime"),
+		},
 	}
 
 	return m.createIndexes(ctx, coll, indexes)
@@ -225,6 +235,11 @@ func (m *IndexManager) ensureDirScanResultIndexes(ctx context.Context, workspace
 		{
 			Keys:    bson.D{{Key: "task_id", Value: 1}},
 			Options: options.Index().SetBackground(true).SetName("idx_task_id"),
+		},
+		// 复合索引：task_id + host + port（按任务查询目录扫描结果）
+		{
+			Keys:    bson.D{{Key: "task_id", Value: 1}, {Key: "host", Value: 1}, {Key: "port", Value: 1}},
+			Options: options.Index().SetBackground(true).SetName("idx_taskId_host_port"),
 		},
 		// 状态码索引
 		{
@@ -271,6 +286,11 @@ func (m *IndexManager) ensureAssetHistoryIndexes(ctx context.Context, workspaceI
 		{
 			Keys:    bson.D{{Key: "assetId", Value: 1}, {Key: "create_time", Value: -1}},
 			Options: options.Index().SetBackground(true).SetName("idx_assetId_createTime"),
+		},
+		// 复合索引：assetId + taskId（按资产和任务关联查询）
+		{
+			Keys:    bson.D{{Key: "assetId", Value: 1}, {Key: "taskId", Value: 1}},
+			Options: options.Index().SetBackground(true).SetName("idx_assetId_taskId"),
 		},
 	}
 

@@ -462,6 +462,7 @@ type AssetInventoryItem struct {
 	WorkspaceId     string   `json:"workspaceId"` // 所属工作空间ID
 	Host            string   `json:"host"`
 	IP              string   `json:"ip"`
+	Ips             []string `json:"ips"`
 	Port            int      `json:"port"`
 	Service         string   `json:"service"`
 	Title           string   `json:"title"`
@@ -508,6 +509,7 @@ type ScreenshotItem struct {
 	Name         string       `json:"name"`        // 主机名
 	Port         int          `json:"port"`
 	IP           string       `json:"ip"`
+	Ips          []string     `json:"ips"`
 	Status       string       `json:"status"`       // HTTP状态码
 	StatusText   string       `json:"statusText"`   // 状态文本
 	Title        string       `json:"title"`        // 页面标题

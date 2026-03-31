@@ -20,6 +20,12 @@ var AssetListProjection = bson.M{
 	"banner":          0,
 }
 
+// AssetScreenshotProjection 资产清单/截图清单专用投影，保留 screenshot、icon_hash_bytes、header、body
+var AssetScreenshotProjection = bson.M{
+	"cert":   0,
+	"banner": 0,
+}
+
 // AssetDetailProjection 详情查询投影（包含所有字段）
 var AssetDetailProjection = bson.M{}
 
@@ -91,7 +97,15 @@ func (m *AssetModel) FindListOptimized(ctx context.Context, filter bson.M, page,
 			return
 		}
 		defer cursor.Close(ctx)
-		if err = cursor.All(ctx, &items); err != nil {
+		for cursor.Next(ctx) {
+			var doc AssetListItem
+			if err := cursor.Decode(&doc); err != nil {
+				errCh <- err
+				return
+			}
+			items = append(items, &doc)
+		}
+		if err := cursor.Err(); err != nil {
 			errCh <- err
 		}
 	}()
@@ -142,7 +156,15 @@ func (m *AssetModel) FindListOptimizedWithSort(ctx context.Context, filter bson.
 			return
 		}
 		defer cursor.Close(ctx)
-		if err = cursor.All(ctx, &items); err != nil {
+		for cursor.Next(ctx) {
+			var doc AssetListItem
+			if err := cursor.Decode(&doc); err != nil {
+				errCh <- err
+				return
+			}
+			items = append(items, &doc)
+		}
+		if err := cursor.Err(); err != nil {
 			errCh <- err
 		}
 	}()
