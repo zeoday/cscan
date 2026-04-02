@@ -526,6 +526,12 @@
                   <el-checkbox label="unknown">Unknown</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
+              <el-form-item label="请求速率(Rate/s)">
+                <el-input-number v-model="form.pocscanRateLimit" :min="1" :max="2000" />
+              </el-form-item>
+              <el-form-item label="模板并发">
+                <el-input-number v-model="form.pocscanConcurrency" :min="1" :max="500" />
+              </el-form-item>
               <el-form-item :label="$t('task.targetTimeout')">
                 <el-input-number v-model="form.pocscanTargetTimeout" :min="30" :max="600" />
                 <span class="form-hint">{{ $t('task.seconds') }}</span>
@@ -1058,6 +1064,8 @@ const form = reactive({
   pocscanCustomOnly: false,
   pocscanSeverity: ['critical', 'high', 'medium'],
   pocscanTargetTimeout: 600,
+  pocscanRateLimit: 800,
+  pocscanConcurrency: 80,
   pocscanForceScan: false,
   pocscanNucleiTemplateIds: [],
   pocscanCustomPocIds: [],
@@ -1265,6 +1273,8 @@ function applyConfig(config) {
     pocscanCustomOnly: config.pocscan?.customPocOnly ?? false,
     pocscanSeverity: config.pocscan?.severity ? config.pocscan.severity.split(',') : ['critical', 'high', 'medium'],
     pocscanTargetTimeout: config.pocscan?.targetTimeout || 600,
+    pocscanRateLimit: config.pocscan?.rateLimit || 800,
+    pocscanConcurrency: config.pocscan?.concurrency || 80,
     pocscanNucleiTemplateIds: config.pocscan?.nucleiTemplateIds || [],
     pocscanCustomPocIds: config.pocscan?.customPocIds || [],
     ...parseCustomHeaders(config.pocscan?.customHeaders),
@@ -1450,6 +1460,8 @@ function buildConfig() {
       forceScan: form.pocscanForceScan && !hasPrePhaseEnabled.value,
       severity: form.pocscanSeverity.join(','),
       targetTimeout: form.pocscanTargetTimeout,
+      rateLimit: form.pocscanRateLimit,
+      concurrency: form.pocscanConcurrency,
       customHeaders: buildCustomHeaders()
     },
     dirscan: {

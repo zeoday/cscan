@@ -910,6 +910,8 @@ const form = reactive({
   pocscanCustomOnly: false,
   pocscanSeverity: ['critical', 'high', 'medium'],
   pocscanTargetTimeout: 600,
+  pocscanRateLimit: 300,
+  pocscanConcurrency: 50,
   pocscanForceScan: false,
   pocscanNucleiTemplateIds: [],
   pocscanCustomPocIds: [],
@@ -1913,6 +1915,8 @@ function buildConfig() {
       customOnly: form.pocscanCustomOnly,
       severity: form.pocscanSeverity,
       targetTimeout: form.pocscanTargetTimeout,
+      rateLimit: form.pocscanRateLimit,
+      concurrency: form.pocscanConcurrency,
       nucleiTemplateIds: form.pocscanNucleiTemplateIds || [],
       customPocIds: form.pocscanCustomPocIds || [],
       customHeaders: buildCustomHeaders()
@@ -2010,6 +2014,8 @@ function applyConfig(config) {
     form.pocscanCustomOnly = poc.customOnly ?? false
     form.pocscanSeverity = poc.severity || ['critical', 'high', 'medium']
     form.pocscanTargetTimeout = poc.targetTimeout ?? 600
+    form.pocscanRateLimit = poc.rateLimit ?? 800
+    form.pocscanConcurrency = poc.concurrency ?? 80
     form.pocscanNucleiTemplateIds = poc.nucleiTemplateIds || []
     form.pocscanCustomPocIds = poc.customPocIds || []
     // 恢复自定义HTTP头部
@@ -2094,6 +2100,8 @@ function resetScanConfig() {
   form.pocscanCustomOnly = false
   form.pocscanSeverity = ['critical', 'high', 'medium']
   form.pocscanTargetTimeout = 600
+  form.pocscanRateLimit = 800
+  form.pocscanConcurrency = 80
   form.pocscanNucleiTemplateIds = []
   form.pocscanCustomPocIds = []
   form.pocscanHeaderMode = 'none'
