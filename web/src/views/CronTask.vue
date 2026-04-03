@@ -899,7 +899,7 @@ const form = reactive({
   fingerprintScreenshot: false,
   fingerprintActiveScan: false,
   fingerprintActiveTimeout: 10,
-  fingerprintTimeout: 30,
+  fingerprintTimeout: 90,
   fingerprintFilterMode: 'http_mapping',
   fingerprintForceScan: false,
   // 漏洞扫描
@@ -1825,6 +1825,7 @@ function parseCustomHeaders(headers) {
   if (!headers || headers.length === 0) {
     return { pocscanHeaderMode: 'none', pocscanPresetUA: '', pocscanCustomHeadersText: '' }
   }
+  // 检查是否只有一个 User-Agent 头（可能是预设UA）
   if (headers.length === 1 && headers[0].toLowerCase().startsWith('user-agent:')) {
     const ua = headers[0].substring(headers[0].indexOf(':') + 1).trim()
     return { pocscanHeaderMode: 'preset', pocscanPresetUA: ua, pocscanCustomHeadersText: '' }
@@ -1849,25 +1850,26 @@ function buildCustomHeaders() {
 }
 
 function buildConfig() {
-  return {
+  const config = {
     batchSize: form.batchSize,
     domainscan: {
       enable: form.domainscanEnable,
       subfinder: form.domainscanSubfinder,
-      bruteforce: form.domainscanBruteforce,
-      bruteforceTimeout: form.domainscanBruteforceTimeout,
       timeout: form.domainscanTimeout,
-      maxEnumTime: form.domainscanMaxEnumTime,
+      maxEnumerationTime: form.domainscanMaxEnumTime,
       threads: form.domainscanThreads,
       rateLimit: form.domainscanRateLimit,
       removeWildcard: form.domainscanRemoveWildcard,
       resolveDNS: form.domainscanResolveDNS,
       concurrent: form.domainscanConcurrent,
-      subdomainDictIds: form.subdomainDictIds || [],
-      recursiveBrute: form.domainscanRecursiveBrute,
-      recursiveDictIds: form.recursiveDictIds || [],
-      wildcardDetect: form.domainscanWildcardDetect
-    },
+      // 只有启用字典爆破时才传递字典ID和增强功能配置
+      subdomainDictIds: form.domainscanBruteforce ? (form.subdomainDictIds || []) : [],
+      bruteforceTimeout: form.domainscanBruteforce ? (form.domainscanBruteforceTimeout || 30) : 30,
+      // KSubdomain增强功能（只有启用字典爆破时才生效）
+      recursiveBrute: form.domainscanBruteforce ? form.domainscanRecursiveBrute : false,
+      recursiveDictIds: (form.domainscanBruteforce && form.domainscanRecursiveBrute) ? (form.recursiveDictIds || []) : [],
+      wildcardDetect: form.domainscanBruteforce ? form.domainscanWildcardDetect : false,
+      },
     portscan: {
       enable: form.portscanEnable,
       tool: form.portscanTool,
@@ -1902,18 +1904,19 @@ function buildConfig() {
       screenshot: form.fingerprintScreenshot,
       activeScan: form.fingerprintActiveScan,
       activeTimeout: form.fingerprintActiveTimeout,
-      timeout: form.fingerprintTimeout,
+      targetTimeout: form.fingerprintTimeout,
       filterMode: form.fingerprintFilterMode,
       forceScan: form.fingerprintForceScan && !form.portscanEnable && !form.portidentifyEnable
     },
     pocscan: {
       enable: form.pocscanEnable,
       mode: form.pocscanMode,
+      useNuclei: true,
       forceScan: form.pocscanForceScan && !hasPrePhaseEnabled.value,
       autoScan: form.pocscanAutoScan,
       automaticScan: form.pocscanAutomaticScan,
       customOnly: form.pocscanCustomOnly,
-      severity: form.pocscanSeverity,
+      severity: form.pocscanSeverity.join(','),
       targetTimeout: form.pocscanTargetTimeout,
       rateLimit: form.pocscanRateLimit,
       concurrency: form.pocscanConcurrency,
@@ -1923,120 +1926,125 @@ function buildConfig() {
     },
     dirscan: {
       enable: form.dirscanEnable,
-      dictIds: form.dirscanDictIds || [],
+      dictIds: form.dirscanDictIds,
       threads: form.dirscanThreads,
       timeout: form.dirscanTimeout,
       followRedirect: form.dirscanFollowRedirect,
-      forceScan: form.dirscanForceScan && !hasPrePhaseEnabled.value
+      forceScan: form.dirscanForceScan && !hasPrePhaseEnabled.value,
+      autoCalibration: form.dirscanAutoCalibration,
+      filterSize: form.dirscanFilterSize,
+      filterWords: form.dirscanFilterWords,
+      filterLines: form.dirscanFilterLines,
+      filterRegex: form.dirscanFilterRegex,
+      matcherMode: form.dirscanMatcherMode,
+      filterMode: form.dirscanFilterMode,
+      rate: form.dirscanRate,
+      recursion: form.dirscanRecursion,
+      recursionDepth: form.dirscanRecursionDepth
     }
   }
+
+  // 根据POC模式设置不同的配置
+  if (form.pocscanMode === 'manual') {
+    // 手动选择模式
+    config.pocscan.nucleiTemplateIds = form.pocscanNucleiTemplateIds
+    config.pocscan.customPocIds = form.pocscanCustomPocIds
+    config.pocscan.autoScan = false
+    config.pocscan.automaticScan = false
+    config.pocscan.customPocOnly = false
+  } else {
+    // 自动匹配模式
+    if (form.pocscanCustomOnly) {
+      // 只使用自定义POC时，禁用自动扫描
+      config.pocscan.autoScan = false
+      config.pocscan.automaticScan = false
+      config.pocscan.customPocOnly = true
+    } else {
+      config.pocscan.autoScan = form.pocscanAutoScan
+      config.pocscan.automaticScan = form.pocscanAutomaticScan
+      config.pocscan.customPocOnly = false
+    }
+  }
+
+  return config
 }
 
 // 从配置对象应用到表单
 function applyConfig(config) {
-  if (!config) return
+  // 判断POC模式：如果有nucleiTemplateIds或customPocIds，则为手动模式
+  const isManualMode = (config.pocscan?.nucleiTemplateIds?.length > 0) || (config.pocscan?.customPocIds?.length > 0)
   
-  // 高级设置
-  if (config.batchSize !== undefined) form.batchSize = config.batchSize
+  // 判断是否启用字典爆破：如果有subdomainDictIds则启用
+  const hasBruteforce = config.domainscan?.subdomainDictIds?.length > 0
   
-  // 子域名扫描
-  if (config.domainscan) {
-    const ds = config.domainscan
-    form.domainscanEnable = ds.enable ?? false
-    form.domainscanSubfinder = ds.subfinder ?? true
-    form.domainscanBruteforce = ds.bruteforce ?? false
-    form.domainscanBruteforceTimeout = ds.bruteforceTimeout ?? 30
-    form.domainscanTimeout = ds.timeout ?? 300
-    form.domainscanMaxEnumTime = ds.maxEnumTime ?? 10
-    form.domainscanThreads = ds.threads ?? 10
-    form.domainscanRateLimit = ds.rateLimit ?? 0
-    form.domainscanRemoveWildcard = ds.removeWildcard ?? true
-    form.domainscanResolveDNS = ds.resolveDNS ?? true
-    form.domainscanConcurrent = ds.concurrent ?? 50
-    form.subdomainDictIds = ds.subdomainDictIds || []
-    form.domainscanRecursiveBrute = ds.recursiveBrute ?? false
-    form.recursiveDictIds = ds.recursiveDictIds || []
-    form.domainscanWildcardDetect = ds.wildcardDetect ?? true
-  }
-  
-  // 端口扫描
-  if (config.portscan) {
-    const ps = config.portscan
-    form.portscanEnable = ps.enable ?? true
-    form.portscanTool = ps.tool || 'naabu'
-    form.portscanRate = ps.rate ?? 3000
-    form.ports = ps.ports || 'top100'
-    form.portThreshold = ps.portThreshold ?? 100
-    form.scanType = ps.scanType || 'c'
-    form.portscanTimeout = ps.timeout ?? 60
-    form.skipHostDiscovery = ps.skipHostDiscovery ?? false
-    form.excludeCDN = ps.excludeCDN ?? false
-    form.excludeHosts = ps.excludeHosts || ''
-    form.portscanWorkers = ps.workers ?? 50
-    form.portscanRetries = ps.retries ?? 2
-    form.portscanWarmUpTime = ps.warmUpTime ?? 1
-    form.portscanVerify = ps.verify ?? false
-  }
-  
-  // 端口识别
-  if (config.portidentify) {
-    const pi = config.portidentify
-    form.portidentifyEnable = pi.enable ?? false
-    form.portidentifyTool = pi.tool || 'nmap'
-    form.portidentifyTimeout = pi.timeout ?? 30
-    form.portidentifyConcurrency = pi.concurrency ?? 10
-    form.portidentifyArgs = pi.args || ''
-    form.portidentifyUDP = pi.udp ?? false
-    form.portidentifyFastMode = pi.fastMode ?? false
-  }
-  
-  // 指纹识别
-  if (config.fingerprint) {
-    const fp = config.fingerprint
-    form.fingerprintEnable = fp.enable ?? true
-    form.fingerprintTool = fp.tool || 'httpx'
-    form.fingerprintIconHash = fp.iconHash ?? true
-    form.fingerprintCustomEngine = fp.customEngine ?? false
-    form.fingerprintScreenshot = fp.screenshot ?? false
-    form.fingerprintActiveScan = fp.activeScan ?? false
-    form.fingerprintActiveTimeout = fp.activeTimeout ?? 10
-    form.fingerprintTimeout = fp.timeout ?? 30
-    form.fingerprintFilterMode = fp.filterMode || 'http_mapping'
-  }
-  
-  // 漏洞扫描
-  if (config.pocscan) {
-    const poc = config.pocscan
-    form.pocscanEnable = poc.enable ?? false
-    form.pocscanMode = poc.mode || 'auto'
-    form.pocscanAutoScan = poc.autoScan ?? true
-    form.pocscanAutomaticScan = poc.automaticScan ?? true
-    form.pocscanCustomOnly = poc.customOnly ?? false
-    form.pocscanSeverity = poc.severity || ['critical', 'high', 'medium']
-    form.pocscanTargetTimeout = poc.targetTimeout ?? 600
-    form.pocscanRateLimit = poc.rateLimit ?? 800
-    form.pocscanConcurrency = poc.concurrency ?? 80
-    form.pocscanNucleiTemplateIds = poc.nucleiTemplateIds || []
-    form.pocscanCustomPocIds = poc.customPocIds || []
-    // 恢复自定义HTTP头部
-    const headerState = parseCustomHeaders(poc.customHeaders)
-    form.pocscanHeaderMode = headerState.pocscanHeaderMode
-    form.pocscanPresetUA = headerState.pocscanPresetUA
-    form.pocscanCustomHeadersText = headerState.pocscanCustomHeadersText
-    // 清空已选择的对象列表，后续可按需加载
-    selectedNucleiTemplates.value = []
-    selectedCustomPocs.value = []
-  }
-  
-  // 目录扫描
-  if (config.dirscan) {
-    const dir = config.dirscan
-    form.dirscanEnable = dir.enable ?? false
-    form.dirscanDictIds = dir.dictIds || []
-    form.dirscanThreads = dir.threads ?? 50
-    form.dirscanTimeout = dir.timeout ?? 10
-    form.dirscanFollowRedirect = dir.followRedirect ?? false
-  }
+  Object.assign(form, {
+    batchSize: config.batchSize || 50,
+    // 子域名扫描
+    domainscanEnable: config.domainscan?.enable ?? false,
+    domainscanSubfinder: config.domainscan?.subfinder ?? true,
+    domainscanBruteforce: hasBruteforce,
+    domainscanBruteforceTimeout: config.domainscan?.bruteforceTimeout || 30,
+    domainscanTimeout: config.domainscan?.timeout || 300,
+    domainscanMaxEnumTime: config.domainscan?.maxEnumerationTime || 10,
+    domainscanThreads: config.domainscan?.threads || 10,
+    domainscanRateLimit: config.domainscan?.rateLimit || 0,
+    domainscanRemoveWildcard: config.domainscan?.removeWildcard ?? true,
+    domainscanResolveDNS: config.domainscan?.resolveDNS ?? true,
+    domainscanConcurrent: config.domainscan?.concurrent || 50,
+    subdomainDictIds: config.domainscan?.subdomainDictIds || [],
+    // KSubdomain增强功能
+    domainscanRecursiveBrute: config.domainscan?.recursiveBrute ?? false,
+    recursiveDictIds: config.domainscan?.recursiveDictIds || [],
+    domainscanWildcardDetect: config.domainscan?.wildcardDetect ?? true,
+    // 端口扫描
+    portscanEnable: config.portscan?.enable ?? true,
+    portscanTool: config.portscan?.tool || 'naabu',
+    portscanRate: config.portscan?.rate || 1000,
+    ports: config.portscan?.ports || 'top100',
+    portThreshold: config.portscan?.portThreshold || 100,
+    scanType: config.portscan?.scanType || 'c',
+    portscanTimeout: config.portscan?.timeout || 60,
+    skipHostDiscovery: config.portscan?.skipHostDiscovery ?? false,
+    excludeCDN: config.portscan?.excludeCDN ?? false,
+    excludeHosts: config.portscan?.excludeHosts || '',
+    // 端口识别
+    portidentifyEnable: config.portidentify?.enable ?? false,
+    portidentifyTool: config.portidentify?.tool || 'nmap',
+    portidentifyTimeout: config.portidentify?.timeout || 30,
+    portidentifyConcurrency: config.portidentify?.concurrency || 10,
+    portidentifyArgs: config.portidentify?.args || '',
+    portidentifyUDP: config.portidentify?.udp ?? false,
+    portidentifyFastMode: config.portidentify?.fastMode ?? false,
+    // 指纹识别
+    fingerprintEnable: config.fingerprint?.enable ?? true,
+    fingerprintTool: config.fingerprint?.tool || (config.fingerprint?.httpx ? 'httpx' : 'builtin'),
+    fingerprintIconHash: config.fingerprint?.iconHash ?? true,
+    fingerprintCustomEngine: config.fingerprint?.customEngine ?? false,
+    fingerprintScreenshot: config.fingerprint?.screenshot ?? false,
+    fingerprintActiveScan: config.fingerprint?.activeScan ?? false,
+    fingerprintActiveTimeout: config.fingerprint?.activeTimeout || 10,
+    fingerprintTimeout: config.fingerprint?.targetTimeout || 90,
+    fingerprintFilterMode: config.fingerprint?.filterMode || 'http_mapping',
+    // 漏洞扫描
+    pocscanEnable: config.pocscan?.enable ?? false,
+    pocscanMode: isManualMode ? 'manual' : 'auto',
+    pocscanAutoScan: config.pocscan?.autoScan ?? true,
+    pocscanAutomaticScan: config.pocscan?.automaticScan ?? true,
+    pocscanCustomOnly: config.pocscan?.customPocOnly ?? false,
+    pocscanSeverity: config.pocscan?.severity ? config.pocscan.severity.split(',') : ['critical', 'high', 'medium'],
+    pocscanTargetTimeout: config.pocscan?.targetTimeout || 600,
+    pocscanRateLimit: config.pocscan?.rateLimit || 800,
+    pocscanConcurrency: config.pocscan?.concurrency || 80,
+    pocscanNucleiTemplateIds: config.pocscan?.nucleiTemplateIds || [],
+    pocscanCustomPocIds: config.pocscan?.customPocIds || [],
+    ...parseCustomHeaders(config.pocscan?.customHeaders),
+    // 目录扫描
+    dirscanEnable: config.dirscan?.enable ?? false,
+    dirscanDictIds: config.dirscan?.dictIds || [],
+    dirscanThreads: config.dirscan?.threads || 50,
+    dirscanTimeout: config.dirscan?.timeout || 10,
+    dirscanFollowRedirect: config.dirscan?.followRedirect ?? false
+  })
 }
 
 // 重置扫描配置为默认值
@@ -2090,7 +2098,7 @@ function resetScanConfig() {
   form.fingerprintScreenshot = false
   form.fingerprintActiveScan = false
   form.fingerprintActiveTimeout = 10
-  form.fingerprintTimeout = 30
+  form.fingerprintTimeout = 90
   form.fingerprintFilterMode = 'http_mapping'
   // 漏洞扫描
   form.pocscanEnable = false
