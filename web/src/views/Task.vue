@@ -57,7 +57,7 @@
             <el-table-column prop="target" :label="$t('task.scanTarget')" min-width="150" show-overflow-tooltip />
             <el-table-column prop="status" :label="$t('task.status')" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status, row)">{{ getStatusText(row) }}</el-tag>
+                <el-tag :type="getStatusType(row.statusrow)">{{ getStatusText(row) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="progress" :label="$t('task.progress')" width="150">
@@ -482,7 +482,7 @@
               </div>
               <div class="config-item">
                 <span class="config-label">{{ $t('task.timeout') }}</span>
-                <span class="config-value">{{ parsedConfig.fingerprint?.targetTimeout || parsedConfig.fingerprint?.timeout || 30 }}{{ $t('task.seconds') }}</span>
+                <span class="config-value">{{ parsedConfig.fingerprint?.targetTimeout || parsedConfig.fingerprint?.timeout || 90 }}{{ $t('task.seconds') }}</span>
               </div>
               <div class="config-item">
                 <span class="config-label">{{ $t('task.concurrent') }}</span>
@@ -598,309 +598,7 @@
       </div>
     </el-drawer>
 
-    <!-- 新建/编辑任务对话框 - Tab页布局 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? $t('task.editTask') : $t('task.newTask')" width="720px" top="5vh" class="task-dialog">
-      <el-tabs v-model="activeTab" class="task-tabs">
-        <!-- 基本信息 Tab -->
-        <el-tab-pane :label="$t('task.basicInfo')" name="basic">
-          <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="tab-form">
-            <el-form-item :label="$t('task.taskName')" prop="name">
-              <el-input v-model="form.name" :placeholder="$t('task.pleaseEnterTaskName')" />
-            </el-form-item>
-            <el-form-item :label="$t('task.scanTarget')" prop="target">
-              <el-input v-model="form.target" type="textarea" :rows="6" :placeholder="$t('task.targetPlaceholder')" />
-            </el-form-item>
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item :label="$t('task.workspace')">
-                  <el-select v-model="form.workspaceId" :placeholder="$t('task.selectWorkspace')" clearable style="width: 100%">
-                    <el-option v-for="ws in workspaceStore.workspaces" :key="ws.id" :label="ws.name" :value="ws.id" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item :label="$t('task.organization')">
-                  <el-select v-model="form.orgId" :placeholder="$t('task.selectOrganization')" clearable style="width: 100%">
-                    <el-option v-for="org in organizations" :key="org.id" :label="org.name" :value="org.id" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-form-item :label="$t('task.specifyWorker')">
-              <el-select v-model="form.workers" multiple :placeholder="$t('task.anyWorkerExecute')" clearable style="width: 100%">
-                <el-option v-for="w in workers" :key="w.name" :label="`${w.name} (${w.ip})`" :value="w.name" />
-              </el-select>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 子域名扫描 Tab -->
-        <el-tab-pane name="domainscan">
-          <template #label>
-            <span>{{ $t('task.subdomainScan') }} <el-tag v-if="form.domainscanEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
-          </template>
-          <el-form label-width="120px" class="tab-form">
-            <el-form-item :label="$t('task.enable')">
-              <el-switch v-model="form.domainscanEnable" />
-              <span class="form-hint">{{ $t('task.subdomainEnumHint') }}</span>
-            </el-form-item>
-            <template v-if="form.domainscanEnable">
-              <el-form-item :label="$t('task.useSubfinder')">
-                <el-switch v-model="form.domainscanSubfinder" />
-                <span class="form-hint">{{ $t('task.subfinderPassiveEnum') }}</span>
-              </el-form-item>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.timeoutSeconds')">
-                    <el-input-number v-model="form.domainscanTimeout" :min="60" :max="3600" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.maxEnumTime')">
-                    <el-input-number v-model="form.domainscanMaxEnumTime" :min="1" :max="60" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.rateLimit')">
-                    <el-input-number v-model="form.domainscanRateLimit" :min="0" :max="1000" style="width:100%" />
-                    <span class="form-hint">0={{ $t('task.noLimit') }}</span>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-form-item :label="$t('task.scanOptions')">
-                <el-checkbox v-model="form.domainscanRemoveWildcard">{{ $t('task.removeWildcardDomain') }}</el-checkbox>
-              </el-form-item>
-              <el-form-item :label="$t('task.dnsResolve')">
-                <el-checkbox v-model="form.domainscanResolveDNS">{{ $t('task.resolveSubdomainDns') }}</el-checkbox>
-                <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
-              </el-form-item>
-            </template>
-            <el-alert v-if="!form.domainscanEnable" type="info" :closable="false" show-icon>
-              <template #title>{{ $t('task.subdomainEnumDesc') }}</template>
-            </el-alert>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 端口扫描 Tab -->
-        <el-tab-pane name="portscan">
-          <template #label>
-            <span>{{ $t('task.portScan') }} <el-tag v-if="form.portscanEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
-          </template>
-          <el-form label-width="100px" class="tab-form">
-            <el-form-item :label="$t('task.enable')">
-              <el-switch v-model="form.portscanEnable" />
-            </el-form-item>
-            <template v-if="form.portscanEnable">
-              <el-form-item :label="$t('task.scanTool')">
-                <el-radio-group v-model="form.portscanTool">
-                  <el-radio label="naabu">Naabu ({{ $t('task.recommended') }})</el-radio>
-                  <el-radio label="masscan" :disabled="!availableTools.masscan">
-                    Masscan <span v-if="!availableTools.masscan" class="tool-tip">({{ $t('task.notInstalled') }})</span>
-                  </el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item :label="$t('task.portRange')">
-                <el-select v-model="form.ports" filterable allow-create default-first-option style="width: 100%">
-                  <el-option :label="$t('task.top100Ports')" value="top100" />
-                  <el-option :label="$t('task.top1000Ports')" value="top1000" />
-                  <el-option :label="'80,443,8080,8443 - ' + $t('task.webCommon')" value="80,443,8080,8443" />
-                  <el-option :label="'1-65535 - ' + $t('task.allPorts')" value="1-65535" />
-                </el-select>
-              </el-form-item>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.scanRate')">
-                    <el-input-number v-model="form.portscanRate" :min="100" :max="100000" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.portThreshold')">
-                    <el-input-number v-model="form.portThreshold" :min="0" :max="65535" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item v-if="form.portscanTool === 'naabu'" :label="$t('task.scanType')">
-                    <el-radio-group v-model="form.scanType">
-                      <el-radio label="c">CONNECT</el-radio>
-                      <el-radio label="s">SYN</el-radio>
-                    </el-radio-group>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.timeoutSeconds')">
-                    <el-input-number v-model="form.portscanTimeout" :min="5" :max="1200" style="width:100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-form-item :label="$t('task.advancedOptions')">
-                <div style="display: block; width: 100%">
-                  <el-checkbox v-model="form.skipHostDiscovery">{{ $t('task.skipHostDiscovery') }} (-Pn)</el-checkbox>
-                  <span class="form-hint">{{ $t('task.skipHostDiscoveryHint') }}</span>
-                </div>
-                <div v-if="form.portscanTool === 'naabu'" style="display: block; width: 100%; margin-top: 8px">
-                  <el-checkbox v-model="form.excludeCDN">{{ $t('task.excludeCdnWaf') }} (-ec)</el-checkbox>
-                  <span class="form-hint">{{ $t('task.excludeCdnHint') }}</span>
-                </div>
-              </el-form-item>
-              <el-form-item :label="$t('task.excludeTargets')">
-                <el-input v-model="form.excludeHosts" placeholder="192.168.1.1,10.0.0.0/8" />
-                <span class="form-hint">{{ $t('task.excludeTargetsHint') }}</span>
-              </el-form-item>
-            </template>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 端口识别 Tab -->
-        <el-tab-pane name="portidentify">
-          <template #label>
-            <span>{{ $t('task.portIdentify') }} <el-tag v-if="form.portidentifyEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
-          </template>
-          <el-form label-width="100px" class="tab-form">
-            <el-form-item :label="$t('task.enable')">
-              <el-switch v-model="form.portidentifyEnable" />
-            </el-form-item>
-            <template v-if="form.portidentifyEnable">
-              <!-- 强制扫描：仅在端口扫描未启用时显示 -->
-              <el-form-item v-if="!form.portscanEnable" :label="$t('task.forceScan')">
-                <el-switch v-model="form.portidentifyForceScan" />
-                <span class="form-hint warning-hint">{{ $t('task.forceScanHint') }}</span>
-              </el-form-item>
-              <el-form-item :label="$t('task.identifyTool')">
-                <el-radio-group v-model="form.portidentifyTool">
-                  <el-radio label="nmap">Nmap</el-radio>
-                  <el-radio label="fingerprintx">Fingerprintx</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item :label="$t('task.timeoutSeconds')">
-                <el-input-number v-model="form.portidentifyTimeout" :min="5" :max="300" />
-                <span class="form-hint">{{ $t('task.singleHostTimeout') }}</span>
-              </el-form-item>
-              <el-form-item v-if="form.portidentifyTool === 'fingerprintx'" :label="$t('task.concurrent')">
-                <el-input-number v-model="form.portidentifyConcurrency" :min="1" :max="100" />
-              </el-form-item>
-              <el-form-item v-if="form.portidentifyTool === 'nmap'" :label="$t('task.nmapParams')">
-                <el-input v-model="form.portidentifyArgs" placeholder="-sV --version-intensity 5" />
-              </el-form-item>
-              <el-form-item v-if="form.portidentifyTool === 'fingerprintx'" :label="$t('task.scanUDP')">
-                <el-switch v-model="form.portidentifyUDP" />
-              </el-form-item>
-              <el-form-item v-if="form.portidentifyTool === 'fingerprintx'" :label="$t('task.fastMode')">
-                <el-switch v-model="form.portidentifyFastMode" />
-              </el-form-item>
-            </template>
-            <el-alert v-if="!form.portidentifyEnable" type="info" :closable="false" show-icon>
-              <template #title>{{ $t('task.portIdentifyDesc') }}</template>
-            </el-alert>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 指纹识别 Tab -->
-        <el-tab-pane name="fingerprint">
-          <template #label>
-            <span>{{ $t('task.fingerprintScan') }} <el-tag v-if="form.fingerprintEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
-          </template>
-          <el-form label-width="100px" class="tab-form">
-            <el-form-item :label="$t('task.enable')">
-              <el-switch v-model="form.fingerprintEnable" />
-            </el-form-item>
-            <template v-if="form.fingerprintEnable">
-              <!-- 强制扫描：仅在端口扫描和端口识别均未启用时显示 -->
-              <el-form-item v-if="!form.portscanEnable && !form.portidentifyEnable" :label="$t('task.forceScan')">
-                <el-switch v-model="form.fingerprintForceScan" />
-                <span class="form-hint warning-hint">{{ $t('task.forceScanHint') }}</span>
-              </el-form-item>
-              <el-form-item :label="$t('task.probeTool')">
-                <el-radio-group v-model="form.fingerprintTool">
-                  <el-radio label="httpx">Httpx ({{ $t('task.recommended') }})</el-radio>
-                  <el-radio label="builtin">Wappalyzer ({{ $t('task.builtinEngine') }})</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item :label="$t('task.additionalFeatures')">
-                <el-checkbox v-model="form.fingerprintIconHash">{{ $t('task.iconHash') }}</el-checkbox>
-                <el-checkbox v-model="form.fingerprintCustomEngine">{{ $t('task.customFingerprint') }}</el-checkbox>
-                <el-checkbox v-model="form.fingerprintScreenshot">{{ $t('task.screenshot') }}</el-checkbox>
-              </el-form-item>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item :label="$t('task.timeoutSeconds')">
-                    <el-input-number v-model="form.fingerprintTimeout" :min="5" :max="120" style="width:100%" />
-                    <span class="form-hint">{{ $t('task.concurrentByWorker') }}</span>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </template>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 漏洞扫描 Tab -->
-        <el-tab-pane name="pocscan">
-          <template #label>
-            <span>{{ $t('task.vulScan') }} <el-tag v-if="form.pocscanEnable" type="success" size="small" style="margin-left:4px">{{ $t('task.enabled') }}</el-tag></span>
-          </template>
-          <el-form label-width="100px" class="tab-form">
-            <el-form-item :label="$t('task.enable')">
-              <el-switch v-model="form.pocscanEnable" />
-              <span class="form-hint">{{ $t('task.useNucleiEngine') }}</span>
-            </el-form-item>
-            <template v-if="form.pocscanEnable">
-              <!-- 强制扫描：仅在前序阶段均未启用时显示 -->
-              <el-form-item v-if="!hasPrePhaseEnabled" :label="$t('task.forceScan')">
-                <el-switch v-model="form.pocscanForceScan" />
-                <span class="form-hint warning-hint">{{ $t('task.forceScanHint') }}</span>
-              </el-form-item>
-              <el-form-item :label="$t('task.autoScan')">
-                <el-checkbox v-model="form.pocscanAutoScan" :disabled="form.pocscanCustomOnly">{{ $t('task.customTagMapping') }}</el-checkbox>
-                <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly">{{ $t('task.webFingerprintAutoMatch') }}</el-checkbox>
-              </el-form-item>
-              <el-form-item :label="$t('task.customPoc')">
-                <el-checkbox v-model="form.pocscanCustomOnly">{{ $t('task.onlyUseCustomPoc') }}</el-checkbox>
-              </el-form-item>
-              <el-form-item :label="$t('task.severityLevel')">
-                <el-checkbox-group v-model="form.pocscanSeverity">
-                  <el-checkbox label="critical">Critical</el-checkbox>
-                  <el-checkbox label="high">High</el-checkbox>
-                  <el-checkbox label="medium">Medium</el-checkbox>
-                  <el-checkbox label="low">Low</el-checkbox>
-                  <el-checkbox label="info">Info</el-checkbox>
-                </el-checkbox-group>
-              </el-form-item>
-              <el-form-item :label="$t('task.targetTimeout')">
-              </el-form-item>
-              <el-form-item label="请求速率(Rate/s)">
-                <el-input-number v-model="form.pocscanRateLimit" :min="1" :max="2000" />
-              </el-form-item>
-              <el-form-item label="模板并发">
-                <el-input-number v-model="form.pocscanConcurrency" :min="1" :max="500" />
-              </el-form-item>
-              <el-form-item :label="$t('task.targetTimeout')">
-                <el-input-number v-model="form.pocscanTargetTimeout" :min="30" :max="600" />
-                <span class="form-hint">{{ $t('task.seconds') }}</span>
-              </el-form-item>
-            </template>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 高级设置 Tab -->
-        <el-tab-pane :label="$t('task.advancedSettings')" name="advanced">
-          <el-form label-width="100px" class="tab-form">
-            <el-form-item :label="$t('task.taskSplit')">
-              <el-input-number v-model="form.batchSize" :min="0" :max="1000" :step="10" />
-              <span class="form-hint">{{ $t('task.batchTargetCount') }}</span>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-      </el-tabs>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="submitting" @click="handleSubmit">{{ isEdit ? $t('common.save') : $t('task.createTask') }}</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    
 
     <!-- 任务日志对话框 -->
     <el-dialog v-model="logDialogVisible" :title="$t('task.taskLog')" width="1000px" @close="closeLogDialog">
@@ -953,17 +651,14 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Search, Clock, VideoPlay, CircleCheck, Document, Setting, Connection, Monitor, Stamp, WarnTriangleFilled, FolderOpened, Grid, Aim, Operation } from '@element-plus/icons-vue'
 import ScanWorkflow from '@/components/ScanWorkflow.vue'
-import { getTaskList, createTask, deleteTask, batchDeleteTask, retryTask, startTask, pauseTask, resumeTask, stopTask, updateTask, getTaskLogs, getWorkerList, saveScanConfig, getScanConfig } from '@/api/task'
+import { getTaskList, deleteTask, batchDeleteTask, retryTask, startTask, pauseTask, resumeTask, stopTask, getTaskLogs, getWorkerList,  } from '@/api/task'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { validateTargets, formatValidationErrors } from '@/utils/target'
 import request from '@/api/request'
 
 const router = useRouter()
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
-const submitting = ref(false)
-const dialogVisible = ref(false)
 const detailVisible = ref(false)
 const activeConfigPanels = ref([]) // 折叠面板展开状态
 const logDialogVisible = ref(false)
@@ -972,13 +667,10 @@ const organizations = ref([])
 const workers = ref([])
 const allTags = ref([]) // 所有标签列表
 const filterTags = ref([]) // 过滤标签
-const formRef = ref()
 const logContainerRef = ref()
 const currentTask = ref({})
 const selectedRows = ref([])
 const autoRefresh = ref(true)
-const activeTab = ref('basic')
-const isEdit = ref(false)
 const taskLogs = ref([])
 const currentLogTaskId = ref('')
 const currentLogTask = ref(null)
@@ -993,81 +685,13 @@ let logPollingTimer = null
 
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 
-const form = reactive({
-  id: '',
-  name: '',
-  target: '',
-  workspaceId: '',
-  orgId: '',
-  workers: [],
-  batchSize: 50,
-  // 子域名扫描
-  domainscanEnable: false,
-  domainscanSubfinder: true,
-  domainscanTimeout: 300,
-  domainscanMaxEnumTime: 10,
-  domainscanThreads: 10,
-  domainscanRateLimit: 0,
-  domainscanRemoveWildcard: true,
-  domainscanResolveDNS: true,
-  domainscanConcurrent: 50,
-  // 端口扫描
-  portscanEnable: true,
-  portscanTool: 'naabu',
-  portscanRate: 1000,
-  ports: 'top100',
-  portThreshold: 100,
-  scanType: 'c',
-  portscanTimeout: 60,
-  skipHostDiscovery: false,
-  excludeCDN: false,
-  excludeHosts: '',
-  portidentifyEnable: false,
-  portidentifyTool: 'nmap',
-  portidentifyTimeout: 30,
-  portidentifyConcurrency: 10,
-  portidentifyArgs: '',
-  portidentifyUDP: false,
-  portidentifyFastMode: false,
-  portidentifyForceScan: false,
-  portidentifyTimeout: 30,
-  portidentifyArgs: '',
-  fingerprintEnable: true,
-  fingerprintTool: 'httpx',
-  fingerprintIconHash: true,
-  fingerprintCustomEngine: false,
-  fingerprintScreenshot: false,
-  fingerprintForceScan: false,
-  fingerprintTimeout: 30,
-  pocscanEnable: false,
-  pocscanAutoScan: true,
-  pocscanAutomaticScan: true,
-  pocscanCustomOnly: false,
-  pocscanSeverity: ['critical', 'high', 'medium'],
-  pocscanTargetTimeout: 600,
-    pocscanRateLimit: 800,
-    pocscanConcurrency: 80,
-  pocscanRateLimit: 800,
-  pocscanConcurrency: 80,
-  pocscanForceScan: false
-})
 
-const targetValidator = (rule, value, callback) => {
-  if (!value) { callback(new Error(t('task.pleaseEnterTarget'))); return }
   const errors = validateTargets(value)
   errors.length > 0 ? callback(new Error(formatValidationErrors(errors))) : callback()
 }
 
-const rules = {
-  name: [{ required: true, message: t('task.pleaseEnterTaskName'), trigger: 'blur' }],
-  target: [{ required: true, message: t('task.pleaseEnterTarget'), trigger: 'blur' }, { validator: targetValidator, trigger: 'blur' }]
-}
 
 // 判断是否有前序扫描阶段启用（用于控制强制扫描开关的显隐）
-const hasPrePhaseEnabled = computed(() => {
-  return form.domainscanEnable || form.portscanEnable ||
-         form.portidentifyEnable || form.fingerprintEnable
-})
 
 const logWorkers = computed(() => {
   const set = new Set()
@@ -1088,16 +712,6 @@ const filteredLogs = computed(() => {
   })
 })
 
-const availableTools = computed(() => {
-  const tools = { nmap: false, masscan: false }
-  for (const w of workers.value) {
-    if (w.tools) {
-      if (w.tools.nmap) tools.nmap = true
-      if (w.tools.masscan) tools.masscan = true
-    }
-  }
-  return tools
-})
 
 // 监听工具可用性，自动关闭不可用的功能
 watch(availableTools, (tools) => {
@@ -1278,26 +892,6 @@ const enabledModulesCount = computed(() => {
   return count
 })
 
-function resetForm() {
-  Object.assign(form, {
-    id: '', name: '', target: '', workspaceId: '', orgId: '', workers: [],
-    batchSize: 50,
-    // 子域名扫描
-    domainscanEnable: false, domainscanSubfinder: true, domainscanTimeout: 300, domainscanMaxEnumTime: 10,
-    domainscanThreads: 10, domainscanRateLimit: 0,
-    domainscanRemoveWildcard: true, domainscanResolveDNS: true, domainscanConcurrent: 50,
-    // 端口扫描
-    portscanEnable: true, portscanTool: 'naabu', portscanRate: 1000, ports: 'top100',
-    portThreshold: 50, scanType: 'c', portscanTimeout: 60, skipHostDiscovery: false, portidentifyEnable: false, portidentifyTimeout: 30,
-    portidentifyArgs: '', fingerprintEnable: true, fingerprintTool: 'httpx', fingerprintIconHash: true,
-    fingerprintCustomEngine: false, fingerprintScreenshot: false,
-    fingerprintTimeout: 30, pocscanEnable: false, pocscanAutoScan: true,
-    pocscanAutomaticScan: true, pocscanCustomOnly: false, pocscanSeverity: ['critical', 'high', 'medium'],
-    pocscanTargetTimeout: 600,
-    pocscanRateLimit: 800,
-    pocscanConcurrency: 80
-  })
-}
 
 // 跳转到新建任务页面
 function goToCreateTask() {
@@ -1314,17 +908,6 @@ function goToEditTask(row) {
   router.push({ path: '/task/create', query: { id: row.id } })
 }
 
-async function showCreateDialog() {
-  loadWorkers()
-  isEdit.value = false
-  resetForm()
-  // 加载用户上次保存的扫描配置
-  try {
-    const res = await getScanConfig()
-    if (res.code === 0 && res.config) {
-      const config = JSON.parse(res.config)
-      applyConfig(config)
-    }
   } catch (e) { console.error('加载扫描配置失败:', e) }
   let wsId = workspaceStore.currentWorkspaceId
   if (wsId === 'all' || !wsId) {
@@ -1336,124 +919,20 @@ async function showCreateDialog() {
   dialogVisible.value = true
 }
 
-// 应用配置到表单
-function applyConfig(config) {
-  Object.assign(form, {
-    batchSize: config.batchSize || 50,
-    // 子域名扫描
-    domainscanEnable: config.domainscan?.enable ?? false,
-    domainscanSubfinder: config.domainscan?.subfinder ?? true,
-    domainscanTimeout: config.domainscan?.timeout || 300,
-    domainscanMaxEnumTime: config.domainscan?.maxEnumerationTime || 10,
-    domainscanThreads: config.domainscan?.threads || 10,
-    domainscanRateLimit: config.domainscan?.rateLimit || 0,
-    domainscanAll: config.domainscan?.all ?? false,
-    domainscanRecursive: config.domainscan?.recursive ?? false,
-    domainscanRemoveWildcard: config.domainscan?.removeWildcard ?? true,
-    domainscanResolveDNS: config.domainscan?.resolveDNS ?? true,
-    domainscanConcurrent: config.domainscan?.concurrent || 50,
-    // 端口扫描
-    portscanEnable: config.portscan?.enable ?? true,
-    portscanTool: config.portscan?.tool || 'naabu',
-    portscanRate: config.portscan?.rate || 1000,
-    ports: config.portscan?.ports || 'top100',
-    portThreshold: config.portscan?.portThreshold || 50,
-    scanType: config.portscan?.scanType || 'c',
-    portscanTimeout: config.portscan?.timeout || 60,
-    skipHostDiscovery: config.portscan?.skipHostDiscovery ?? false,
-    excludeCDN: config.portscan?.excludeCDN ?? false,
-    excludeHosts: config.portscan?.excludeHosts || '',
-    portidentifyEnable: config.portidentify?.enable ?? false,
-    portidentifyTool: config.portidentify?.tool || 'nmap',
-    portidentifyTimeout: config.portidentify?.timeout || 30,
-    portidentifyConcurrency: config.portidentify?.concurrency || 10,
-    portidentifyArgs: config.portidentify?.args || '',
-    portidentifyUDP: config.portidentify?.udp ?? false,
-    portidentifyFastMode: config.portidentify?.fastMode ?? false,
-    fingerprintEnable: config.fingerprint?.enable ?? true,
-    fingerprintTool: config.fingerprint?.tool || (config.fingerprint?.httpx ? 'httpx' : 'builtin'),
-    fingerprintIconHash: config.fingerprint?.iconHash ?? true,
-    fingerprintCustomEngine: config.fingerprint?.customEngine ?? false,
-    fingerprintScreenshot: config.fingerprint?.screenshot ?? false,
-    fingerprintTimeout: config.fingerprint?.targetTimeout || 30,
-    pocscanEnable: config.pocscan?.enable ?? false,
-    pocscanAutoScan: config.pocscan?.autoScan ?? true,
-    pocscanAutomaticScan: config.pocscan?.automaticScan ?? true,
-    pocscanCustomOnly: config.pocscan?.customPocOnly ?? false,
-    pocscanSeverity: config.pocscan?.severity ? config.pocscan.severity.split(',') : ['critical', 'high', 'medium'],
-    pocscanTargetTimeout: config.pocscan?.targetTimeout || 600,
-    pocscanRateLimit: config.pocscan?.rateLimit || 800,
-    pocscanConcurrency: config.pocscan?.concurrency || 80
-  })
-}
 
 function showDetail(row) { currentTask.value = row; detailVisible.value = true }
 
-function handleEdit(row) {
-  loadWorkers()
-  isEdit.value = true
-  resetForm()
-  Object.assign(form, { id: row.id, name: row.name, target: row.target, workspaceId: row.workspaceId || '' })
-  // 解析已保存的配置
-  if (row.config) {
-    try {
-      const config = JSON.parse(row.config)
-      applyConfig(config)
-    } catch (e) { console.error('Parse config error:', e) }
   }
   activeTab.value = 'basic'
   dialogVisible.value = true
 }
 
-function buildConfig() {
-  return {
-    batchSize: form.batchSize,
-    domainscan: { enable: form.domainscanEnable, subfinder: form.domainscanSubfinder, timeout: form.domainscanTimeout, maxEnumerationTime: form.domainscanMaxEnumTime, threads: form.domainscanThreads, rateLimit: form.domainscanRateLimit, all: form.domainscanAll, recursive: form.domainscanRecursive, removeWildcard: form.domainscanRemoveWildcard, resolveDNS: form.domainscanResolveDNS, concurrent: form.domainscanConcurrent },
-    portscan: { enable: form.portscanEnable, tool: form.portscanTool, rate: form.portscanRate, ports: form.ports, portThreshold: form.portThreshold, scanType: form.scanType, timeout: form.portscanTimeout, skipHostDiscovery: form.skipHostDiscovery, excludeCDN: form.excludeCDN, excludeHosts: form.excludeHosts },
-    portidentify: { enable: form.portidentifyEnable, tool: form.portidentifyTool, timeout: form.portidentifyTimeout, concurrency: form.portidentifyConcurrency, args: form.portidentifyArgs, udp: form.portidentifyUDP, fastMode: form.portidentifyFastMode, forceScan: form.portidentifyForceScan && !form.portscanEnable },
-    fingerprint: { enable: form.fingerprintEnable, tool: form.fingerprintTool, iconHash: form.fingerprintIconHash, customEngine: form.fingerprintCustomEngine, screenshot: form.fingerprintScreenshot, targetTimeout: form.fingerprintTimeout, forceScan: form.fingerprintForceScan && !form.portscanEnable && !form.portidentifyEnable },
-    pocscan: { enable: form.pocscanEnable, useNuclei: true, forceScan: form.pocscanForceScan && !hasPrePhaseEnabled.value, autoScan: form.pocscanAutoScan, automaticScan: form.pocscanAutomaticScan, customPocOnly: form.pocscanCustomOnly, severity: form.pocscanSeverity.join(','), targetTimeout: form.pocscanTargetTimeout, rateLimit: form.pocscanRateLimit, concurrency: form.pocscanConcurrency }
   }
 }
 
-// 扫描配置字段列表（用于监听变化自动保存）
-const scanConfigFields = [
-  'batchSize',
-  'domainscanEnable', 'domainscanSubfinder', 'domainscanTimeout', 'domainscanMaxEnumTime', 'domainscanThreads', 'domainscanRateLimit', 'domainscanAll', 'domainscanRecursive', 'domainscanRemoveWildcard', 'domainscanResolveDNS', 'domainscanConcurrent',
-  'portscanEnable', 'portscanTool', 'portscanRate', 'ports', 'portThreshold', 'scanType', 'portscanTimeout', 'skipHostDiscovery', 'excludeCDN', 'excludeHosts',
-  'portidentifyEnable', 'portidentifyTool', 'portidentifyTimeout', 'portidentifyConcurrency', 'portidentifyArgs', 'portidentifyUDP', 'portidentifyFastMode', 'portidentifyForceScan',
-  'fingerprintEnable', 'fingerprintTool', 'fingerprintIconHash', 'fingerprintCustomEngine', 'fingerprintScreenshot', 'fingerprintTimeout', 'fingerprintForceScan',
-  'pocscanEnable', 'pocscanAutoScan', 'pocscanAutomaticScan', 'pocscanCustomOnly', 'pocscanSeverity', 'pocscanTargetTimeout', 'pocscanForceScan'
-]
 
-// 防抖保存配置
-let saveConfigTimer = null
-function debounceSaveConfig() {
-  if (saveConfigTimer) clearTimeout(saveConfigTimer)
-  saveConfigTimer = setTimeout(() => {
-    const config = buildConfig()
-    saveScanConfig({ config: JSON.stringify(config) }).catch(e => console.error('自动保存配置失败:', e))
-  }, 500)
-}
 
-// 监听扫描配置变化，自动保存（仅在新建任务对话框打开且非编辑模式时）
-watch(
-  () => scanConfigFields.map(f => form[f]),
-  () => {
-    if (dialogVisible.value && !isEdit.value) {
-      debounceSaveConfig()
-    }
-  },
-  { deep: true }
-)
 
-async function handleSubmit() {
-  await formRef.value.validate()
-  submitting.value = true
-  try {
-    const config = buildConfig()
-    const configStr = JSON.stringify(config)
-    const data = { name: form.name, target: form.target, workspaceId: form.workspaceId, orgId: form.orgId, workers: form.workers, config: configStr }
     let res
     if (isEdit.value) {
       res = await updateTask({ id: form.id, ...data })
@@ -1615,24 +1094,12 @@ function closeLogDialog() {
   .progress-hint { color: var(--el-text-color-secondary); font-size: 12px; }
 }
 
-.task-dialog {
-  :deep(.el-dialog__body) { padding: 10px 20px 0; }
 }
 
-.task-tabs {
-  :deep(.el-tabs__header) { margin-bottom: 15px; }
   :deep(.el-tabs__item) { font-size: 14px; }
 }
 
-.tab-form {
-  min-height: 320px;
-  padding: 10px 0;
-}
 
-.dialog-footer {
-  padding-top: 10px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
 
 .log-progress {
   margin-bottom: 15px;
